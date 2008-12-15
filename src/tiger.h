@@ -1,6 +1,6 @@
-typedef u_int8_t byte;
+typedef uint8_t byte;
 
-void tiger(u_int64_t *, u_int64_t, u_int64_t[3]);
+void tiger(uint64_t *, uint64_t, uint64_t[3]);
 
 /* Big endian:                                         */
 #if !(defined(__alpha)||defined(__i386__)||defined(__vax__)||defined(__amd64__))
@@ -25,7 +25,7 @@ void tiger(u_int64_t *, u_int64_t, u_int64_t[3]);
 /* Must be at least three.                             */
 #define PASSES 3
 
-extern u_int64_t table[4*256];
+extern uint64_t table[4*256];
 
 #define t1 (table)
 #define t2 (table+256)
@@ -52,13 +52,13 @@ extern u_int64_t table[4*256];
 #define round(a,b,c,x,mul) \
       c ^= x; \
       a -= t1[(byte)(c)] ^ \
-           t2[(byte)(((u_int32_t)(c))>>(2*8))] ^ \
+           t2[(byte)(((uint32_t)(c))>>(2*8))] ^ \
        t3[(byte)((c)>>(4*8))] ^ \
-           t4[(byte)(((u_int32_t)((c)>>(4*8)))>>(2*8))] ; \
-      b += t4[(byte)(((u_int32_t)(c))>>(1*8))] ^ \
-           t3[(byte)(((u_int32_t)(c))>>(3*8))] ^ \
-       t2[(byte)(((u_int32_t)((c)>>(4*8)))>>(1*8))] ^ \
-           t1[(byte)(((u_int32_t)((c)>>(4*8)))>>(3*8))]; \
+           t4[(byte)(((uint32_t)((c)>>(4*8)))>>(2*8))] ; \
+      b += t4[(byte)(((uint32_t)(c))>>(1*8))] ^ \
+           t3[(byte)(((uint32_t)(c))>>(3*8))] ^ \
+       t2[(byte)(((uint32_t)((c)>>(4*8)))>>(1*8))] ^ \
+           t1[(byte)(((uint32_t)((c)>>(4*8)))>>(3*8))]; \
       b *= mul;
 #endif
 
@@ -122,10 +122,10 @@ extern u_int64_t table[4*256];
 
 #define tiger_compress_macro(str, state) \
 { \
-  register u_int64_t a, b, c, tmpa; \
-  u_int64_t aa, bb, cc; \
-  register u_int64_t x0, x1, x2, x3, x4, x5, x6, x7; \
-/*  register u_int32_t i; \*/\
+  register uint64_t a, b, c, tmpa; \
+  uint64_t aa, bb, cc; \
+  register uint64_t x0, x1, x2, x3, x4, x5, x6, x7; \
+/*  register uint32_t i; \*/\
   int pass_no; \
 \
   a = state[0]; \
@@ -147,6 +147,6 @@ extern u_int64_t table[4*256];
 /* Still leaves the function above in the code, in case some other */
 /* module calls it directly.                                       */
 #define tiger_compress(str, state) \
-  tiger_compress_macro(((u_int64_t*)str), ((u_int64_t*)state))
+  tiger_compress_macro(((uint64_t*)str), ((uint64_t*)state))
 #endif
 

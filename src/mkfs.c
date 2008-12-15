@@ -36,13 +36,13 @@
   #define VERSION "0.1"
 #endif
 
-u_int64_t filesystem;
-u_int64_t filesystem_size;
+uint64_t filesystem;
+uint64_t filesystem_size;
 
 int main(int argc, char **argv)
 {
     char *fs = NULL;
-    u_int32_t force = FALSE;
+    uint32_t force = FALSE;
     errno = EXIT_SUCCESS;
     
     if (argc < 2)
@@ -107,7 +107,7 @@ int main(int argc, char **argv)
                 perror("Could not create the file system");
                 return errno;
             }
-            filesystem_size = (u_int64_t)(lseek64(filesystem, 0, SEEK_END) / 1048576);
+            filesystem_size = (uint64_t)(lseek64(filesystem, 0, SEEK_END) / 1048576);
             break;
         case S_IFREG:
             if (force)
@@ -150,19 +150,19 @@ int main(int argc, char **argv)
     fprintf(stdout, "Usable   : %llu MB (Approx)\n", filesystem_size * 5 / 8);
 #endif
 
-    u_int8_t *data = malloc(DATA);
+    uint8_t *data = malloc(DATA);
     srand48(time(0));
 
     unsigned char *IV = calloc(SERPENT_B, sizeof (char));
     char key_mat[1];
-    u_int32_t *subkeys = generate_key(key_mat);
+    uint32_t *subkeys = generate_key(key_mat);
 
-    for (u_int64_t i = 0; i < filesystem_size * BLOCKS; i++)
+    for (uint64_t i = 0; i < filesystem_size * BLOCKS; i++)
     {
-        u_int64_t next = 0;
-        for (u_int32_t j = 0; j < DATA; j++)
+        uint64_t next = 0;
+        for (uint32_t j = 0; j < DATA; j++)
             data[j] = lrand48() % 0xFF;
-        for (u_int32_t j = 0; j < NEXT; j++)
+        for (uint32_t j = 0; j < NEXT; j++)
             next = (next << BYTE) | (lrand48() % 0xFF);
         key_mat[0] = (lrand48() % 0x08) + 48;
         

@@ -13,15 +13,15 @@
 #include "serpent.h"
 
 void *generate_key(char *text) {
-    u_int64_t *key = calloc(3, sizeof (u_int64_t));
-    tiger((u_int64_t *)text, strlen(text), key);
-    return serpent_subkeys((u_int32_t *)key);
+    uint64_t *key = calloc(3, sizeof (uint64_t));
+    tiger((uint64_t *)text, strlen(text), key);
+    return serpent_subkeys((uint32_t *)key);
 }
 
-u_int32_t *serpent_subkeys(u_int32_t *material) {
-//    u_int32_t *subkeys = calloc(33, sizeof (u_int32_t));
-    u_int32_t subkeys[33][4];
-    u_int32_t w[132] = { 0 }, k[132] = { 0 };
+uint32_t *serpent_subkeys(uint32_t *material) {
+//    uint32_t *subkeys = calloc(33, sizeof (uint32_t));
+    uint32_t subkeys[33][4];
+    uint32_t w[132] = { 0 }, k[132] = { 0 };
     int i;
 
     for (i = 0; i < SIZE_TIGER / SIZE_DWORD; i++)
@@ -85,10 +85,10 @@ u_int32_t *serpent_subkeys(u_int32_t *material) {
     return ret;
 }
 
-void serpent_encrypt(u_int32_t plaintext[4], u_int32_t ciphertext[4], u_int32_t *k) {
-    u_int32_t subkeys[33][4];
-    register u_int32_t x0, x1, x2, x3;
-    register u_int32_t y0, y1, y2, y3;
+void serpent_encrypt(uint32_t plaintext[4], uint32_t ciphertext[4], uint32_t *k) {
+    uint32_t subkeys[33][4];
+    register uint32_t x0, x1, x2, x3;
+    register uint32_t y0, y1, y2, y3;
 
     for (int i = 0; i <= 32; i++)
         for (int j = 0; j < 4; j++)
@@ -205,10 +205,10 @@ void serpent_encrypt(u_int32_t plaintext[4], u_int32_t ciphertext[4], u_int32_t 
     ciphertext[3] = x3;
 }
 
-void serpent_decrypt(u_int32_t ciphertext[4], u_int32_t plaintext[4], u_int32_t *k) {
-    u_int32_t subkeys[33][4];
-    register u_int32_t x0, x1, x2, x3;
-    register u_int32_t y0, y1, y2, y3;
+void serpent_decrypt(uint32_t ciphertext[4], uint32_t plaintext[4], uint32_t *k) {
+    uint32_t subkeys[33][4];
+    register uint32_t x0, x1, x2, x3;
+    register uint32_t y0, y1, y2, y3;
 
     for (int i = 0; i <= 32; i++)
         for (int j = 0; j < 4; j++)

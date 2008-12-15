@@ -24,11 +24,11 @@
 char *dir_get_file(const char *);
 char *dir_get_pass(const char *);
 char *dir_get_path(const char *);
-char *dir_get_part(const char *, u_int32_t);
+char *dir_get_part(const char *, uint32_t);
 
-u_int32_t dir_count_sub(const char *);
+uint32_t dir_count_sub(const char *);
 
-u_int32_t dir_is_file(const char *);
+uint32_t dir_is_file(const char *);
 
 char *dir_strip_root(const char *);
 char *dir_strip_tail(const char *);
