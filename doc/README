@@ -1,0 +1,117 @@
+vstegfs (Virtual Steganographic File System):
+
+Changes:
+    Fixed file/block size limit.
+    Ported to 32 bit GNU systems.
+    Fixed writing file system to block devices.
+    (And others...)
+
+About:
+    vstegfs is a steganographic file system in userspace.
+    Steganographic file systems allow the user plausible
+    deniability of files within. It achieves this by becoming a
+    lossy file system: writing a file to the file system may
+    overwrite an existing file without warning.
+
+    Each file system block is 128 bytes, with 80 being used for
+    actual data, with the rest being used to verify the integrity
+    of the data, and point to the location of the next block. (Yes
+    this makes it VERY inefficient, but the possibility of not
+    being able to retrieve data eclipses this.)
+    
+    vstegfs uses a file hierarchy similar to that of conventional
+    file systems. However, all directories must start with a +
+    symbol; allowing vstegfs to easily distinguish between files
+    and directories. For each sub directory, a check is made to
+    ensure that the current block isn't already being used by
+    another file down that path. Files at a deeper level 'know'
+    about the files above them, but files in the root directory
+    know only of those other files also in the root. Therefore,
+    files at a deeper level are less likely to overwrite another
+    file, but are more susceptible to being overwritten themselves.
+
+    NB - Files and directories do not need to be created, they
+    already exist - just try stat'ing a file to see what this
+    means ;-) (that said, just because a file might exist doesn't
+    mean it does or contains any valid data).
+
+    Files can be stored with or without a password. The convention
+    adopted for vstegfs is `/dir/tree/file:passwd'; that is,
+    everything after a colon is used at the password for encrypting
+    and decrypting the file. In addition to this, as with the
+    directory hierarchy and the file name, the password is also
+    used to locate the header blocks for files.
+
+
+Technical Data:
+    Serpent:
+        128 bit block
+        192 bit key
+
+    Tiger:
+        192 bit hash
+        64 bit words
+
+    Standard (Header) File Block:
+
+         Chunk Name        Size (in bits)
+        +--------------------------------+ -+--------+ --+
+        | Directory/Path Checksum    128 |           |   |
+        |                                |           |   +- Tiger128
+        |                                |           |   |
+        |                                |           |   |
+        +--------------------------------+           | --+
+        | Data                       640 |           |
+        |  (Starting blocks)             |           |
+        |                                |           |
+        |                                |           |
+        |                                |           |
+        |                                |           |
+        |                                |           |
+        |                                |           |
+        |                                |           |
+        |                                |           |
+        |                                |           |
+        |                                |           |
+        |                                |           |
+        |                                |           |
+        |                                |           |
+        |                                |           |
+        |                                |           |
+        |                                |           |
+        |                                |           +- Serpent
+        |                                |           |
+        +--------------------------------+ -+ -------+
+        | Checksum                   192 |  |        |
+        |                                |  |        |
+        |                                |  |        |
+        |                                |  +- Tiger |
+        |                                |  |        |
+        |                                |  |        |
+        +--------------------------------+ -+        |
+        | Next block                  64 |           |
+        |  (File Size)                   |           |
+        +--------------------------------+ ----------+
+
+
+Notes:
+    Using 64 bits to represent the block numbers allows up to
+    1.845e19 blocks. This allows a theoretical maximum partition
+    size of 2ZB (zettabytes). Thus the maximum theoretical capacity
+    is roughtly 1.25ZB. In actual fact, due to the limits of the
+    open64() function used by the GNU C Library and the Linux
+    Kernel, the maximum usable limit stands as 8EB (exabytes). This
+    gives approximately 70 trillion blocks, equalling upto 5EB of
+    available storage space. (Other limits may exist on other
+    systems.)
+
+    The en/decryption key for the block will be a combination of a
+    user supplied password, name of the file and the group the file
+    belongs to.
+
+    The first 64 bits are initially random data, which, after
+    encryption, has the group number XOR'd over the top. This
+    allows the entire block to be encrypted (with some random data
+    which can be discarded upon decryption), yet allows the path
+    identifier to remain visible without requiring that null values
+    be encrypted just to satisfy the Serpent block size.
