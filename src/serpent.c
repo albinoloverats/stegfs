@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/types.h>
+#include <inttypes.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -24,12 +24,12 @@ uint32_t *serpent_subkeys(uint32_t *material) {
     uint32_t w[132] = { 0 }, k[132] = { 0 };
     int i;
 
-    for (i = 0; i < SIZE_TIGER / SIZE_DWORD; i++)
+    for (i = 0; i < SIZE_TIGER_BITS / SIZE_SIZE_QWORD; i++)
         w[i] = material[i];
 #ifdef __amd64__
-    w[i] = (material[i] & ((1 << ((SIZE_TIGER & 31))) - 1)) | (1 << ((SIZE_TIGER & 31)));
+    w[i] = (material[i] & ((1 << ((SIZE_TIGER_BITS & 31))) - 1)) | (1 << ((SIZE_TIGER_BITS & 31)));
 #else
-    w[i] = (material[i] & ((1L << ((SIZE_TIGER & 31))) - 1)) | (1L << ((SIZE_TIGER & 31)));
+    w[i] = (material[i] & ((1L << ((SIZE_TIGER_BITS & 31))) - 1)) | (1L << ((SIZE_TIGER_BITS & 31)));
 #endif
     for (i++; i < 8; i++)
         w[i] = 0;

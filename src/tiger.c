@@ -1,4 +1,4 @@
-#include <sys/types.h>
+#include <inttypes.h>
 #include "tiger.h"
 
 /* The compress function is a function. Requires smaller cache?    */
@@ -18,7 +18,7 @@ void tiger(uint64_t *str, uint64_t length, uint64_t res[3])
 
   for(i=length; i>=64; i-=64)
     {
-#ifdef TIGER_BIG_ENDIAN
+#ifdef TIGER_BYTESIG_ENDIAN
       for(j=0; j<64; j++)
     temp[j^7] = ((byte*)str)[j];
       tiger_compress(((uint64_t*)temp), res);
@@ -28,7 +28,7 @@ void tiger(uint64_t *str, uint64_t length, uint64_t res[3])
       str += 8;
     }
 
-#ifdef TIGER_BIG_ENDIAN
+#ifdef TIGER_BYTESIG_ENDIAN
   for(j=0; j<i; j++)
     temp[j^7] = ((byte*)str)[j];
 

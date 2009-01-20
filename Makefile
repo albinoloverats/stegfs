@@ -1,8 +1,6 @@
 .PHONY: vstegfs mkfs all install clean distclean uninstall
 
-REVISION := -D'REVISION="$(shell svnversion -n .)"'
-
-COMPOPT := `pkg-config fuse --cflags --libs` -std=gnu99 -O2 -Wall -pipe -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE $(REVISION) -o
+COMPOPT := `pkg-config fuse --cflags --libs` -std=gnu99 -O2 -Wall -pipe -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -o
 
 all: vstegfs mkfs
 

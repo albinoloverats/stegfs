@@ -1,6 +1,6 @@
 /*
  * vstegfs ~ a virtual steganographic file system for linux
- * Copyright (c) 2007-2008, albinoloverats ~ Software Development
+ * Copyright (c) 2007-2009, albinoloverats ~ Software Development
  * email: vstegfs@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -28,12 +28,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdbool.h>
 #include <inttypes.h>
 
 #include "vstegfs.h"
 #include "dir.h"
 
-#define APP_NAME "vstegfs"
 
 #define PAGESIZE 4096 // the number of bytes given us by the kernel
 
@@ -52,7 +52,7 @@ uint64_t filesystem_size;
 static int vstegfs_getattr(const char *path, struct stat *stbuf)
 {
     char *name = dir_get_file(path);
-    memset(stbuf, 0, sizeof (struct stat));
+    memset(stbuf, 0, sizeof( struct stat ));
     uint64_t inod = 0, size = 0;
     if (strcmp(path, "/") == 0)
     {
@@ -80,8 +80,8 @@ static int vstegfs_getattr(const char *path, struct stat *stbuf)
     stbuf->st_uid = fuse_get_context()->uid;
     stbuf->st_gid = fuse_get_context()->gid;
     stbuf->st_size = size;
-    stbuf->st_blksize = BLOCK;
-    stbuf->st_blocks = (int)((size / BLOCK) + 1);
+    stbuf->st_blksize = SIZE_BLOCK;
+    stbuf->st_blocks = (int)((size / SIZE_BLOCK) + 1);
 
     return EXIT_SUCCESS;
 }
@@ -210,16 +210,15 @@ static struct fuse_operations vstegfs_oper = {
 int main(int argc, char **argv)
 {
     if (argc < 2)
-    {
-        show_usage();
-        return EXIT_FAILURE;
-    }
+        return show_usage();
 
-    char *fs = NULL, *mount = NULL;
-    uint32_t debug = FALSE;
-    while (TRUE)
+    char *fs    = NULL;
+    char *mount = NULL;
+    bool debug = false;
+    while (true)
     {
-        static struct option long_options[] = {
+        static struct option long_options[] =
+        {
             {"debug"     , no_argument      , 0, 'd'},
             {"filesystem", required_argument, 0, 'f'},
             {"mount"     , required_argument, 0, 'm'},
@@ -235,7 +234,7 @@ int main(int argc, char **argv)
         switch (opt)
         {
             case 'd':
-                debug = TRUE;
+                debug = true;
                 break;
             case 'f':
                 fs = strdup(optarg);
@@ -244,34 +243,28 @@ int main(int argc, char **argv)
                 mount = strdup(optarg);
                 break;
             case 'h':
-                show_help();
-                return EXIT_SUCCESS;
+                return show_help();
             case 'l':
-                show_licence();
-                return EXIT_SUCCESS;
+                return show_licence();
             case 'v':
-                show_version();
-                return EXIT_SUCCESS;
+                return show_version();
             case '?':
-                return EXIT_FAILURE;
             default:
+                fprintf(stderr, "%s: unknown option %c\n", NAME, opt);
                 return EXIT_FAILURE;
         }
     }
 
     if (!mount || !fs)
-    {
-        show_usage();
-        return EXIT_FAILURE;
-    }
-    if ((filesystem = open64(fs, O_RDWR, S_IRUSR | S_IWUSR)) < 3)
+        return show_usage();
+    if ((filesystem = open(fs, O_RDWR, S_IRUSR | S_IWUSR)) < 3)
     {
         perror("Could not open file system");
         return errno;
     }
-    filesystem_size = lseek64(filesystem, 0LL, SEEK_END) / BLOCK;
+    filesystem_size = lseek(filesystem, 0LL, SEEK_END) / SIZE_BLOCK;
 
-    char **args = calloc(debug ? 5 : 4, sizeof (char *));
+    char **args = calloc(debug ? 5 : 4, sizeof( char ));
     args[0] = strdup(argv[0]);
     args[1] = strdup("-o");
     args[2] = strdup("use_ino");
@@ -282,7 +275,7 @@ int main(int argc, char **argv)
     return fuse_main(debug ? 5 : 4, args, &vstegfs_oper, NULL);
 }
 
-void show_help(void)
+uint64_t show_help(void)
 {
     show_version();
     fprintf(stderr, "\n");
@@ -295,9 +288,10 @@ void show_help(void)
     fprintf(stderr, "\n");
     fprintf(stderr, "\n  Fuse executable to mount vstegfs file systems");
     fprintf(stderr, "\n");
+    return EXIT_SUCCESS;
 }
 
-void show_licence(void)
+uint64_t show_licence(void)
 {
     fprintf(stderr, "This program is free software: you can redistribute it and/or modify\n");
     fprintf(stderr, "it under the terms of the GNU General Public License as published by\n");
@@ -311,18 +305,17 @@ void show_licence(void)
     fprintf(stderr, "\n");
     fprintf(stderr, "You should have received a copy of the GNU General Public License\n");
     fprintf(stderr, "along with this program.  If not, see <http://www.gnu.org/licenses/>.\n");
+    return EXIT_SUCCESS;
 }
 
-void show_usage(void)
+uint64_t show_usage(void)
 {
-    fprintf(stderr, "Usage\n  %s [OPTION] [ARGUMENT]\n", APP_NAME);
+    fprintf(stderr, "Usage\n  %s [OPTION] [ARGUMENT]\n", NAME);
+    return EXIT_FAILURE;
 }
 
-void show_version(void)
+uint64_t show_version(void)
 {
-    fprintf(stderr, "%s\n", APP_NAME);
-#ifdef RELEASE
-    fprintf(stderr, "  Official Release %i\n", RELEASE);
-#endif
-    fprintf(stderr, "  SVN Revision %s\n", REVISION);
+    fprintf(stderr, "%s version : %s\n%*s built on: %s %s\n", NAME, VERSION, (int)strlen(NAME), "", __DATE__, __TIME__);
+    return EXIT_SUCCESS;
 }

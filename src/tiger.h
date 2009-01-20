@@ -4,7 +4,7 @@ void tiger(uint64_t *, uint64_t, uint64_t[3]);
 
 /* Big endian:                                         */
 #if !(defined(__alpha)||defined(__i386__)||defined(__vax__)||defined(__amd64__))
-#define TIGER_BIG_ENDIAN
+#define TIGER_BYTESIG_ENDIAN
 #endif
 
 /* The following macro denotes that an optimization    */

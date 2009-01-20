@@ -1,6 +1,6 @@
 /*
  * vstegfs ~ a virtual steganographic file system for linux
- * Copyright (c) 2007-2008, albinoloverats ~ Software Development
+ * Copyright (c) 2007-2009, albinoloverats ~ Software Development
  * email: vstegfs@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -19,23 +19,18 @@
  */
 
 #ifndef _DIR_H_
-#define _DIR_H_
+  #define _DIR_H_
 
-char *dir_get_file(const char *);
-char *dir_get_pass(const char *);
-char *dir_get_path(const char *);
-char *dir_get_part(const char *, uint32_t);
+  char *dir_get_file(const char *);
+  char *dir_get_pass(const char *);
+  char *dir_get_path(const char *);
+  char *dir_get_part(const char *, uint32_t);
 
-uint32_t dir_count_sub(const char *);
+  uint32_t dir_count_sub(const char *);
 
-uint32_t dir_is_file(const char *);
+  uint32_t dir_is_file(const char *);
 
-char *dir_strip_root(const char *);
-char *dir_strip_tail(const char *);
-
-#ifndef TRUE
-#define TRUE 1
-#define FALSE 0
-#endif
+  char *dir_strip_root(const char *);
+  char *dir_strip_tail(const char *);
 
 #endif /* _DIR_H_ */

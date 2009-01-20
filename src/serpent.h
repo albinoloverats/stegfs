@@ -1,6 +1,6 @@
 /*
  *    encrypt ~ a simple, modular, (multi-OS,) encryption utility
- *    Copyright (c) 2005-2008, albinoloverats ~ Software Development
+ *    Copyright (c) 2005-2009, albinoloverats ~ Software Development
  *    email: encrypt@albinoloverats.net
  *
  *    This program is free software: you can redistribute it and/or modify
@@ -18,16 +18,16 @@
  *
  */
 
-#ifndef _SERPENT_H_
-#define _SERPENT_H_
+#ifndef _SERPENT_BYTES_H_
+#define _SERPENT_BYTES_H_
 
-#define SIZE_BYTE 8
-#define SIZE_DWORD 32
-#define SIZE_TIGER 192
-#define SIZE_SERPENT 128
+#define SIZE_SIZE_BYTE 8
+#define SIZE_SIZE_QWORD 32
+#define SIZE_TIGER_BITS 192
+#define SIZE_SERPENT_BYTES 128
 
-#define CHUNK_TIGER 3
-#define CHUNK_SERPENT 16
+#define CHUNK_TIGER_BITS 3
+#define CHUNK_SERPENT_BYTES 16
 
 void *generate_key(char *);
 uint32_t *serpent_subkeys(uint32_t *);
@@ -509,4 +509,4 @@ void serpent_decrypt(uint32_t[4], uint32_t[4], uint32_t *);
   #define PHI 0x9e3779b9L
 #endif
 
-#endif /* _SERPENT_H_ */
+#endif /* _SERPENT_BYTES_H_ */

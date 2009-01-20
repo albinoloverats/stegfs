@@ -1,6 +1,6 @@
 /*
  * vstegfs ~ a virtual steganographic file system for linux
- * Copyright (c) 2007-2008, albinoloverats ~ Software Development
+ * Copyright (c) 2007-2009, albinoloverats ~ Software Development
  * email: vstegfs@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdbool.h>
 #include <sys/stat.h>
 
 #include "vstegfs.h"
@@ -42,17 +43,16 @@ uint64_t filesystem_size;
 int main(int argc, char **argv)
 {
     char *fs = NULL;
-    uint32_t force = FALSE;
+    bool force = false;
     errno = EXIT_SUCCESS;
     
     if (argc < 2)
+        return show_usage();
+
+    while (true)
     {
-        show_usage();
-        return EXIT_FAILURE;
-    }
-    while (TRUE)
-    {
-        static struct option long_options[] = {
+        static struct option long_options[] =
+        {
             {"filesystem", required_argument, 0, 'f'},
             {"size"      , required_argument, 0, 's'},
             {"force"     , no_argument      , 0, 'x'},
@@ -74,40 +74,37 @@ int main(int argc, char **argv)
                 filesystem_size = strtoll(optarg, NULL, 0);
                 break;
             case 'x':
-                force = TRUE;
+                force = true;
                 break;
             case 'h':
-                show_help();
-                return EXIT_SUCCESS;
+                return show_help();
             case 'l':
-                show_licence();
-                return EXIT_SUCCESS;
+                return show_licence();
             case 'v':
-                show_version();
-                return EXIT_SUCCESS;
+                return show_version();
             case '?':
-                return EXIT_FAILURE;
             default:
+                fprintf(stderr, "%s: unknown option %c\n", NAME, opt);
                 return EXIT_FAILURE;
         }
     }
     /*
      * is this a device or a file?
      */
-    struct stat64 *fs_stat = calloc(1, sizeof (struct stat));
-    stat64(fs, fs_stat);
+    struct stat *fs_stat = calloc(1, sizeof( struct stat ));
+    stat(fs, fs_stat);
     switch (fs_stat->st_mode & S_IFMT)
     {
         case S_IFBLK:
             /*
              * use a device as the file system
              */
-            if ((filesystem = open64(fs, O_WRONLY | F_WRLCK, S_IRUSR | S_IWUSR)) < 0)
+            if ((filesystem = open(fs, O_WRONLY | F_WRLCK, S_IRUSR | S_IWUSR)) < 0)
             {
                 perror("Could not create the file system");
                 return errno;
             }
-            filesystem_size = (uint64_t)(lseek64(filesystem, 0, SEEK_END) / 1048576);
+            filesystem_size = (uint64_t)(lseek(filesystem, 0, SEEK_END) / 1048576);
             break;
         case S_IFREG:
             if (force)
@@ -125,7 +122,7 @@ int main(int argc, char **argv)
             /*
              * file doesn't exist - good, lets create it...
              */
-            if ((filesystem = open64(fs, O_WRONLY | O_CREAT | O_EXCL | O_TRUNC | F_WRLCK, S_IRUSR | S_IWUSR)) < 0)
+            if ((filesystem = open(fs, O_WRONLY | O_CREAT | O_EXCL | O_TRUNC | F_WRLCK, S_IRUSR | S_IWUSR)) < 0)
             {
                 perror("Could not create the file system");
                 return errno;
@@ -143,27 +140,27 @@ int main(int argc, char **argv)
 
     fprintf(stdout, "Location : %s\n", fs);
 #ifdef __amd64__
-    fprintf(stdout, "Size     : %lu MB (%lu blocks)\n", filesystem_size, filesystem_size * BLOCKS);
+    fprintf(stdout, "Size     : %lu MB (%lu blocks)\n", filesystem_size, filesystem_size * SIZE_BLOCKS);
     fprintf(stdout, "Usable   : %lu MB (Approx)\n", filesystem_size * 5 / 8);
 #else
-    fprintf(stdout, "Size     : %llu MB (%llu blocks)\n", filesystem_size, filesystem_size * BLOCKS);
+    fprintf(stdout, "Size     : %llu MB (%llu blocks)\n", filesystem_size, filesystem_size * SIZE_BLOCKS);
     fprintf(stdout, "Usable   : %llu MB (Approx)\n", filesystem_size * 5 / 8);
 #endif
 
-    uint8_t *data = malloc(DATA);
+    uint8_t *data = malloc(LENGTH_DATA);
     srand48(time(0));
 
-    unsigned char *IV = calloc(SERPENT_B, sizeof (char));
+    unsigned char *IV = calloc(SERPENT_BYTES_B, sizeof( char ));
     char key_mat[1];
     uint32_t *subkeys = generate_key(key_mat);
 
-    for (uint64_t i = 0; i < filesystem_size * BLOCKS; i++)
+    for (uint64_t i = 0; i < filesystem_size * SIZE_BLOCKS; i++)
     {
         uint64_t next = 0;
-        for (uint32_t j = 0; j < DATA; j++)
+        for (uint32_t j = 0; j < LENGTH_DATA; j++)
             data[j] = lrand48() % 0xFF;
-        for (uint32_t j = 0; j < NEXT; j++)
-            next = (next << BYTE) | (lrand48() % 0xFF);
+        for (uint32_t j = 0; j < LENGTH_NEXT; j++)
+            next = (next << SIZE_BYTE) | (lrand48() % 0xFF);
         key_mat[0] = (lrand48() % 0x08) + 48;
         
         errno = block_write(key_mat, data, next, IV, subkeys);
@@ -173,7 +170,7 @@ int main(int argc, char **argv)
     return errno;
 }
 
-void show_help(void)
+uint64_t show_help(void)
 {
     show_version();
     fprintf(stderr, "\n");
@@ -189,9 +186,10 @@ void show_help(void)
     fprintf(stderr, "\n  instead of a file (eg: /dev/sda1) a size is not needed as the file");
     fprintf(stderr, "\n  system will use all available space on that device/partition.");
     fprintf(stderr, "\n");
+    return EXIT_SUCCESS;
 }
 
-void show_licence(void)
+uint64_t show_licence(void)
 {
     fprintf(stderr, "This program is free software: you can redistribute it and/or modify\n");
     fprintf(stderr, "it under the terms of the GNU General Public License as published by\n");
@@ -205,18 +203,17 @@ void show_licence(void)
     fprintf(stderr, "\n");
     fprintf(stderr, "You should have received a copy of the GNU General Public License\n");
     fprintf(stderr, "along with this program.  If not, see <http://www.gnu.org/licenses/>.\n");
+    return EXIT_SUCCESS;
 }
 
-void show_usage(void)
+uint64_t show_usage(void)
 {
-    fprintf(stderr, "Usage:\n  %s [OPTION] [ARGUMENT]\n", APP_NAME);
+    fprintf(stderr, "Usage\n  %s [OPTION] [ARGUMENT]\n", NAME);
+    return EXIT_FAILURE;
 }
 
-void show_version(void)
+uint64_t show_version(void)
 {
-    fprintf(stderr, "%s\n", APP_NAME);
-#ifdef RELEASE
-    fprintf(stderr, "  Official Release %i\n", RELEASE);
-#endif
-    fprintf(stderr, "  SVN Revision %s\n", REVISION);
+    fprintf(stderr, "%s version : %s\n%*s built on: %s %s\n", NAME, VERSION, (int)strlen(NAME), "", __DATE__, __TIME__);
+    return EXIT_SUCCESS;
 }

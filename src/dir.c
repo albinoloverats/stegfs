@@ -1,6 +1,6 @@
 /*
  * vstegfs ~ a virtual steganographic file system for linux
- * Copyright (c) 2007-2008, albinoloverats ~ Software Development
+ * Copyright (c) 2007-2009, albinoloverats ~ Software Development
  * email: vstegfs@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -22,6 +22,8 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
+#include <inttypes.h>
 
 //#include "vstegfs.h"
 #include "dir.h"
@@ -88,8 +90,8 @@ uint32_t dir_count_sub(const char *path)
 uint32_t dir_is_file(const char *path)
 {
     if (path[strlen(path) - 1] != '/')
-        return TRUE;
-    return FALSE;
+        return true;
+    return false;
 }
 
 /*
@@ -99,7 +101,7 @@ char *dir_strip_root(const char *path)
 {
     if (path[0] != '/')
         return strdup(path);
-    char *str = calloc(strlen(path), sizeof (char));
+    char *str = calloc(strlen(path), sizeof( char ));
     strncpy(str, path + 1, strlen(path) - 1);
     return str;
 }
@@ -111,7 +113,7 @@ char *dir_strip_tail(const char *path)
 {
     if (path[strlen(path) - 1] != '/')
         return strdup(path);
-    char *str = calloc(strlen(path), sizeof (char));
+    char *str = calloc(strlen(path), sizeof( char ));
     strncpy(str, path, strlen(path) - 1);
     return str;
 }
