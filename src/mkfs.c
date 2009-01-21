@@ -32,13 +32,10 @@
 #include "vstegfs.h"
 #include "serpent.h"
 
-#define APP_NAME "mkvstegfs"
-#ifndef VERSION
-  #define VERSION "0.1"
-#endif
+#define NAME "mkfs"
 
 uint64_t filesystem;
-uint64_t filesystem_size;
+  size_t filesystem_size;
 
 int main(int argc, char **argv)
 {
@@ -104,7 +101,7 @@ int main(int argc, char **argv)
                 perror("Could not create the file system");
                 return errno;
             }
-            filesystem_size = (uint64_t)(lseek(filesystem, 0, SEEK_END) / 1048576);
+            filesystem_size = (lseek(filesystem, 0, SEEK_END) / 1048576); // 1MB in bytes
             break;
         case S_IFREG:
             if (force)
@@ -147,19 +144,19 @@ int main(int argc, char **argv)
     fprintf(stdout, "Usable   : %llu MB (Approx)\n", filesystem_size * 5 / 8);
 #endif
 
-    uint8_t *data = malloc(LENGTH_DATA);
+    char *data = malloc(LENGTH_DATA);
     srand48(time(0));
 
-    unsigned char *IV = calloc(SERPENT_BYTES_B, sizeof( char ));
+    char *IV = calloc(SERPENT_BYTES_B, sizeof( char ));
     char key_mat[1];
     uint32_t *subkeys = generate_key(key_mat);
 
     for (uint64_t i = 0; i < filesystem_size * SIZE_BLOCKS; i++)
     {
         uint64_t next = 0;
-        for (uint32_t j = 0; j < LENGTH_DATA; j++)
+        for (uint8_t j = 0; j < LENGTH_DATA; j++)
             data[j] = lrand48() % 0xFF;
-        for (uint32_t j = 0; j < LENGTH_NEXT; j++)
+        for (uint8_t j = 0; j < LENGTH_NEXT; j++)
             next = (next << SIZE_BYTE) | (lrand48() % 0xFF);
         key_mat[0] = (lrand48() % 0x08) + 48;
         

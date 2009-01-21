@@ -55,7 +55,7 @@ char *dir_get_pass(const char *path)
 char *dir_get_path(const char *path)
 {
     char *ret = NULL;
-    for (uint32_t i = 1; i < dir_count_sub(path); i++)
+    for (uint64_t i = 1; i < dir_count_sub(path); i++)
         asprintf(&ret, "%s/%s", ret ? ret : "", dir_get_part(path, i));
     return ret ? ret : "/";
 }
@@ -63,10 +63,10 @@ char *dir_get_path(const char *path)
 /*
  * get a specific part of a path
  */
-char *dir_get_part(const char *path, uint32_t entry)
+char *dir_get_part(const char *path, uint64_t entry)
 {
     char *ret = NULL, *tmp = dir_strip_root(path);
-    for (uint32_t i = 0; i < entry; i++)
+    for (uint64_t i = 0; i < entry; i++)
         ret = strsep(&tmp, "/");
     return ret;
 }
@@ -75,10 +75,10 @@ char *dir_get_part(const char *path, uint32_t entry)
  * count the number of sub directories
  * (including the file)
  */
-uint32_t dir_count_sub(const char *path)
+uint64_t dir_count_sub(const char *path)
 {
     char *tmp = dir_strip_root(path);
-    for (uint32_t i = 0;; i++)
+    for (uint64_t i = 0;; i++)
         if (!strsep(&tmp, "/"))
             return dir_is_file(path) ? i : --i;
 }
@@ -87,7 +87,7 @@ uint32_t dir_count_sub(const char *path)
  * check for trailing / ; if it exists then all
  * we have is a path to a directory, not a file
  */
-uint32_t dir_is_file(const char *path)
+bool dir_is_file(const char *path)
 {
     if (path[strlen(path) - 1] != '/')
         return true;

@@ -34,6 +34,7 @@
 #include "vstegfs.h"
 #include "dir.h"
 
+#define NAME "vstegfs"
 
 #define PAGESIZE 4096 // the number of bytes given us by the kernel
 
@@ -47,14 +48,14 @@ cache cache_write;
 cache cache_read;
 
 uint64_t filesystem;
-uint64_t filesystem_size;
+  size_t filesystem_size;
 
 static int vstegfs_getattr(const char *path, struct stat *stbuf)
 {
     char *name = dir_get_file(path);
     memset(stbuf, 0, sizeof( struct stat ));
     uint64_t inod = 0, size = 0;
-    if (strcmp(path, "/") == 0)
+    if (!strcmp(path, "/"))
     {
         stbuf->st_mode = S_IFDIR | 0700;
         stbuf->st_nlink = 2;
@@ -68,7 +69,7 @@ static int vstegfs_getattr(const char *path, struct stat *stbuf)
     }
     else
     {
-        char *p;
+        char *p = NULL;
         asprintf(&p, "vstegfs%s", path);
         size = file_check(dir_get_file(p), dir_get_path(p), dir_get_pass(p));
         free(p);
@@ -81,7 +82,7 @@ static int vstegfs_getattr(const char *path, struct stat *stbuf)
     stbuf->st_gid = fuse_get_context()->gid;
     stbuf->st_size = size;
     stbuf->st_blksize = SIZE_BLOCK;
-    stbuf->st_blocks = (int)((size / SIZE_BLOCK) + 1);
+    stbuf->st_blocks = (blkcnt_t)((size / SIZE_BLOCK) + 1);
 
     return EXIT_SUCCESS;
 }
@@ -95,7 +96,7 @@ static int vstegfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, 
 
 static int vstegfs_unlink(const char *path)
 {
-    char *p;
+    char *p = NULL;
     asprintf(&p, "vstegfs%s", path);
     file_unlink(dir_get_file(p), dir_get_path(p), dir_get_pass(p));
     free(p);
@@ -106,7 +107,7 @@ static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, 
 {
     if (!offset)
     {
-        char *p;
+        char *p = NULL;
         asprintf(&p, "vstegfs%s", path);
         
         cache_read.size = file_check(dir_get_file(p), dir_get_path(p), dir_get_pass(p));
@@ -140,7 +141,7 @@ static int vstegfs_write(const char *path, const char *buf, size_t size, off_t o
     if (size == PAGESIZE)
         return size;
 
-    char *p;
+    char *p = NULL;
     asprintf(&p, "vstegfs%s", path);
 
     FILE *stream = fmemopen(cache_write.data, cache_write.size, "r");

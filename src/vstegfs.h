@@ -23,7 +23,6 @@
 
   #include <inttypes.h>
 
-  #define NAME     "vstegfs"
   #define VERSION  "2009??"
 
   #define SIZE_BLOCKS    8192  // blocks per MB
@@ -73,15 +72,15 @@
   uint64_t *file_find(char *, char *, char *);
   uint32_t file_unlink(char *, char *, char *);
 
-  uint32_t block_write(char *, uint8_t *, uint64_t, uint8_t *, uint32_t *);
-  uint64_t block_read(char *, uint8_t *, uint8_t *, uint32_t *);
+  uint32_t block_write(char *, char *, uint64_t, char *, uint32_t *);
+  uint64_t block_read(char *, char *, char *, uint32_t *);
   uint32_t block_check(char *, uint64_t);
 
-  void block_encrypt(uint8_t *, uint8_t *, uint32_t *);
-  void block_decrypt(uint8_t *, uint8_t *, uint32_t *);
+  void block_encrypt(char *, char *, uint32_t *);
+  void block_decrypt(char *, char *, uint32_t *);
 
-  void *hash_data(uint8_t *, uint64_t);
-  void *hash_path(uint8_t *, uint64_t);
+  void *hash_data(char *, uint64_t);
+  void *hash_path(char *, uint64_t);
 
   uint64_t check_endian(uint64_t);
 
