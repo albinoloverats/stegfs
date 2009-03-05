@@ -28,7 +28,8 @@
 #include "common/common.h"
 
 #define _VSTEG_S_
-#include "vstegfs.h"
+#include "src/vstegfs.h"
+#include "src/dir.h"
 
 extern int64_t vstegfs_save(vstat_t f)
 {
@@ -62,7 +63,7 @@ extern int64_t vstegfs_save(vstat_t f)
         /*
          * find somewhere to start this copy of the file
          */
-        if (!(start[i] = calc_next_block(f.fs, path)))
+        if (!(start[i] = calc_next_block(f.fs, f.path)))
             return ENOSPC;
         /*
          * initialise the mcrypt library routines, and create a new IV
@@ -89,7 +90,7 @@ extern int64_t vstegfs_save(vstat_t f)
         {
             vblock_t b;
             uint64_t this = next;
-            if (!(next = calc_next_block(f.fs, path)))
+            if (!(next = calc_next_block(f.fs, f.path)))
                 return ENOSPC;
             /*
              * build the block; this includes putting in the data,
@@ -314,7 +315,7 @@ static uint64_t vstegfs_header(vstat_t *f, vblock_t *b)
     uint16_t header[MAX_COPIES] = { 0x0 };
     {
         char *fp = NULL;
-        asprintf(&fp, "%s/%s", f->path, f->name);
+        asprintf(&fp, "%s/%s:%s", f->path, f->name, f->pass);
         MHASH h = mhash_init(MHASH_TIGER);
         mhash(h, fp, strlen(fp));
         uint8_t *ph = mhash_end(h);
@@ -464,26 +465,43 @@ static bool is_block_ours(uint64_t fs, uint64_t pos, uint64_t *hash)
     return true; /* looks like the hashes match, must be one of ours :) */
 }
 
-static uint64_t calc_next_block(uint64_t fs, uint64_t *path)
+static uint64_t calc_next_block(uint64_t fs, char *path)
 {
     uint64_t block = 0x0;
     uint64_t fsb = lseek(fs, 0, SEEK_END) / SB_BLOCK;
     int16_t att = 0; /* give us up to 32767 attempts to find a block */
+    bool found = false;
     /*
-     * now compute the next block location - and keep going
-     * until we find one which is usable
+     * set everything so we can check we're not overwriting a file which
+     * is along the same path as us
      */
-    do
+    char *p = dir_strip_tail(path);
+    uint64_t ents = dir_count_sub(p);
+    for (uint64_t i = 1; i <= ents; i++)
     {
+        char *ent = dir_get_part(p, i);
+        uint8_t hash[SB_PATH] = { 0x00 };
+        {
+            MHASH h = mhash_init(MHASH_TIGER);
+            mhash(h, ent, strlen(ent));
+            uint8_t *ph = mhash_end(h);
+            memcpy(hash, ph, SB_PATH);
+            free(ph);
+        }
+        free(ent);
+        if (att++ < 0)
+            break;
         block = ((mrand48() << 0x20) | mrand48()) % fsb;
-        if (att < 0)
-            return 0;
-        /*
-         * TODO check that the block isn't used by a file which is along
-         * the same path as us
-         */
 
+        if (is_block_ours(fs, block, (uint64_t *)hash))
+            continue;
+        /*
+         * we've found a block which doesn't live along our tree/path -
+         * use it
+         */
+        found = true;
+        break;
     }
-    while (is_block_ours(fs, block, path));
-    return block;
+    free(p);
+    return found ? block : 0;
 }

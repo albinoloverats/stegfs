@@ -87,6 +87,7 @@ void msg(const char *s, ...)
     fprintf(stderr, "\r%s: ", c_app);
     vfprintf(stderr, s, ap);
     fprintf(stderr, "\n");
+	fflush(stderr);
     va_end(ap);
 }
 

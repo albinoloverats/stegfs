@@ -67,7 +67,7 @@
     static int64_t block_save(uint64_t, uint64_t, MCRYPT, vblock_t *);
     static int64_t block_open(uint64_t, uint64_t, MCRYPT, vblock_t *);
     static bool is_block_ours(uint64_t, uint64_t, uint64_t *);
-    static uint64_t calc_next_block(uint64_t, uint64_t *);
+    static uint64_t calc_next_block(uint64_t, char *);
   #endif /* _VSTEG_S_ */
   
 #endif /* _VSTEGFS_H_ */
