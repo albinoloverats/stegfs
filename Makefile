@@ -1,18 +1,19 @@
 .PHONY: vstegfs mkfs all install clean distclean uninstall
 
-COMPOPT := `pkg-config fuse --cflags --libs` -std=gnu99 -O2 -Wall -pipe -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -o
+OPTIONS := `pkg-config fuse --cflags --libs` -lmhash -lmcrypt -std=gnu99 -O2 -Wall -pipe -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -I ./ -o
+COMMON  := src/vstegfs.c src/dir.c common/common.c
 
-all: vstegfs mkfs
+#all: vstegfs mkfs
 
 vstegfs:
 # build the main fuse executable
-	 @gcc $(COMPOPT) vstegfs src/fuse.c src/vstegfs.c src/dir.c src/tiger.c src/sboxes.c src/serpent.c
-	-@echo "compiled \`src/fuse.c srv/vstegfs.c src/dir.c src/tiger.c src/sboxes.c src/serpent.c' --> \`vstegfs'"
+	 @gcc $(OPTIONS) vstegfs $(COMMON) src/fuse.c
+	-@echo "compiled \`src/fuse.c srv/vstegfs.c src/dir.c common/common.c' --> \`vstegfs'"
 
-mkfs:
-# build the mkfs utility
-	 @gcc $(COMPOPT) mkvstegfs src/mkfs.c src/vstegfs.c src/dir.c src/tiger.c src/sboxes.c src/serpent.c
-	-@echo "compiled \`src/mkfs.c src/vstegfs.c src/dir.c /src/tiger.c src/sboxes.c src/serpent.c' --> \`mkvstegfs'"
+#mkfs:
+## build the mkfs utility
+#	 @gcc $(OPTIONS) mkvstegfs $(COMMON) src/mkfs.c
+#	-@echo "compiled \`src/mkfs.c src/vstegfs.c src/dir.c' --> \`mkvstegfs'"
 
 install:
 # install vstegfs

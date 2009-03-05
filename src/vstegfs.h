@@ -21,76 +21,53 @@
 #ifndef _VSTEGFS_H_
   #define _VSTEGFS_H_
 
-  #include <inttypes.h>
 
-  #define VERSION  "2009??"
+  /* size (in bytes) for various blocks of data */
+  #define SB_SERPENT 0x10               /*  16 bytes -- 128 bits */
+  #define SB_TIGER   0x18               /*  24 bytes -- 192 bits */
 
-  #define SIZE_BLOCKS    8192  // blocks per MB
-  #define SIZE_BLOCK      128  // block size in bytes
-
-  #define SIZE_BYTE         8  // size in bits
-  #define SIZE_WORD        16
-  #define SIZE_DWORD       32
-  #define SIZE_QWORD       64
-
-  #define LENGTH_PATH      16  // bytes per block
-  #define LENGTH_DATA      80  // bytes per block
-  #define LENGTH_CHECKSUM  24  // bytes per block
-  #define LENGTH_NEXT       8  // bytes per block
-
-  #define OFFSET_PATH       0  // bytes offset from start of block
-  #define OFFSET_DATA      16  // bytes offset from start of block
-  #define OFFSET_CHECKSUM  96  // bytes offset from start of block
-  #define OFFSET_NEXT     120  // bytes offset from start of block
-
-  #define TIGER_BITS      192
-  #define TIGER_BYTES      24
-  #define TIGER_128_BITS  128
-  #define TIGER_128_BYTES  16
-
-  #define SERPENT_BYTES   128
-  #define SERPENT_BYTES_B  16
-
-  #define FILE_COPIES      10  // number of redundent copies of each file
-  #define FILE_HEADERS      3  // number of copies of the header block
-
-  //typedef struct v_block
-  //{
-  //    uint8_t path[0x10];
-  //    uint8_t data[0x50];
-  //    uint8_t hash[0x18];
-  //    uint64_t next;
-  //}
-  //v_block;
-
-  /*
-   * main functions
-   */
-  uint32_t file_write(FILE *, size_t, char *, char *, char *);
-  uint32_t file_read(FILE *, char *, char *, char *);
-  uint32_t file_check(char *, char *, char *);
-  uint64_t *file_find(char *, char *, char *);
-  uint32_t file_unlink(char *, char *, char *);
-
-  uint32_t block_write(char *, char *, uint64_t, char *, uint32_t *);
-  uint64_t block_read(char *, char *, char *, uint32_t *);
-  uint32_t block_check(char *, uint64_t);
-
-  void block_encrypt(char *, char *, uint32_t *);
-  void block_decrypt(char *, char *, uint32_t *);
-
-  void *hash_data(char *, uint64_t);
-  void *hash_path(char *, uint64_t);
-
-  uint64_t check_endian(uint64_t);
+  #define SB_BLOCK   0x80               /* 128 bytes -- full block */
+  #define SB_PATH    SB_TIGER*2/3       /*  16 bytes -- 2/3 size of full tiger hash */
+  #define SB_DATA    0x50               /*  80 bytes */
+  #define SB_HASH    SB_TIGER           /*  24 bytes */
+  #define SB_NEXT    0x08               /*   8 bytes */
 
 
-  /*
-   * common application functions
-   */
-  uint64_t show_help(void);
-  uint64_t show_licence(void);
-  uint64_t show_usage(void);
-  uint64_t show_version(void);
+  #define MAX_COPIES 9
 
+
+  typedef struct vstat_t
+  {
+      uint64_t fs;
+      FILE  *file;
+      char  *name;
+      char  *path;
+      char  *pass;
+  }
+  vstat_t;
+
+  typedef struct vblock_t
+  {
+      uint64_t path[0x02];              /*  16 bytes */
+      uint8_t  data[0x50];              /*  80 bytes */
+      uint64_t hash[0x03];              /*  24 bytes */
+      uint64_t next[0x01];              /*   8 bytes */
+  }
+  vblock_t;
+
+
+  extern  int64_t vstegfs_save(vstat_t);
+  extern  int64_t vstegfs_open(vstat_t);
+  extern uint64_t vstegfs_find(vstat_t);
+  extern   void   vstegfs_kill(vstat_t);
+
+  #ifdef _VSTEG_S_
+    static uint64_t vstegfs_header(vstat_t *, vblock_t *);
+    static MCRYPT vstegfs_mcrypt_init(vstat_t *, uint8_t);
+    static int64_t block_save(uint64_t, uint64_t, MCRYPT, vblock_t *);
+    static int64_t block_open(uint64_t, uint64_t, MCRYPT, vblock_t *);
+    static bool is_block_ours(uint64_t, uint64_t, uint64_t *);
+    static uint64_t calc_next_block(uint64_t, uint64_t *);
+  #endif /* _VSTEG_S_ */
+  
 #endif /* _VSTEGFS_H_ */

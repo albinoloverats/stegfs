@@ -20,439 +20,470 @@
 
 #include <time.h>
 #include <errno.h>
-#include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
+#include <mhash.h>
+#include <mcrypt.h>
 #include <stdbool.h>
 #include <inttypes.h>
-#include <sys/stat.h>
 
+#include "common/common.h"
+
+#define _VSTEG_S_
 #include "vstegfs.h"
-#include "dir.h"
-#include "tiger.h"
-#include "serpent.h"
 
-extern uint64_t filesystem;
-extern   size_t filesystem_size;
-
-/*
- * main functions for writing files to and from from the file system
- */
-
-uint32_t file_write(FILE *file, size_t fsize, char *filename, char *filepath, char *password)
+extern int64_t vstegfs_save(vstat_t f)
 {
-    errno = EXIT_SUCCESS;
-    char *data = calloc(LENGTH_DATA, sizeof( char ));;
-    uint64_t first = 0;
-    uint64_t current = 0;
-    uint64_t next = 0;
-
-    srand48(time(0));
-
-    if ((fsize * FILE_COPIES / LENGTH_DATA) + (FILE_HEADERS * SIZE_BLOCK) > filesystem_size)
-    {
-        //fprintf(stderr, "Insufficient space available\n");
-        return ENOSPC;
-    }
     /*
-     * create the key/subkeys and set the IV
+     * some initial preparations - such as: is the file larger than the
+     * file system? because that wouldn't be good :s
      */
-    char *key_mat = NULL;
-    char *IV = calloc(SERPENT_BYTES_B, sizeof( char ));
-    asprintf(&key_mat, "%s\255%s\255%s", filename, password, filepath);
-    uint32_t *subkeys = generate_key(key_mat);
-    /* 
-     * start the header blocks
+    uint64_t f_size = (fseek(f.file, 0, SEEK_END) ? 0 : ftell(f.file));
+    uint64_t fs_size = lseek(f.fs, 0, SEEK_END);
+    if (MAX_COPIES * f_size > fs_size * 5 / 8)
+        return EFBIG;
+    uint64_t fs_blocks = fs_size / SB_BLOCK;
+    srand48(time(0));
+    /*
+     * compute path hash (same for all copies and blocks of the file)
      */
-    uint64_t *start = calloc(FILE_COPIES, sizeof( uint64_t ));
-    uint64_t *headers = hash_data(key_mat, strlen(key_mat));
-    for (uint8_t i = 0; i < FILE_HEADERS; i++)
+    uint64_t path[2];
     {
-        lseek(filesystem, (headers[i] % filesystem_size) * SIZE_BLOCK, SEEK_SET);
-        for (uint8_t j = 0; j < LENGTH_DATA; j++)
-            data[j] = 0xFF;
-        block_write(filepath, data, fsize, IV, subkeys);
+        MHASH h = mhash_init(MHASH_TIGER);
+        mhash(h, f.path, strlen(f.path));
+        uint8_t *ph = mhash_end(h);
+        memcpy(path, ph, SB_PATH); /* we only need the 1st 128 bits ATM */
+        free(ph);
     }
-    /* 
-     * each file is stored 10x to try and ensure data survival
+    uint64_t start[MAX_COPIES] = { 0x0 };
+    /*
+     * work through the file to be hidden (MAX_COPIES) times
      */
-    for (uint8_t i = 0; i < FILE_COPIES; i++)
+    for (uint8_t i = 0; i < MAX_COPIES; i++)
     {
-        memset(IV, 0x14 * i, SERPENT_BYTES_B);
-        /* 
-         * remember the first block so we can write the header correctly at the end
+        /*
+         * find somewhere to start this copy of the file
          */
-        for (uint8_t j = 0; j < 2; j++)
-            first = (first << SIZE_DWORD) | (uint32_t)mrand48();
-        first %= filesystem_size;
-        current = first;
-        start[i] = first;
-        fseek(file, 0, SEEK_SET);
-        while ((fread(data, sizeof( char ), LENGTH_DATA, file)) > 0)
+        if (!(start[i] = calc_next_block(f.fs, path)))
+            return ENOSPC;
+        /*
+         * initialise the mcrypt library routines, and create a new IV
+         * (based on the filename, password and copy number)
+         */
+        MCRYPT c = vstegfs_mcrypt_init(&f, i);
+        /*
+         * make sure we're at the beginning of the file, our data buffer
+         * is clean and we're looking at the correct starting block on
+         * the file system
+         */
+        rewind(f.file);
+        uint8_t data[SB_DATA] = { 0x00 };
+        uint64_t next = start[i];
+        /*
+         * while we keep reading data, keep encrypting and storing it
+         */
+        errno = EXIT_SUCCESS;
+        /*
+         * check if we have more than a full block of data, if we don't
+         * then handle that as a special case
+         */
+        while (fread(data, sizeof( uint8_t ), SB_DATA, f.file) > 0)
         {
-            uint64_t failed = 0; // if this values exceeds the size of the file system assume there is no space left
-            /* 
-             * compute the next block number and check if we might have used it before
+            vblock_t b;
+            uint64_t this = next;
+            if (!(next = calc_next_block(f.fs, path)))
+                return ENOSPC;
+            /*
+             * build the block; this includes putting in the data,
+             * calculating a hash of the data and making a note of the
+             * next block location
              */
-            do
-            {
-                for (uint8_t j = 0; j < 2; j++)
-                    next = (next << SIZE_DWORD) | (uint32_t)mrand48();
-                next %= filesystem_size; // ensure that the 'new' block is within the limits of the current file system
-                if (failed > filesystem_size)
-                    return ENOSPC;
-                else
-                    failed++;
-            }
-            while (block_check(filepath, next));
-            lseek(filesystem, current * SIZE_BLOCK, SEEK_SET);
-            block_write(filepath, data, next, IV, subkeys);
-            current = next;
-            /* 
-             * clear data before next use
+            memcpy(b.path,  path, SB_PATH);
+            memcpy(b.data,  data, SB_DATA);
+            /* the hash will get calculated when the block is saved */
+            memcpy(b.next, &next, SB_NEXT);
+            /*
+             * save the block - if there is a problem, give up with IO
+             * error
              */
-            for (uint64_t j = 0; j < LENGTH_DATA; j++)
-                data[j] = 0x00;
+            if (block_save(f.fs, this, c, &b))
+                return EIO;
+            /*
+             * get ready for the next chunk of data...
+             */
+            memset(data, 0x00, SB_DATA);
         }
+        mcrypt_generic_deinit(c);
+        mcrypt_module_close(c);
     }
-
-    /* 
-     * now that's done, we can finish the header blocks
-     */
-    memset(IV, 0, SERPENT_BYTES_B);
-    for (uint8_t i = 0; i < FILE_HEADERS; i++)
-    {
-        lseek(filesystem, (headers[i] % filesystem_size) * SIZE_BLOCK, SEEK_SET);
-        uint64_t z = 0;
-
-        for (uint8_t j = 0; j < FILE_COPIES; j++)
-            for (uint8_t k = 0; k < SIZE_BYTE; k++)
-                data[z++] = (start[j] & (0xFFLL << (56 - (k * SIZE_BYTE)))) >> (56 - (k * SIZE_BYTE));
-        block_write(filepath, data, fsize, IV, subkeys);
-    }
-    return errno;
-}
-
-uint32_t file_read(FILE *file, char *filename, char *filepath, char *password)
-{
-    errno = EXIT_SUCCESS;
-    char *data = calloc(LENGTH_DATA, sizeof( char ));;
-    uint64_t current = 0;
-    uint64_t next = 0;
-    short failed = false;
-
-    srand48(time(0));
-    size_t fsize = 0;
-
     /*
-     * create the key/subkeys and set the IV
+     * finalise header blocks
      */
-    char *key_mat = NULL;
-    char *IV = calloc(SERPENT_BYTES_B, sizeof( char ));
-    asprintf(&key_mat, "%s\255%s\255%s", filename, password, filepath);
-    uint32_t *subkeys = generate_key(key_mat);
-
-    /* 
-     * find the header blocks
-     */
-    uint64_t *start = calloc(FILE_COPIES, sizeof( uint64_t ));
-    uint64_t *headers = hash_data(key_mat, strlen(key_mat));
-    for (uint8_t i = 0; i < FILE_HEADERS; i++)
+    uint16_t header[MAX_COPIES] = { 0x0 };
     {
-        if (block_check(filepath, headers[i] % filesystem_size))
+        /*
+         * this easily (but uniquely) determines where header blocks
+         * should be located
+         */
+        char *fp = NULL;
+        asprintf(&fp, "%s/%s", f.path, f.name);
+        MHASH h = mhash_init(MHASH_TIGER);
+        mhash(h, fp, strlen(fp));
+        uint8_t *ph = mhash_end(h);
+        memcpy(header, ph, SB_HASH);
+        free(ph);
+        free(fp);
+    }
+    /*
+     * construct the header block, then save it in each of its
+     * locations
+     */
+    {
+        vblock_t b;
+        memcpy(b.path, path, SB_PATH);
+        memset(b.data, 0x00, SB_DATA);
+        for (uint8_t i = 0; i < MAX_COPIES; i++)
+            memcpy(b.data + i * sizeof( uint64_t ), &start[i], sizeof( uint64_t ));
+        for (uint8_t i = 1; i <= sizeof( uint64_t ); i++)
+            b.data[SB_DATA - i] = mrand48();
+        memcpy(b.next, &f_size, sizeof( uint64_t ));
+        for (uint8_t i = 0; i < MAX_COPIES; i++)
         {
-            lseek(filesystem, (headers[i] % filesystem_size) * SIZE_BLOCK, SEEK_SET);
-            if ((fsize = block_read(filepath, data, IV, subkeys)) > 0)
-                break;
+            /*
+             * each header block is encrypted independently
+             */
+            uint64_t head = 0x0;
+            for (int8_t j = (sizeof( uint64_t ) / sizeof( uint16_t )); j >= 0; --j)
+                head = (head << 0x10) | header[i + j];
+            head %= fs_blocks;
+            /*
+             * write this copy of the header
+             */
+            MCRYPT c = vstegfs_mcrypt_init(&f, i);
+            if (block_save(f.fs, head, c, &b))
+                return EIO;
+            mcrypt_generic_deinit(c);
+            mcrypt_module_close(c);
         }
     }
-    if (!fsize)
-        return ENOENT;
-    /* 
-     * from data, we can now extract the starting blocks for each branch
-     */
-    memset(IV, 0, SERPENT_BYTES_B);
-    for (uint8_t i = 0; i < FILE_COPIES; i++)
-    {
-        uint64_t k = 0;
-        for (uint8_t j = 0; j < SIZE_BYTE; j++)
-            k = (k << 8) | data[j + (i * 8)];
-        start[i] = k;
-    }
-    /* 
-     * calculate the number of blocks used
-     */
-    div_t result = div(fsize, LENGTH_DATA);
-    uint64_t fblocks = result.quot;
-    uint64_t frem = result.rem;
-
-    if (frem)
-        fblocks++;
-    /* 
-     * now we check through each copy of the file to try and extract it
-     */
-    for (uint8_t i = 0; i < FILE_COPIES; i++)
-    {
-        memset(IV, 0x14 * i, SERPENT_BYTES_B);
-        failed = false;
-        current = start[i];
-        fseek(file, 0, SEEK_SET);
-        for (uint64_t j = 0; j < fblocks; j++)
-        {
-            if (block_check(filepath, current))
-            {
-                lseek(filesystem, current * SIZE_BLOCK, SEEK_SET);
-                if ((next = block_read(filepath, data, IV, subkeys)))
-                {
-                    if (j == (fblocks - 1))
-                        fwrite(data, sizeof( char ), frem, file);
-                    else
-                        fwrite(data, sizeof( char ), LENGTH_DATA, file);
-                }
-                else
-                    failed = true;
-            }
-            else
-                failed = true;
-            if (failed)
-                break;
-            current = next;
-        }
-        if (!failed)
-            break; // we found a full copy of the file :)
-    }
-    if (failed)
-        errno = EIO;
-    return errno;
-}
-
-uint32_t file_check(char *filename, char *filepath, char *password)
-{
     /*
-     * create the key/subkeys and set the IV
+     * success :D
      */
-    char *key_mat = NULL;
-    char *data = calloc(LENGTH_DATA, sizeof( char ));;
-    char *IV = calloc(SERPENT_BYTES_B, sizeof( char ));
-    asprintf(&key_mat, "%s\255%s\255%s", filename, password, filepath);
-    uint32_t *subkeys = generate_key(key_mat);
-    /* 
-     * return the size found in the first header block
-     * (note that it might not actually exist)
-     */
-    uint64_t *headers = hash_data(key_mat, strlen(key_mat));
-    lseek(filesystem, (headers[0] % filesystem_size) * SIZE_BLOCK, SEEK_SET);
-    return block_read(filepath, data, IV, subkeys);
-}
-
-uint64_t *file_find(char *filename, char *filepath, char *password)
-{
-    /*
-     * create the key
-     */
-    char *key_mat = NULL;
-    asprintf(&key_mat, "%s\255%s\255%s", filename, password, filepath);
-    /* 
-     * return the hashed header blocks
-     */
-    return hash_data(key_mat, strlen(key_mat));
-}
-
-uint32_t file_unlink(char *filename, char *filepath, char *password)
-{
-    /*
-     * create the key/subkeys and set the IV
-     */
-    char *key_mat = NULL;
-    asprintf(&key_mat, "%s\255%s\255%s", filename, password, filepath);
-    /* 
-     * corrupt the header blocks so the file cannot be found
-     */
-    srand48(time(0));
-    uint64_t *headers = hash_data(key_mat, strlen(key_mat));
-    uint8_t *block = calloc(SIZE_BLOCK, sizeof( char ));
-
-    for (uint8_t i = 0; i < FILE_HEADERS; i++)
-    {
-        if (block_check(filepath, headers[i] % filesystem_size))
-        {
-            lseek(filesystem, (headers[i] % filesystem_size) * SIZE_BLOCK, SEEK_SET);
-            for (uint8_t i = 0; i < SIZE_BLOCK; i++)
-                block[i] = (char)(lrand48() & 0xFF);
-            write(filesystem, block, SIZE_BLOCK);
-        }
-    }
-    free(block);
-
     return EXIT_SUCCESS;
 }
 
+extern int64_t vstegfs_open(vstat_t f)
+{
+    uint64_t path[2];
+    {
+        MHASH h = mhash_init(MHASH_TIGER);
+        mhash(h, f.path, strlen(f.path));
+        uint8_t *ph = mhash_end(h);
+        memcpy(path, ph, SB_PATH);
+        free(ph);
+    }
+    /*
+     * find a valid header block
+     */
+    vblock_t hb;
+    uint64_t f_size = vstegfs_header(&f, &hb);
+    /*
+     * if we don't know the size of the file then we didn't find an
+     * uncorrupted header - give up
+     */
+    if (!f_size)
+        return ENOENT;
+    uint64_t start[MAX_COPIES] = { 0x0 };
+    memcpy(start, hb.data, sizeof( uint64_t ) * MAX_COPIES);
+
+    /*
+     * try each of the starting blocks and see if we can
+     * find a full copy of the file
+     */
+    for (uint8_t i = 0; i < MAX_COPIES; i++)
+    {
+        MCRYPT c = vstegfs_mcrypt_init(&f, i);
+        rewind(f.file); /* back to the beginning */
+        uint64_t next = start[i];
+        uint64_t bytes = 0x0;
+        /*
+         * now we're ready to read this copy of the file
+         */
+        while (is_block_ours(f.fs, next, path))
+        {
+            vblock_t b;
+            if (block_open(f.fs, next, c, &b))
+                break;
+            /*
+             * woo - we now have successfully decrypted another block
+             * for this file
+             */
+            bytes += SB_DATA;
+            uint8_t need = SB_DATA;
+            if (bytes > f_size)
+                /* that was the final block, but we don't need all of it */
+                need = SB_DATA - (bytes - f_size);
+
+            fwrite (&b.data, sizeof( uint8_t ), need, f.file);
+
+            if (bytes >= f_size)
+                return EXIT_SUCCESS; /* done */
+
+            memcpy(&next, b.next, SB_NEXT);
+        }
+        mcrypt_generic_deinit(c);
+        mcrypt_module_close(c);
+    }
+    /*
+     * if we make it this far something has gone wrong
+     */
+    return ENOENT;
+}
+
+extern uint64_t vstegfs_find(vstat_t f)
+{
+    vblock_t b;
+    return vstegfs_header(&f, &b);
+}
+
+void vstegfs_kill(vstat_t f)
+{
+    /*
+     * calculate the locations of the header blocks
+     */
+    uint16_t header[MAX_COPIES] = { 0x0 };
+    {
+        char *fp = NULL;
+        asprintf(&fp, "%s/%s", f.path, f.name);
+        MHASH h = mhash_init(MHASH_TIGER);
+        mhash(h, fp, strlen(fp));
+        uint8_t *ph = mhash_end(h);
+        memcpy(header, ph, SB_HASH);
+        free(ph);
+        free(fp);
+    }
+    uint64_t path[2];
+    {
+        MHASH h = mhash_init(MHASH_TIGER);
+        mhash(h, f.path, strlen(f.path));
+        uint8_t *ph = mhash_end(h);
+        memcpy(path, ph, SB_PATH);
+        free(ph);
+    }
+    uint64_t fs_blocks = lseek(f.fs, 0, SEEK_END) / SB_BLOCK;
+    for (uint8_t i = 0; i < MAX_COPIES; i++)
+    {
+        uint64_t head = 0x0;
+        for (int8_t j = (sizeof( uint64_t ) / sizeof( uint16_t )); j >= 0; --j)
+            head = (head << 0x10) | header[i + j];
+        head %= fs_blocks;
+        if (is_block_ours(f.fs, head, path))
+        {
+            /*
+             * one of our header blocks, thus it needs randomising
+             */
+            vblock_t b;
+            MCRYPT c = vstegfs_mcrypt_init(&f, i);
+
+            uint8_t path[SB_PATH];
+            uint8_t data[SB_DATA];
+            uint8_t next[SB_NEXT];
+
+            for (uint8_t j = 0; j < SB_PATH; j++)
+                path[j] = mrand48();
+            for (uint8_t j = 0; j < SB_DATA; j++)
+                data[j] = mrand48();
+            for (uint8_t j = 0; j < SB_NEXT; j++)
+                next[j] = mrand48();
+
+            memcpy(b.path, path, SB_PATH);
+            memcpy(b.data, data, SB_DATA);
+            memcpy(b.next, next, SB_NEXT);
+
+            block_save(f.fs, head, c, &b);
+
+            mcrypt_generic_deinit(c);
+            mcrypt_module_close(c);
+        }
+    }
+}
+
+static uint64_t vstegfs_header(vstat_t *f, vblock_t *b)
+{
+    /*
+     * find the header blocks for the file
+     */
+    uint16_t header[MAX_COPIES] = { 0x0 };
+    {
+        char *fp = NULL;
+        asprintf(&fp, "%s/%s", f->path, f->name);
+        MHASH h = mhash_init(MHASH_TIGER);
+        mhash(h, fp, strlen(fp));
+        uint8_t *ph = mhash_end(h);
+        memcpy(header, ph, SB_HASH);
+        free(ph);
+        free(fp);
+    }
+    /*
+     * compute path hash (same for all copies and blocks of the file)
+     */
+    uint64_t path[2];
+    {
+        MHASH h = mhash_init(MHASH_TIGER);
+        mhash(h, f->path, strlen(f->path));
+        uint8_t *ph = mhash_end(h);
+        memcpy(path, ph, SB_PATH);
+        free(ph);
+    }
+    uint64_t fs_blocks = lseek(f->fs, 0, SEEK_END) / SB_BLOCK;
+    uint64_t f_size = 0x0;
+    /*
+     * try to find a header
+     */
+    for (uint8_t i = 0; i < MAX_COPIES; i++)
+    {
+        uint64_t head = 0x0;
+        for (int8_t j = (sizeof( uint64_t ) / sizeof( uint16_t )); j >= 0; --j)
+            head = (head << 0x10) | header[i + j];
+        head %= fs_blocks;
+        if (is_block_ours(f->fs, head, path))
+        {
+            /*
+             * found a header block which might be ours, if we can read
+             * its contents we're in business
+             */
+            MCRYPT c = vstegfs_mcrypt_init(f, i);
+            if (!block_open(f->fs, head, c, b))
+            {
+                /*
+                 * if we're here we were able to successfully open the
+                 * header
+                 */
+                memcpy(&f_size, b->next, SB_NEXT);
+            }
+            mcrypt_generic_deinit(c);
+            mcrypt_module_close(c);
+        }
+        if (f_size)
+            break;
+    }
+    return f_size;
+}
+
+static MCRYPT vstegfs_mcrypt_init(vstat_t *f, uint8_t ivi)
+{
+    MCRYPT c = mcrypt_module_open(MCRYPT_SERPENT, NULL, MCRYPT_CBC, NULL);
+    uint8_t key[SB_TIGER] = { 0x00 };
+    {
+        char *fk = NULL;
+        asprintf(&fk, "%s:%s", f->name, f->pass ?: "vstegfs");
+        MHASH h = mhash_init(MHASH_TIGER);
+        mhash(h, fk, strlen(fk));
+        uint8_t *ph = mhash_end(h);
+        memcpy(key, ph, SB_TIGER);
+        free(ph);
+        free(fk);
+    }
+    uint8_t ivs[SB_SERPENT] = { 0x00 };
+    {
+        char *iv_s = NULL;
+        asprintf(&iv_s, "%s:%i", f->name, ivi);
+        MHASH h = mhash_init(MHASH_TIGER);
+        mhash(h, iv_s, strlen(iv_s));
+        uint8_t *ph = mhash_end(h);
+        memcpy(ivs, ph, SB_SERPENT);
+        free(ph);
+        free(iv_s);
+    }
+    mcrypt_generic_init(c, key, sizeof( key ), ivs);
+    return c;
+}
 
 /*
- * functions for writing and reading a single block
+ * local block functions
  */
 
-uint32_t block_write(char *filepath, char *data, uint64_t next, char *IV, uint32_t *subkeys)
+static int64_t block_save(uint64_t fs, uint64_t pos, MCRYPT c, vblock_t *b)
 {
     errno = EXIT_SUCCESS;
-    char *block = calloc(SIZE_BLOCK, sizeof( char ));
+    /*
+     * calculate the hash of the data
+     */
+    {
+        uint8_t data[SB_DATA] = { 0x00 };
+        memcpy(data, (uint8_t *)b->data, SB_DATA);
 
-//    for (uint32_t i = 0; i < LENGTH_PATH; i++)
-//        block[i] = (uint32_t)mrand48() % 0xFF;
+        MHASH h = mhash_init(MHASH_TIGER);
+        mhash(h, data, SB_DATA);
+        uint8_t *ph = mhash_end(h);
 
-    memmove(block + OFFSET_DATA, data, LENGTH_DATA);
-    memmove(block + OFFSET_CHECKSUM, hash_data(data, LENGTH_DATA), LENGTH_CHECKSUM);
-    next = check_endian(next);
-    memmove(block + OFFSET_NEXT, &next, LENGTH_NEXT);
-
-    block_encrypt(block, IV, subkeys);
-
-    memmove(block + OFFSET_PATH, hash_path(filepath, strlen(filepath)), LENGTH_PATH);
-    write(filesystem, block, SIZE_BLOCK);
-    free(block);
+        memcpy((uint8_t *)b->hash, ph, SB_HASH);
+        free(ph);
+    }
+    uint8_t d[SB_SERPENT * 7] = { 0x00 };
+    memcpy(d, ((uint8_t *)b) + SB_SERPENT, SB_BLOCK - SB_PATH);
+    mcrypt_generic(c, d, sizeof( d ));
+    memcpy(((uint8_t *)b) + SB_SERPENT, d, SB_BLOCK - SB_PATH);
+    /*
+     * write the encrypted block to this block location
+     */
+    pwrite(fs, b, sizeof( vblock_t ), pos * SB_BLOCK);
     return errno;
 }
 
-uint64_t block_read(char *filepath, char *data, char *IV, uint32_t *subkeys)
+static int64_t block_open(uint64_t fs, uint64_t pos, MCRYPT c, vblock_t *b)
 {
-    uint64_t next = 0;
-    char *eblck = calloc(SIZE_BLOCK, sizeof( char ));
-    char *block = calloc(SIZE_BLOCK, sizeof( char ));
-    char *hash = calloc(LENGTH_CHECKSUM, sizeof( char ));
-    read(filesystem, eblck, SIZE_BLOCK);
+    errno = EXIT_SUCCESS;
+    pread(fs, b, sizeof( vblock_t ), pos * SB_BLOCK);
 
-    memcpy(block + OFFSET_DATA, eblck + OFFSET_DATA, SIZE_BLOCK - LENGTH_PATH);
-    block_decrypt(block, IV, subkeys);
-    
-    memmove(data, block + OFFSET_DATA, LENGTH_DATA);
-    memmove(hash, block + OFFSET_CHECKSUM, LENGTH_CHECKSUM);
-    if (memcmp(hash, hash_data(data, LENGTH_DATA), TIGER_BYTES))
-        return 0;
-    memmove(&next, block + OFFSET_NEXT, LENGTH_NEXT);
-    next = check_endian(next);
-
-    free(block);
-    free(eblck);
-    free(hash);
-    return next;
-}
-
-uint32_t block_check(char *filepath, uint64_t next)
-{
-    char *buf = calloc(TIGER_128_BYTES, sizeof( char ));
-    char *dir = NULL;
-    bool ret = false;
-    lseek(filesystem, next * SIZE_BLOCK, SEEK_SET);
-    read(filesystem, buf, TIGER_128_BYTES);
-    lseek(filesystem, next * SIZE_BLOCK, SEEK_SET);
-    /* 
-     * memcmp returns 0 if the values are the same;
+    uint8_t d[SB_SERPENT * 7] = { 0x00 };
+    memcpy(d, ((uint8_t *)b) + SB_SERPENT, SB_BLOCK - SB_PATH);
+    mdecrypt_generic(c, d, sizeof( d ));
+    memcpy(((uint8_t *)b) + SB_SERPENT, d, SB_BLOCK - SB_PATH);
+    /*
+     * check the hash of the decrypted data
      */
-    uint64_t j = dir_count_sub(filepath);
-    for (uint64_t i = 1; i <= j; i++)
+    uint8_t hash[SB_HASH] = { 0x00 };
     {
-        asprintf(&dir, "%s/%s", dir ? dir : "", dir_get_part(filepath, i));
-        char *tmp = hash_path(dir, strlen(dir));
-        if (!memcmp(buf, tmp, TIGER_128_BYTES))
-            ret = true;
-        free(tmp);
+        MHASH h = mhash_init(MHASH_TIGER);
+        mhash(h, b->data, SB_DATA);
+        uint8_t *ph = mhash_end(h);
+        memcpy(hash, ph, SB_HASH);
+        free(ph);
     }
-    free(dir);
-    free(buf);
-    return ret;
+    if (memcmp(hash, b->hash, SB_HASH))
+        return EXIT_FAILURE;
+    return errno;
 }
 
-
-/*
- * functions for encrypting and decrypting a single block
- */
-
-void block_encrypt(char *block, char *IV, uint32_t *subkeys)
+static bool is_block_ours(uint64_t fs, uint64_t pos, uint64_t *hash)
 {
-    char *plaintext = calloc(SERPENT_BYTES_B, sizeof( char ));
-    char *ciphertext = calloc(SERPENT_BYTES_B, sizeof( char ));
-    for (uint8_t i = 1; i < 8; i++)
+    uint8_t buf[SB_PATH] = { 0x00 };
+    if (pread(fs, buf, SB_PATH, pos * SB_BLOCK) < 0)
+        return false; /* we screwed up, so just assume it's not ours :p */
+    if (memcmp(buf, hash, SB_PATH))
+        return false; /* they're different, so not ours */
+    return true; /* looks like the hashes match, must be one of ours :) */
+}
+
+static uint64_t calc_next_block(uint64_t fs, uint64_t *path)
+{
+    uint64_t block = 0x0;
+    uint64_t fsb = lseek(fs, 0, SEEK_END) / SB_BLOCK;
+    int16_t att = 0; /* give us up to 32767 attempts to find a block */
+    /*
+     * now compute the next block location - and keep going
+     * until we find one which is usable
+     */
+    do
     {
-        memmove(plaintext, block + (SERPENT_BYTES_B * i), SERPENT_BYTES_B);
+        block = ((mrand48() << 0x20) | mrand48()) % fsb;
+        if (att < 0)
+            return 0;
+        /*
+         * TODO check that the block isn't used by a file which is along
+         * the same path as us
+         */
 
-        uint32_t t[4], pt[4], ct[4];
-        memcpy(pt, plaintext, CHUNK_SERPENT_BYTES);
-        memcpy(t, IV, CHUNK_SERPENT_BYTES);
-        for (uint8_t i = 0; i < 4; i++)
-            pt[i] ^= t[i];
-        serpent_encrypt(pt, ct, subkeys);
-        memcpy(ciphertext, ct, CHUNK_SERPENT_BYTES);
-        memcpy(IV, ciphertext, CHUNK_SERPENT_BYTES);
-
-        memmove(block + (SERPENT_BYTES_B * i), ciphertext, SERPENT_BYTES_B);
     }
-    free(plaintext);
-    free(ciphertext);
-}
-
-void block_decrypt(char *block, char *IV, uint32_t *subkeys)
-{
-    char *plaintext = calloc(SERPENT_BYTES_B, sizeof( char ));
-    char *ciphertext = calloc(SERPENT_BYTES_B, sizeof( char ));
-    for (uint8_t i = 1; i < 8; i++)
-    {
-        memmove(ciphertext, block + (SERPENT_BYTES_B * i), SERPENT_BYTES_B);
-
-        uint32_t t[4], pt[4], ct[4];
-        memcpy(ct, ciphertext, CHUNK_SERPENT_BYTES);
-        serpent_decrypt(ct, pt, subkeys);
-        memcpy(t, IV, CHUNK_SERPENT_BYTES);
-        for (uint8_t i = 0; i < 4; i++)
-            pt[i] ^= t[i];
-        memcpy(IV, ct, CHUNK_SERPENT_BYTES);
-        memcpy(plaintext, pt, CHUNK_SERPENT_BYTES);
-
-        memmove(block + (SERPENT_BYTES_B * i), plaintext, SERPENT_BYTES_B);
-    }
-    free(plaintext);
-    free(ciphertext);
-}
-
-
-/*
- * miscellaneous functions
- */
-
-void *hash_data(char *data, uint64_t len)
-{
-    uint64_t *sum = calloc(3, sizeof( uint64_t ));
-    tiger((uint64_t *)data, len, sum);
-    for (uint8_t i = 0; i < 3; i++)
-        sum[i] = check_endian(sum[i]);
-    return sum;
-}
-
-void *hash_path(char *filepath, uint64_t len)
-{
-    char chr[1];
-    uint32_t val = 0;
-    for (uint64_t i = 0; i < len; i++)
-        val += filepath[i];
-    chr[0] = (val % 0x08) + 48;
-    return hash_data(chr, 1);
-}
-
-uint64_t check_endian(uint64_t val)
-{
-    uint64_t ret = 0;
-#ifdef LITTLE_ENDIAN
-    ret |= (val & (0xFFLL  << 56)) >> 56;
-    ret |= (val & (0xFFLL  << 48)) >> 40;
-    ret |= (val & (0xFFLL  << 40)) >> 24;
-    ret |= (val & (0xFFLL  << 32)) >>  8;
-    ret |= (val & (0xFFLL  << 24)) <<  8;
-    ret |= (val & (0xFFLL  << 16)) << 24;
-    ret |= (val & (0xFFLL  <<  8)) << 40;
-    ret |= (val &  0xFFLL) << 56;
-#else
-    ret = val;
-#endif
-    return ret;
+    while (is_block_ours(fs, block, path));
+    return block;
 }

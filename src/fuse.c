@@ -21,41 +21,38 @@
 #define FUSE_USE_VERSION 27
 
 #include <fuse.h>
-#include <errno.h>
 #include <fcntl.h>
-#include <stdio.h>
 #include <getopt.h>
-#include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
-#include <stdbool.h>
-#include <inttypes.h>
 
-#include "vstegfs.h"
-#include "dir.h"
+#include "common/common.h"
 
-#define NAME "vstegfs"
+#include "src/vstegfs.h"
+#include "src/dir.h"
 
-#define PAGESIZE 4096 // the number of bytes given us by the kernel
+#define APP "vstegfs"
+#define VER "200903-"
+
+#define PAGESIZE 4096 /* the number of bytes given us by the kernel */
 
 typedef struct cache
 {
-    char *data;
-    size_t size;
-} cache;
+    uint8_t *data;
+    size_t   size;
+}
+cache;
 
-cache cache_write;
-cache cache_read;
+static cache cache_write;
+static cache cache_read;
 
-uint64_t filesystem;
-  size_t filesystem_size;
+static uint64_t filesystem;
 
 static int vstegfs_getattr(const char *path, struct stat *stbuf)
 {
     char *name = dir_get_file(path);
     memset(stbuf, 0, sizeof( struct stat ));
-    uint64_t inod = 0, size = 0;
-    if (!strcmp(path, "/"))
+    uint64_t inod = 0x0, size = 0x0;
+    if (strcmp(path, "/") == 0)
     {
         stbuf->st_mode = S_IFDIR | 0700;
         stbuf->st_nlink = 2;
@@ -71,9 +68,17 @@ static int vstegfs_getattr(const char *path, struct stat *stbuf)
     {
         char *p = NULL;
         asprintf(&p, "vstegfs%s", path);
-        size = file_check(dir_get_file(p), dir_get_path(p), dir_get_pass(p));
+        msg("look up: %s", p);
+        vstat_t vs;
+        {
+            vs.fs   = filesystem;
+            vs.file = NULL;
+            vs.name = dir_get_file(p);
+            vs.path = dir_get_path(p);
+            vs.pass = dir_get_pass(p);
+        }
+        size = vstegfs_find(vs);
         free(p);
-        inod = (file_find(dir_get_file(p), dir_get_path(p), dir_get_pass(p)))[0] % filesystem_size;
         stbuf->st_mode = S_IFREG | 0600;
         stbuf->st_nlink = 1;
     }
@@ -81,8 +86,8 @@ static int vstegfs_getattr(const char *path, struct stat *stbuf)
     stbuf->st_uid = fuse_get_context()->uid;
     stbuf->st_gid = fuse_get_context()->gid;
     stbuf->st_size = size;
-    stbuf->st_blksize = SIZE_BLOCK;
-    stbuf->st_blocks = (blkcnt_t)((size / SIZE_BLOCK) + 1);
+    stbuf->st_blksize = SB_BLOCK;
+    stbuf->st_blocks = (int)((size / SB_BLOCK) + 1);
 
     return EXIT_SUCCESS;
 }
@@ -98,7 +103,17 @@ static int vstegfs_unlink(const char *path)
 {
     char *p = NULL;
     asprintf(&p, "vstegfs%s", path);
-    file_unlink(dir_get_file(p), dir_get_path(p), dir_get_pass(p));
+
+    vstat_t vk;
+    {
+        vk.fs   = filesystem;
+        vk.file = NULL;
+        vk.name = dir_get_file(p);
+        vk.path = dir_get_path(p);
+        vk.pass = dir_get_pass(p);
+    }
+    vstegfs_kill(vk);
+
     free(p);
     return EXIT_SUCCESS;
 }
@@ -109,12 +124,32 @@ static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, 
     {
         char *p = NULL;
         asprintf(&p, "vstegfs%s", path);
-        
-        cache_read.size = file_check(dir_get_file(p), dir_get_path(p), dir_get_pass(p));
-        cache_read.data = realloc(cache_read.data, cache_read.size);
+        msg("read: %s", p);
 
-        FILE *stream = open_memstream(&cache_read.data, &cache_read.size);
-        errno = file_read(stream, dir_get_file(p), dir_get_path(p), dir_get_pass(p));
+        {
+            vstat_t vs;
+            vs.fs   = filesystem;
+            vs.file = NULL;
+            vs.name = dir_get_file(p);
+            vs.path = dir_get_path(p);
+            vs.pass = dir_get_pass(p);
+            cache_read.size = vstegfs_find(vs);
+            cache_read.data = realloc(cache_read.data, cache_read.size);
+        }
+
+        FILE *stream = open_memstream((char **)&cache_read.data, &cache_read.size);
+
+        {
+            vstat_t vs;
+            vs.fs   = filesystem;
+            vs.file = stream;
+            vs.name = dir_get_file(p);
+            vs.path = dir_get_path(p);
+            vs.pass = dir_get_pass(p);
+
+            errno = vstegfs_open(vs);
+        }
+
         fclose(stream);
         free(p);
     }
@@ -126,7 +161,7 @@ static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, 
         memcpy(buf, cache_read.data + offset, size);
     }
     else
-        size = 0;
+        size = errno;
     return size;
 }
 
@@ -143,13 +178,25 @@ static int vstegfs_write(const char *path, const char *buf, size_t size, off_t o
 
     char *p = NULL;
     asprintf(&p, "vstegfs%s", path);
+    msg("write: %s", p);
 
     FILE *stream = fmemopen(cache_write.data, cache_write.size, "r");
-    errno = file_write(stream, cache_write.size, dir_get_file(p), dir_get_path(p), dir_get_pass(p));
-    fclose(stream);
 
+    vstat_t vs;
+    {
+        vs.fs   = filesystem;
+        vs.file = stream;
+        vs.name = dir_get_file(p);
+        vs.path = dir_get_path(p);
+        vs.pass = dir_get_pass(p);
+
+        errno = vstegfs_save(vs);
+    }
+
+    fclose(stream);
     free(p);
-    cache_write.size = 0;
+
+    cache_write.size = 0x0;
     free(cache_write.data);
     cache_write.data = NULL;
 
@@ -189,14 +236,15 @@ static int vstegfs_null_0(const char *path, struct fuse_file_info *fi)
 }
 
 
-static struct fuse_operations vstegfs_oper = {
+static struct fuse_operations vstegfs_oper =
+{
     .getattr	= vstegfs_getattr,
     .readdir	= vstegfs_readdir,
     .unlink     = vstegfs_unlink,
     .read       = vstegfs_read,
     .write      = vstegfs_write,
     /*
-     * null functions (return success everytime)
+     * null functions (return success every time)
      */
     .mknod      = vstegfs_mknod,
     .truncate   = vstegfs_truncate,
@@ -210,16 +258,16 @@ static struct fuse_operations vstegfs_oper = {
 
 int main(int argc, char **argv)
 {
+    init(APP, VER);
+
     if (argc < 2)
         return show_usage();
 
-    char *fs    = NULL;
-    char *mount = NULL;
+    char *fs = NULL, *mount = NULL;
     bool debug = false;
     while (true)
     {
-        static struct option long_options[] =
-        {
+        static struct option long_options[] = {
             {"debug"     , no_argument      , 0, 'd'},
             {"filesystem", required_argument, 0, 'f'},
             {"mount"     , required_argument, 0, 'm'},
@@ -251,21 +299,17 @@ int main(int argc, char **argv)
                 return show_version();
             case '?':
             default:
-                fprintf(stderr, "%s: unknown option %c\n", NAME, opt);
-                return EXIT_FAILURE;
+                die("unknown option %c", opt);
         }
     }
 
     if (!mount || !fs)
         return show_usage();
-    if ((filesystem = open(fs, O_RDWR, S_IRUSR | S_IWUSR)) < 3)
-    {
-        perror("Could not open file system");
-        return errno;
-    }
-    filesystem_size = lseek(filesystem, 0LL, SEEK_END) / SIZE_BLOCK;
 
-    char **args = calloc(debug ? 5 : 4, sizeof( char ));
+    if ((filesystem = open(fs, O_RDWR, S_IRUSR | S_IWUSR)) < 3)
+        die("could not open file system");
+
+    char **args = calloc(debug ? 5 : 4, sizeof( char * ));
     args[0] = strdup(argv[0]);
     args[1] = strdup("-o");
     args[2] = strdup("use_ino");
@@ -276,47 +320,16 @@ int main(int argc, char **argv)
     return fuse_main(debug ? 5 : 4, args, &vstegfs_oper, NULL);
 }
 
-uint64_t show_help(void)
+int64_t show_help(void)
 {
     show_version();
-    fprintf(stderr, "\n");
     show_usage();
-    fprintf(stderr, "\n  -f, --filesystem  FILE SYSTEM  Where to write the file system to");
-    fprintf(stderr, "\n  -m, --mount       MOUNT POINT  Where to mount the file system");
-    fprintf(stderr, "\n  -h, --help                     Show this help list");
-    fprintf(stderr, "\n  -l, --licence                  Show overview of GNU GPL");
-    fprintf(stderr, "\n  -v, --version                  Show version information");
-    fprintf(stderr, "\n");
-    fprintf(stderr, "\n  Fuse executable to mount vstegfs file systems");
-    fprintf(stderr, "\n");
-    return EXIT_SUCCESS;
-}
-
-uint64_t show_licence(void)
-{
-    fprintf(stderr, "This program is free software: you can redistribute it and/or modify\n");
-    fprintf(stderr, "it under the terms of the GNU General Public License as published by\n");
-    fprintf(stderr, "the Free Software Foundation, either version 3 of the License, or\n");
-    fprintf(stderr, "(at your option) any later version.\n");
-    fprintf(stderr, "\n");
-    fprintf(stderr, "This program is distributed in the hope that it will be useful,\n");
-    fprintf(stderr, "but WITHOUT ANY WARRANTY; without even the implied warranty of\n");
-    fprintf(stderr, "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n");
-    fprintf(stderr, "GNU General Public License for more details.\n");
-    fprintf(stderr, "\n");
-    fprintf(stderr, "You should have received a copy of the GNU General Public License\n");
-    fprintf(stderr, "along with this program.  If not, see <http://www.gnu.org/licenses/>.\n");
-    return EXIT_SUCCESS;
-}
-
-uint64_t show_usage(void)
-{
-    fprintf(stderr, "Usage\n  %s [OPTION] [ARGUMENT]\n", NAME);
-    return EXIT_FAILURE;
-}
-
-uint64_t show_version(void)
-{
-    fprintf(stderr, "%s version : %s\n%*s built on: %s %s\n", NAME, VERSION, (int)strlen(NAME), "", __DATE__, __TIME__);
+    fprintf(stderr, "\nOptions:\n\n");
+    fprintf(stderr, "  -f, --filesystem  FILE SYSTEM  Where to write the file system to\n");
+    fprintf(stderr, "  -m, --mount       MOUNT POINT  Where to mount the file system\n");
+    fprintf(stderr, "  -h, --help                     Show this help list\n");
+    fprintf(stderr, "  -l, --licence                  Show overview of GNU GPL\n");
+    fprintf(stderr, "  -v, --version                  Show version information\n\n");
+    fprintf(stderr, "  Fuse executable to mount vstegfs file systems\n");
     return EXIT_SUCCESS;
 }

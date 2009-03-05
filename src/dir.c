@@ -25,8 +25,7 @@
 #include <stdbool.h>
 #include <inttypes.h>
 
-//#include "vstegfs.h"
-#include "dir.h"
+#include "src/dir.h"
 
 /*
  * return the file part of the path (everything
@@ -55,7 +54,7 @@ char *dir_get_pass(const char *path)
 char *dir_get_path(const char *path)
 {
     char *ret = NULL;
-    for (uint64_t i = 1; i < dir_count_sub(path); i++)
+    for (uint32_t i = 1; i < dir_count_sub(path); i++)
         asprintf(&ret, "%s/%s", ret ? ret : "", dir_get_part(path, i));
     return ret ? ret : "/";
 }
@@ -63,10 +62,10 @@ char *dir_get_path(const char *path)
 /*
  * get a specific part of a path
  */
-char *dir_get_part(const char *path, uint64_t entry)
+char *dir_get_part(const char *path, uint32_t entry)
 {
     char *ret = NULL, *tmp = dir_strip_root(path);
-    for (uint64_t i = 0; i < entry; i++)
+    for (uint32_t i = 0; i < entry; i++)
         ret = strsep(&tmp, "/");
     return ret;
 }
@@ -75,10 +74,10 @@ char *dir_get_part(const char *path, uint64_t entry)
  * count the number of sub directories
  * (including the file)
  */
-uint64_t dir_count_sub(const char *path)
+uint32_t dir_count_sub(const char *path)
 {
     char *tmp = dir_strip_root(path);
-    for (uint64_t i = 0;; i++)
+    for (uint32_t i = 0;; i++)
         if (!strsep(&tmp, "/"))
             return dir_is_file(path) ? i : --i;
 }
@@ -87,7 +86,7 @@ uint64_t dir_count_sub(const char *path)
  * check for trailing / ; if it exists then all
  * we have is a path to a directory, not a file
  */
-bool dir_is_file(const char *path)
+uint32_t dir_is_file(const char *path)
 {
     if (path[strlen(path) - 1] != '/')
         return true;
@@ -101,7 +100,7 @@ char *dir_strip_root(const char *path)
 {
     if (path[0] != '/')
         return strdup(path);
-    char *str = calloc(strlen(path), sizeof( char ));
+    char *str = calloc(strlen(path), sizeof (char));
     strncpy(str, path + 1, strlen(path) - 1);
     return str;
 }
@@ -113,7 +112,7 @@ char *dir_strip_tail(const char *path)
 {
     if (path[strlen(path) - 1] != '/')
         return strdup(path);
-    char *str = calloc(strlen(path), sizeof( char ));
+    char *str = calloc(strlen(path), sizeof (char));
     strncpy(str, path, strlen(path) - 1);
     return str;
 }

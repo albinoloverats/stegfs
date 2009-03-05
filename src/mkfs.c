@@ -27,15 +27,15 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <inttypes.h>
 #include <sys/stat.h>
 
-#include "vstegfs.h"
-#include "serpent.h"
+#include "src/vstegfs.h"
+#include "src/serpent.h"
 
-#define NAME "mkfs"
+#define NAME "mkvstegfs"
 
 uint64_t filesystem;
-  size_t filesystem_size;
 
 int main(int argc, char **argv)
 {
@@ -44,12 +44,13 @@ int main(int argc, char **argv)
     errno = EXIT_SUCCESS;
     
     if (argc < 2)
-        return show_usage();
-
+    {
+        show_usage();
+        return EXIT_FAILURE;
+    }
     while (true)
     {
-        static struct option long_options[] =
-        {
+        static struct option long_options[] = {
             {"filesystem", required_argument, 0, 'f'},
             {"size"      , required_argument, 0, 's'},
             {"force"     , no_argument      , 0, 'x'},
@@ -74,20 +75,24 @@ int main(int argc, char **argv)
                 force = true;
                 break;
             case 'h':
-                return show_help();
+                show_help();
+                return EXIT_SUCCESS;
             case 'l':
-                return show_licence();
+                show_licence();
+                return EXIT_SUCCESS;
             case 'v':
-                return show_version();
+                show_version();
+                return EXIT_SUCCESS;
             case '?':
+                return EXIT_FAILURE;
             default:
-                fprintf(stderr, "%s: unknown option %c\n", NAME, opt);
                 return EXIT_FAILURE;
         }
     }
     /*
      * is this a device or a file?
      */
+	uint64_t fs_size = 0x0;
     struct stat *fs_stat = calloc(1, sizeof( struct stat ));
     stat(fs, fs_stat);
     switch (fs_stat->st_mode & S_IFMT)
@@ -101,7 +106,7 @@ int main(int argc, char **argv)
                 perror("Could not create the file system");
                 return errno;
             }
-            filesystem_size = (lseek(filesystem, 0, SEEK_END) / 1048576); // 1MB in bytes
+            fs_size = lseek(filesystem, 0, SEEK_END) / 1048576;
             break;
         case S_IFREG:
             if (force)
@@ -129,7 +134,7 @@ int main(int argc, char **argv)
     /*
      * check the size of the file system
      */
-    if (filesystem_size < 1)
+    if (fs_size < 1)
     {
         fprintf(stderr, "Cannot have a file system with size < 1MB\n");
         return EXIT_FAILURE;
@@ -137,37 +142,64 @@ int main(int argc, char **argv)
 
     fprintf(stdout, "Location : %s\n", fs);
 #ifdef __amd64__
-    fprintf(stdout, "Size     : %lu MB (%lu blocks)\n", filesystem_size, filesystem_size * SIZE_BLOCKS);
-    fprintf(stdout, "Usable   : %lu MB (Approx)\n", filesystem_size * 5 / 8);
+    fprintf(stdout, "Size     : %lu MB (%lu blocks)\n", fs_size, fs_size * SB_BLOCK);
+    fprintf(stdout, "Usable   : %lu MB (Approx)\n", fs_size * 5 / 8);
 #else
-    fprintf(stdout, "Size     : %llu MB (%llu blocks)\n", filesystem_size, filesystem_size * SIZE_BLOCKS);
-    fprintf(stdout, "Usable   : %llu MB (Approx)\n", filesystem_size * 5 / 8);
+    fprintf(stdout, "Size     : %llu MB (%llu blocks)\n", fs_size, fs_size * SB_BLOCKS);
+    fprintf(stdout, "Usable   : %llu MB (Approx)\n", fs_size * 5 / 8);
 #endif
 
-    char *data = malloc(LENGTH_DATA);
+    uint8_t *data = malloc(DATA);
     srand48(time(0));
 
-    char *IV = calloc(SERPENT_BYTES_B, sizeof( char ));
+    unsigned char *IV = calloc(SERPENT_B, sizeof( char ));
     char key_mat[1];
     uint32_t *subkeys = generate_key(key_mat);
 
-    for (uint64_t i = 0; i < filesystem_size * SIZE_BLOCKS; i++)
+//    uint16_t pc = 0;
+    for (uint64_t i = 0; i < filesystem_size * BLOCKS; i++)
     {
         uint64_t next = 0;
-        for (uint8_t j = 0; j < LENGTH_DATA; j++)
+        for (uint32_t j = 0; j < DATA; j++)
             data[j] = lrand48() % 0xFF;
-        for (uint8_t j = 0; j < LENGTH_NEXT; j++)
-            next = (next << SIZE_BYTE) | (lrand48() % 0xFF);
+        for (uint32_t j = 0; j < NEXT; j++)
+            next = (next << BYTE) | (lrand48() % 0xFF);
         key_mat[0] = (lrand48() % 0x08) + 48;
         
         errno = block_write(key_mat, data, next, IV, subkeys);
+
+//        if (pc < (uint16_t)((100 * i) / (filesystem_size * BLOCKS)))
+        {
+            fprintf(stdout, "\r%3i%% ", (uint16_t)((100 * i) / (filesystem_size * BLOCKS)));
+            if (((i * 100) / (filesystem_size * BLOCKS)) >= 100)
+                fprintf(stdout, "##########");
+            else if (((i * 100) / (filesystem_size * BLOCKS)) >= 90)
+                fprintf(stdout, "#########");
+            else if (((i * 100) / (filesystem_size * BLOCKS)) >= 80)
+                fprintf(stdout, "########");
+            else if (((i * 100) / (filesystem_size * BLOCKS)) >= 70)
+                fprintf(stdout, "#######");
+            else if (((i * 100) / (filesystem_size * BLOCKS)) >= 60)
+                fprintf(stdout, "######");
+            else if (((i * 100) / (filesystem_size * BLOCKS)) >= 50)
+                fprintf(stdout, "#####");
+            else if (((i * 100) / (filesystem_size * BLOCKS)) >= 40)
+                fprintf(stdout, "####");
+            else if (((i * 100) / (filesystem_size * BLOCKS)) >= 30)
+                fprintf(stdout, "###");
+            else if (((i * 100) / (filesystem_size * BLOCKS)) >= 20)
+                fprintf(stdout, "##");
+            else if (((i * 100) / (filesystem_size * BLOCKS)) >= 10)
+                fprintf(stdout, "#");
+//            pc = (100 * i) / (filesystem_size * BLOCKS);
+        }
     }
 
     close(filesystem);
     return errno;
 }
 
-uint64_t show_help(void)
+void show_help(void)
 {
     show_version();
     fprintf(stderr, "\n");
@@ -183,10 +215,9 @@ uint64_t show_help(void)
     fprintf(stderr, "\n  instead of a file (eg: /dev/sda1) a size is not needed as the file");
     fprintf(stderr, "\n  system will use all available space on that device/partition.");
     fprintf(stderr, "\n");
-    return EXIT_SUCCESS;
 }
 
-uint64_t show_licence(void)
+void show_licence(void)
 {
     fprintf(stderr, "This program is free software: you can redistribute it and/or modify\n");
     fprintf(stderr, "it under the terms of the GNU General Public License as published by\n");
@@ -200,17 +231,14 @@ uint64_t show_licence(void)
     fprintf(stderr, "\n");
     fprintf(stderr, "You should have received a copy of the GNU General Public License\n");
     fprintf(stderr, "along with this program.  If not, see <http://www.gnu.org/licenses/>.\n");
-    return EXIT_SUCCESS;
 }
 
-uint64_t show_usage(void)
+void show_usage(void)
 {
-    fprintf(stderr, "Usage\n  %s [OPTION] [ARGUMENT]\n", NAME);
-    return EXIT_FAILURE;
+    fprintf(stderr, "Usage:\n  %s [OPTION] [ARGUMENT]\n", NAME);
 }
 
-uint64_t show_version(void)
+void show_version(void)
 {
-    fprintf(stderr, "%s version : %s\n%*s built on: %s %s\n", NAME, VERSION, (int)strlen(NAME), "", __DATE__, __TIME__);
-    return EXIT_SUCCESS;
+    fprintf(stderr, "%s\n", NAME);
 }

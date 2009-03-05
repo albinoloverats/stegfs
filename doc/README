@@ -45,22 +45,22 @@ About:
 
 Technical Data:
     Serpent:
-        128 bit block
-        192 bit key
+        128-bit block
+        192-bit key
 
     Tiger:
-        192 bit hash
-        64 bit words
+        192-bit hash
+         64-bit words
 
     Standard (Header) File Block:
 
          Chunk Name        Size (in bits)
-        +--------------------------------+ -+--------+ --+
-        | Directory/Path Checksum    128 |           |   |
-        |                                |           |   +- Tiger128
-        |                                |           |   |
-        |                                |           |   |
-        +--------------------------------+           | --+
+        +--------------------------------+ -+
+        | Directory/Path Checksum    128 |  |
+        |                                |  +- Tiger128
+        |                                |  |
+        |                                |  |
+        +--------------------------------+ -+--------+
         | Data                       640 |           |
         |  (Starting blocks)             |           |
         |                                |           |
@@ -79,7 +79,7 @@ Technical Data:
         |                                |           |
         |                                |           |
         |                                |           |
-        |                                |           +- Serpent
+        |                                |           +- Serpent (x7)
         |                                |           |
         +--------------------------------+ -+ -------+
         | Checksum                   192 |  |        |
@@ -108,10 +108,3 @@ Notes:
     The en/decryption key for the block will be a combination of a
     user supplied password, name of the file and the group the file
     belongs to.
-
-    The first 64 bits are initially random data, which, after
-    encryption, has the group number XOR'd over the top. This
-    allows the entire block to be encrypted (with some random data
-    which can be discarded upon decryption), yet allows the path
-    identifier to remain visible without requiring that null values
-    be encrypted just to satisfy the Serpent block size.
