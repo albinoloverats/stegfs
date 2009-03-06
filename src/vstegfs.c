@@ -428,7 +428,7 @@ extern int64_t vstegfs_block_save(uint64_t fs, uint64_t pos, MCRYPT c, vblock_t 
     }
     uint8_t d[SB_SERPENT * 7] = { 0x00 };
     memcpy(d, ((uint8_t *)b) + SB_SERPENT, SB_BLOCK - SB_PATH);
-//    mcrypt_generic(c, d, sizeof( d ));
+    mcrypt_generic(c, d, sizeof( d ));
     memcpy(((uint8_t *)b) + SB_SERPENT, d, SB_BLOCK - SB_PATH);
     /*
      * write the encrypted block to this block location
@@ -444,7 +444,7 @@ static int64_t block_open(uint64_t fs, uint64_t pos, MCRYPT c, vblock_t *b)
     pread(fs, b, sizeof( vblock_t ), pos * SB_BLOCK);
     uint8_t d[SB_SERPENT * 7] = { 0x00 };
     memcpy(d, ((uint8_t *)b) + SB_SERPENT, SB_BLOCK - SB_PATH);
-//    mdecrypt_generic(c, d, sizeof( d ));
+    mdecrypt_generic(c, d, sizeof( d ));
     memcpy(((uint8_t *)b) + SB_SERPENT, d, SB_BLOCK - SB_PATH);
     /*
      * check the hash of the decrypted data
