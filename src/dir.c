@@ -18,22 +18,24 @@
  *
  */
 
-#include <stdio.h>
-#include <stddef.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdbool.h>
-#include <inttypes.h>
+#include "common/common.h"
 
 #include "src/dir.h"
+
+/*
+ * these functions all return newly allocated strings (which the user is
+ * required to free once finished with them)
+ */
 
 /*
  * return the file part of the path (everything after the final /)
  */
 extern char *dir_get_file(const char *path)
 {
-    char *namepass = dir_get_part(path, dir_count_sub(path));
-    return strtok(namepass, ":");
+    msg("%s", __func__);
+    if (!strrchr(path, '/'))
+        return strndup(path, strrchr(path, ':') - path);
+    return strndup(strrchr(path, '/') + 1, strrchr(path, ':') - strrchr(path, '/') - 1);
 }
 
 /*
@@ -41,9 +43,10 @@ extern char *dir_get_file(const char *path)
  */
 extern char *dir_get_pass(const char *path)
 {
-    char *namepass = dir_get_part(path, dir_count_sub(path));
-    strtok(namepass, ":");
-    return strtok(NULL, ":");
+    msg("%s", __func__);
+    if (!strrchr(path, ':'))
+        return strdup("");
+    return strdup(strrchr(path, ':')) + 1;
 }
 
 /*
@@ -51,65 +54,6 @@ extern char *dir_get_pass(const char *path)
  */
 extern char *dir_get_path(const char *path)
 {
-    char *ret = NULL;
-    for (uint64_t i = 1; i < dir_count_sub(path); i++)
-        asprintf(&ret, "%s/%s", ret ? ret : "", dir_get_part(path, i));
-    return ret ? ret : "/";
-}
-
-/*
- * get a specific part of a path
- */
-extern char *dir_get_part(const char *path, uint64_t entry)
-{
-    char *ret = NULL, *tmp = dir_strip_root(path);
-    for (uint64_t i = 0; i < entry; i++)
-        ret = strsep(&tmp, "/");
-    return ret;
-}
-
-/*
- * count the number of sub directories (including the file)
- */
-extern uint64_t dir_count_sub(const char *path)
-{
-    char *tmp = dir_strip_root(path);
-    for (uint64_t i = 0;; i++)
-        if (!strsep(&tmp, "/"))
-            return dir_is_file(path) ? i : --i;
-}
-
-/*
- * check for trailing / ; if it exists then all we have is a path to a
- * directory, not a file
- */
-extern uint64_t dir_is_file(const char *path)
-{
-    if (path[strlen(path) - 1] != '/')
-        return true;
-    return false;
-}
-
-/*
- * remove leading /
- */
-extern char *dir_strip_root(const char *path)
-{
-    if (path[0] != '/')
-        return strdup(path);
-    char *str = calloc(strlen(path), sizeof( char ));
-    strncpy(str, path + 1, strlen(path) - 1);
-    return str;
-}
-
-/*
- * remove trailing /
- */
-extern char *dir_strip_tail(const char *path)
-{
-    if (path[strlen(path) - 1] != '/')
-        return strdup(path);
-    char *str = calloc(strlen(path), sizeof( char ));
-    strncpy(str, path, strlen(path) - 1);
-    return str;
+    msg("%s", __func__);
+    return strndup(path, strrchr(path, '/') - path);
 }

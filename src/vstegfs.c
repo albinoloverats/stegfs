@@ -29,10 +29,10 @@
 
 #define _VSTEG_S_
 #include "src/vstegfs.h"
-#include "src/dir.h"
 
 extern int64_t vstegfs_save(vstat_t f)
 {
+    msg("%s", __func__);
     /*
      * some initial preparations - such as: is the file larger than the
      * file system? because that wouldn't be good :s
@@ -69,7 +69,7 @@ extern int64_t vstegfs_save(vstat_t f)
          * initialise the mcrypt library routines, and create a new IV
          * (based on the filename, password and copy number)
          */
-        MCRYPT c = vstegfs_mcrypt_init(&f, i);
+        MCRYPT c = vstegfs_crypt_init(&f, i);
         /*
          * make sure we're at the beginning of the file, our data buffer
          * is clean and we're looking at the correct starting block on
@@ -99,13 +99,14 @@ extern int64_t vstegfs_save(vstat_t f)
              */
             memcpy(b.path,  path, SB_PATH);
             memcpy(b.data,  data, SB_DATA);
-            /* the hash will get calculated when the block is saved */
+            memset(b.hash,  0x00, SB_HASH);
             memcpy(b.next, &next, SB_NEXT);
             /*
              * save the block - if there is a problem, give up with IO
              * error
              */
-            if (block_save(f.fs, this, c, &b))
+            hex((uint8_t *)&b, SB_BLOCK);
+            if (vstegfs_block_save(f.fs, this, c, &b))
                 return EIO;
             /*
              * get ready for the next chunk of data...
@@ -125,7 +126,7 @@ extern int64_t vstegfs_save(vstat_t f)
          * should be located
          */
         char *fp = NULL;
-        asprintf(&fp, "%s/%s", f.path, f.name);
+        asprintf(&fp, "%s/%s:%s", f.path, f.name, f.pass ?: ROOT_PATH);
         MHASH h = mhash_init(MHASH_TIGER);
         mhash(h, fp, strlen(fp));
         uint8_t *ph = mhash_end(h);
@@ -158,8 +159,8 @@ extern int64_t vstegfs_save(vstat_t f)
             /*
              * write this copy of the header
              */
-            MCRYPT c = vstegfs_mcrypt_init(&f, i);
-            if (block_save(f.fs, head, c, &b))
+            MCRYPT c = vstegfs_crypt_init(&f, i);
+            if (vstegfs_block_save(f.fs, head, c, &b))
                 return EIO;
             mcrypt_generic_deinit(c);
             mcrypt_module_close(c);
@@ -173,6 +174,7 @@ extern int64_t vstegfs_save(vstat_t f)
 
 extern int64_t vstegfs_open(vstat_t f)
 {
+    msg("%s", __func__);
     uint64_t path[2];
     {
         MHASH h = mhash_init(MHASH_TIGER);
@@ -201,7 +203,7 @@ extern int64_t vstegfs_open(vstat_t f)
      */
     for (uint8_t i = 0; i < MAX_COPIES; i++)
     {
-        MCRYPT c = vstegfs_mcrypt_init(&f, i);
+        MCRYPT c = vstegfs_crypt_init(&f, i);
         rewind(f.file); /* back to the beginning */
         uint64_t next = start[i];
         uint64_t bytes = 0x0;
@@ -211,8 +213,13 @@ extern int64_t vstegfs_open(vstat_t f)
         while (is_block_ours(f.fs, next, path))
         {
             vblock_t b;
+            msg("read block...");
             if (block_open(f.fs, next, c, &b))
+            {
+                hex((uint8_t *)&b, SB_BLOCK);
                 break;
+            }
+            hex((uint8_t *)&b, SB_BLOCK);
             /*
              * woo - we now have successfully decrypted another block
              * for this file
@@ -222,7 +229,6 @@ extern int64_t vstegfs_open(vstat_t f)
             if (bytes > f_size)
                 /* that was the final block, but we don't need all of it */
                 need = SB_DATA - (bytes - f_size);
-
             fwrite (&b.data, sizeof( uint8_t ), need, f.file);
 
             if (bytes >= f_size)
@@ -241,19 +247,21 @@ extern int64_t vstegfs_open(vstat_t f)
 
 extern uint64_t vstegfs_find(vstat_t f)
 {
+    msg("%s", __func__);
     vblock_t b;
     return vstegfs_header(&f, &b);
 }
 
-void vstegfs_kill(vstat_t f)
+extern void vstegfs_kill(vstat_t f)
 {
+    msg("%s", __func__);
     /*
      * calculate the locations of the header blocks
      */
     uint16_t header[MAX_COPIES] = { 0x0 };
     {
         char *fp = NULL;
-        asprintf(&fp, "%s/%s", f.path, f.name);
+        asprintf(&fp, "%s/%s:%s", f.path, f.name, f.pass ?: ROOT_PATH);
         MHASH h = mhash_init(MHASH_TIGER);
         mhash(h, fp, strlen(fp));
         uint8_t *ph = mhash_end(h);
@@ -282,7 +290,7 @@ void vstegfs_kill(vstat_t f)
              * one of our header blocks, thus it needs randomising
              */
             vblock_t b;
-            MCRYPT c = vstegfs_mcrypt_init(&f, i);
+            MCRYPT c = vstegfs_crypt_init(&f, i);
 
             uint8_t path[SB_PATH];
             uint8_t data[SB_DATA];
@@ -299,7 +307,7 @@ void vstegfs_kill(vstat_t f)
             memcpy(b.data, data, SB_DATA);
             memcpy(b.next, next, SB_NEXT);
 
-            block_save(f.fs, head, c, &b);
+            vstegfs_block_save(f.fs, head, c, &b);
 
             mcrypt_generic_deinit(c);
             mcrypt_module_close(c);
@@ -309,13 +317,14 @@ void vstegfs_kill(vstat_t f)
 
 static uint64_t vstegfs_header(vstat_t *f, vblock_t *b)
 {
+    msg("%s", __func__);
     /*
      * find the header blocks for the file
      */
     uint16_t header[MAX_COPIES] = { 0x0 };
     {
         char *fp = NULL;
-        asprintf(&fp, "%s/%s:%s", f->path, f->name, f->pass);
+        asprintf(&fp, "%s/%s:%s", f->path, f->name, f->pass ?: ROOT_PATH);
         MHASH h = mhash_init(MHASH_TIGER);
         mhash(h, fp, strlen(fp));
         uint8_t *ph = mhash_end(h);
@@ -351,7 +360,7 @@ static uint64_t vstegfs_header(vstat_t *f, vblock_t *b)
              * found a header block which might be ours, if we can read
              * its contents we're in business
              */
-            MCRYPT c = vstegfs_mcrypt_init(f, i);
+            MCRYPT c = vstegfs_crypt_init(f, i);
             if (!block_open(f->fs, head, c, b))
             {
                 /*
@@ -369,13 +378,14 @@ static uint64_t vstegfs_header(vstat_t *f, vblock_t *b)
     return f_size;
 }
 
-static MCRYPT vstegfs_mcrypt_init(vstat_t *f, uint8_t ivi)
+extern MCRYPT vstegfs_crypt_init(vstat_t *f, uint8_t ivi)
 {
+    msg("%s", __func__);
     MCRYPT c = mcrypt_module_open(MCRYPT_SERPENT, NULL, MCRYPT_CBC, NULL);
     uint8_t key[SB_TIGER] = { 0x00 };
     {
         char *fk = NULL;
-        asprintf(&fk, "%s:%s", f->name, f->pass ?: "vstegfs");
+        asprintf(&fk, "%s:%s", f->name, f->pass ?: ROOT_PATH);
         MHASH h = mhash_init(MHASH_TIGER);
         mhash(h, fk, strlen(fk));
         uint8_t *ph = mhash_end(h);
@@ -386,7 +396,7 @@ static MCRYPT vstegfs_mcrypt_init(vstat_t *f, uint8_t ivi)
     uint8_t ivs[SB_SERPENT] = { 0x00 };
     {
         char *iv_s = NULL;
-        asprintf(&iv_s, "%s:%i", f->name, ivi);
+        asprintf(&iv_s, "%s+%i", f->name, ivi);
         MHASH h = mhash_init(MHASH_TIGER);
         mhash(h, iv_s, strlen(iv_s));
         uint8_t *ph = mhash_end(h);
@@ -398,12 +408,9 @@ static MCRYPT vstegfs_mcrypt_init(vstat_t *f, uint8_t ivi)
     return c;
 }
 
-/*
- * local block functions
- */
-
-static int64_t block_save(uint64_t fs, uint64_t pos, MCRYPT c, vblock_t *b)
+extern int64_t vstegfs_block_save(uint64_t fs, uint64_t pos, MCRYPT c, vblock_t *b)
 {
+    msg("%s", __func__);
     errno = EXIT_SUCCESS;
     /*
      * calculate the hash of the data
@@ -421,7 +428,7 @@ static int64_t block_save(uint64_t fs, uint64_t pos, MCRYPT c, vblock_t *b)
     }
     uint8_t d[SB_SERPENT * 7] = { 0x00 };
     memcpy(d, ((uint8_t *)b) + SB_SERPENT, SB_BLOCK - SB_PATH);
-    mcrypt_generic(c, d, sizeof( d ));
+//    mcrypt_generic(c, d, sizeof( d ));
     memcpy(((uint8_t *)b) + SB_SERPENT, d, SB_BLOCK - SB_PATH);
     /*
      * write the encrypted block to this block location
@@ -432,12 +439,12 @@ static int64_t block_save(uint64_t fs, uint64_t pos, MCRYPT c, vblock_t *b)
 
 static int64_t block_open(uint64_t fs, uint64_t pos, MCRYPT c, vblock_t *b)
 {
+    msg("%s", __func__);
     errno = EXIT_SUCCESS;
     pread(fs, b, sizeof( vblock_t ), pos * SB_BLOCK);
-
     uint8_t d[SB_SERPENT * 7] = { 0x00 };
     memcpy(d, ((uint8_t *)b) + SB_SERPENT, SB_BLOCK - SB_PATH);
-    mdecrypt_generic(c, d, sizeof( d ));
+//    mdecrypt_generic(c, d, sizeof( d ));
     memcpy(((uint8_t *)b) + SB_SERPENT, d, SB_BLOCK - SB_PATH);
     /*
      * check the hash of the decrypted data
@@ -452,11 +459,13 @@ static int64_t block_open(uint64_t fs, uint64_t pos, MCRYPT c, vblock_t *b)
     }
     if (memcmp(hash, b->hash, SB_HASH))
         return EXIT_FAILURE;
+    msg("return %i", errno);
     return errno;
 }
 
 static bool is_block_ours(uint64_t fs, uint64_t pos, uint64_t *hash)
 {
+    msg("%s", __func__);
     uint8_t buf[SB_PATH] = { 0x00 };
     if (pread(fs, buf, SB_PATH, pos * SB_BLOCK) < 0)
         return false; /* we screwed up, so just assume it's not ours :p */
@@ -467,33 +476,33 @@ static bool is_block_ours(uint64_t fs, uint64_t pos, uint64_t *hash)
 
 static uint64_t calc_next_block(uint64_t fs, char *path)
 {
-    uint64_t block = 0x0;
+    msg("%s", __func__);
     uint64_t fsb = lseek(fs, 0, SEEK_END) / SB_BLOCK;
+    uint64_t block = ((mrand48() << 0x20) | mrand48()) % fsb;
     int16_t att = 0; /* give us up to 32767 attempts to find a block */
-    bool found = false;
-    /*
-     * set everything so we can check we're not overwriting a file which
-     * is along the same path as us
-     */
-    char *p = dir_strip_tail(path);
-    uint64_t ents = dir_count_sub(p);
+    bool found = true;
     /*
      * we will skip past the root directory - files in the root can be
      * overwritten by any other files, even those also in the root -
      * this may seem a little odd, but trust me, it's for the best
      */
-    for (uint64_t i = 2; i <= ents; i++)
+    char *token = NULL;
+    char *p = strdup(path);
+    char *s = NULL;
+    while ((token = strsep(&p, "/")))
     {
-        char *ent = dir_get_part(p, i);
+        if (!strcmp(token, ROOT_PATH))
+            continue;
+        found = false;
+        asprintf(&s, "%s/%s", s ? s : "", token);
         uint8_t hash[SB_PATH] = { 0x00 };
         {
             MHASH h = mhash_init(MHASH_TIGER);
-            mhash(h, ent, strlen(ent));
+            mhash(h, s, strlen(s));
             uint8_t *ph = mhash_end(h);
             memcpy(hash, ph, SB_PATH);
             free(ph);
         }
-        free(ent);
         if (att++ < 0)
             break;
         block = ((mrand48() << 0x20) | mrand48()) % fsb;
@@ -507,6 +516,6 @@ static uint64_t calc_next_block(uint64_t fs, char *path)
         found = true;
         break;
     }
-    free(p);
+    free(s);
     return found ? block : 0;
 }

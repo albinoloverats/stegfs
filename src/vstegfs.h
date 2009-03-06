@@ -35,6 +35,7 @@
 
   #define MAX_COPIES 9
 
+  #define ROOT_PATH "vstegfs"
 
   typedef struct vstat_t
   {
@@ -61,10 +62,13 @@
   extern uint64_t vstegfs_find(vstat_t);
   extern   void   vstegfs_kill(vstat_t);
 
+  #if defined(_VBLOCK_SAVE_) || defined(_VSTEG_S_)
+    extern MCRYPT  vstegfs_crypt_init(vstat_t *, uint8_t);
+    extern int64_t vstegfs_block_save(uint64_t, uint64_t, MCRYPT, vblock_t *);
+  #endif /* _VBLOCK_SAVE_ */
+
   #ifdef _VSTEG_S_
     static uint64_t vstegfs_header(vstat_t *, vblock_t *);
-    static MCRYPT vstegfs_mcrypt_init(vstat_t *, uint8_t);
-    static int64_t block_save(uint64_t, uint64_t, MCRYPT, vblock_t *);
     static int64_t block_open(uint64_t, uint64_t, MCRYPT, vblock_t *);
     static bool is_block_ours(uint64_t, uint64_t, uint64_t *);
     static uint64_t calc_next_block(uint64_t, char *);

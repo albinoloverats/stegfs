@@ -19,38 +19,42 @@
  */
 
 #include <time.h>
-#include <errno.h>
 #include <fcntl.h>
-#include <stdio.h>
 #include <getopt.h>
-#include <stdlib.h>
-#include <string.h>
+#include <mcrypt.h>
 #include <unistd.h>
-#include <stdbool.h>
-#include <inttypes.h>
 #include <sys/stat.h>
 
+#include "common/common.h"
+
+#define _VBLOCK_SAVE_
 #include "src/vstegfs.h"
-#include "src/serpent.h"
 
-#define NAME "mkvstegfs"
+#define APP "mkvstegfs"
+#define VER "200903-"
 
-uint64_t filesystem;
+#define SM_1TB 0x00100000 /* size in MB of 1 TB */
+#define SM_1GB 0x00000400 /* size in MB of 1 GB */
+
+#define SB_1MB 1048576
+
+static uint64_t size_in_mb(char *);
 
 int main(int argc, char **argv)
 {
-    char *fs = NULL;
+    init(APP, VER);
+
+    uint64_t  fs_size = 0x0;
+    char     *fs_name = NULL;
+
     bool force = false;
-    errno = EXIT_SUCCESS;
-    
+
     if (argc < 2)
-    {
-        show_usage();
-        return EXIT_FAILURE;
-    }
+        return show_usage();
     while (true)
     {
-        static struct option long_options[] = {
+        static struct option long_options[] =
+        {
             {"filesystem", required_argument, 0, 'f'},
             {"size"      , required_argument, 0, 's'},
             {"force"     , no_argument      , 0, 'x'},
@@ -66,179 +70,204 @@ int main(int argc, char **argv)
         switch (opt)
         {
             case 'f':
-                fs = strdup(optarg);
+                fs_name = strdup(optarg);
                 break;
             case 's':
-                filesystem_size = strtoll(optarg, NULL, 0);
+                fs_size = size_in_mb(optarg);
                 break;
             case 'x':
                 force = true;
                 break;
             case 'h':
-                show_help();
-                return EXIT_SUCCESS;
+                return show_help();
             case 'l':
-                show_licence();
-                return EXIT_SUCCESS;
+                return show_licence();
             case 'v':
-                show_version();
-                return EXIT_SUCCESS;
+                return show_version();
             case '?':
-                return EXIT_FAILURE;
             default:
-                return EXIT_FAILURE;
+                die("unknown option %c", opt);
         }
     }
     /*
      * is this a device or a file?
      */
-	uint64_t fs_size = 0x0;
-    struct stat *fs_stat = calloc(1, sizeof( struct stat ));
-    stat(fs, fs_stat);
-    switch (fs_stat->st_mode & S_IFMT)
+    uint64_t fs = 0x0;
+    struct stat fs_stat;
+    stat(fs_name, &fs_stat);
+    switch (fs_stat.st_mode & S_IFMT)
     {
         case S_IFBLK:
             /*
              * use a device as the file system
              */
-            if ((filesystem = open(fs, O_WRONLY | F_WRLCK, S_IRUSR | S_IWUSR)) < 0)
-            {
-                perror("Could not create the file system");
-                return errno;
-            }
-            fs_size = lseek(filesystem, 0, SEEK_END) / 1048576;
+            if ((fs = open(fs_name, O_WRONLY | F_WRLCK, S_IRUSR | S_IWUSR)) < 0)
+                die("could not create the file system");
+            fs_size = lseek(fs, 0, SEEK_END) / SB_1MB;
             break;
         case S_IFREG:
             if (force)
                 break;
-            fprintf(stderr, "File by that name already exists - use -x to force\n");
-            return EEXIST;
+            die("file by that name already exists - use -x to force");
         case S_IFDIR:
         case S_IFCHR:
         case S_IFLNK:
         case S_IFSOCK:
         case S_IFIFO:
-            fprintf(stderr, "Unable to create file system on specified device\n");
-            return ENODEV;
+            die("unable to create file system on specified device");
         default:
             /*
              * file doesn't exist - good, lets create it...
              */
-            if ((filesystem = open(fs, O_WRONLY | O_CREAT | O_EXCL | O_TRUNC | F_WRLCK, S_IRUSR | S_IWUSR)) < 0)
-            {
-                perror("Could not create the file system");
-                return errno;
-            }
+            if ((fs = open(fs_name, O_WRONLY | O_CREAT | O_EXCL | O_TRUNC | F_WRLCK, S_IRUSR | S_IWUSR)) < 0)
+                die("could not create the file system");
             break;
     }
     /*
      * check the size of the file system
      */
     if (fs_size < 1)
+        die("cannot have a file system with size < 1MB");
+    /*
+     * display some information about the soon-to-be file system to the
+     * user
+     */
+    msg("location      : %s", fs_name);
+    uint64_t fs_blocks = fs_size * SB_1MB / SB_BLOCK;
+    msg("total blocks  : %8lu", fs_blocks);
     {
-        fprintf(stderr, "Cannot have a file system with size < 1MB\n");
-        return EXIT_FAILURE;
-    }
-
-    fprintf(stdout, "Location : %s\n", fs);
-#ifdef __amd64__
-    fprintf(stdout, "Size     : %lu MB (%lu blocks)\n", fs_size, fs_size * SB_BLOCK);
-    fprintf(stdout, "Usable   : %lu MB (Approx)\n", fs_size * 5 / 8);
-#else
-    fprintf(stdout, "Size     : %llu MB (%llu blocks)\n", fs_size, fs_size * SB_BLOCKS);
-    fprintf(stdout, "Usable   : %llu MB (Approx)\n", fs_size * 5 / 8);
-#endif
-
-    uint8_t *data = malloc(DATA);
-    srand48(time(0));
-
-    unsigned char *IV = calloc(SERPENT_B, sizeof( char ));
-    char key_mat[1];
-    uint32_t *subkeys = generate_key(key_mat);
-
-//    uint16_t pc = 0;
-    for (uint64_t i = 0; i < filesystem_size * BLOCKS; i++)
-    {
-        uint64_t next = 0;
-        for (uint32_t j = 0; j < DATA; j++)
-            data[j] = lrand48() % 0xFF;
-        for (uint32_t j = 0; j < NEXT; j++)
-            next = (next << BYTE) | (lrand48() % 0xFF);
-        key_mat[0] = (lrand48() % 0x08) + 48;
-        
-        errno = block_write(key_mat, data, next, IV, subkeys);
-
-//        if (pc < (uint16_t)((100 * i) / (filesystem_size * BLOCKS)))
+        char *units = strdup("MB");
+        float volume = fs_size;
+        if (volume >= SM_1TB)
         {
-            fprintf(stdout, "\r%3i%% ", (uint16_t)((100 * i) / (filesystem_size * BLOCKS)));
-            if (((i * 100) / (filesystem_size * BLOCKS)) >= 100)
-                fprintf(stdout, "##########");
-            else if (((i * 100) / (filesystem_size * BLOCKS)) >= 90)
-                fprintf(stdout, "#########");
-            else if (((i * 100) / (filesystem_size * BLOCKS)) >= 80)
-                fprintf(stdout, "########");
-            else if (((i * 100) / (filesystem_size * BLOCKS)) >= 70)
-                fprintf(stdout, "#######");
-            else if (((i * 100) / (filesystem_size * BLOCKS)) >= 60)
-                fprintf(stdout, "######");
-            else if (((i * 100) / (filesystem_size * BLOCKS)) >= 50)
-                fprintf(stdout, "#####");
-            else if (((i * 100) / (filesystem_size * BLOCKS)) >= 40)
-                fprintf(stdout, "####");
-            else if (((i * 100) / (filesystem_size * BLOCKS)) >= 30)
-                fprintf(stdout, "###");
-            else if (((i * 100) / (filesystem_size * BLOCKS)) >= 20)
-                fprintf(stdout, "##");
-            else if (((i * 100) / (filesystem_size * BLOCKS)) >= 10)
-                fprintf(stdout, "#");
-//            pc = (100 * i) / (filesystem_size * BLOCKS);
+            volume /= SM_1TB;
+            units = strdup("TB");
         }
+        else if (volume >= SM_1GB)
+        {
+            volume /= SM_1GB;
+            units = strdup("GB");
+        }
+        msg("volume        : %8.2f %s", volume, units);
+        free(units);
+    }
+    {
+        char *units = strdup("MB");
+        float fs_data = fs_size * SB_DATA;
+        fs_data /= SB_BLOCK;
+        if (fs_data >= SM_1TB)
+        {
+            fs_data /= SM_1TB;
+            units = strdup("TB");
+        }
+        else if (fs_data >= SM_1GB)
+        {
+            fs_data /= SM_1GB;
+            units = strdup("GB");
+        }
+        msg("data capacity : %8.2f %s", fs_data, units);
+        free(units);
+    }
+    {
+        char *units = strdup("MB");
+        float fs_avail = fs_size * SB_DATA;
+        fs_avail /= SB_BLOCK;
+        fs_avail /= MAX_COPIES;
+        if (fs_avail >= SM_1TB)
+        {
+            fs_avail /= SM_1TB;
+            units = strdup("TB");
+        }
+        else if (fs_avail >= SM_1GB)
+        {
+            fs_avail /= SM_1GB;
+            units = strdup("GB");
+        }
+        msg("usable space  : %8.2f %s", fs_avail, units);
+        free(units);
+    }
+    /*
+     * create lots of noise
+     */
+    vstat_t f;
+    f.fs   = fs;
+    f.name = malloc(SB_PATH);
+    f.pass = malloc(SB_HASH);
+
+    for (uint64_t i = 0; i < fs_blocks; i++)
+    {
+        for (uint8_t j = 0; j < SB_PATH; j++)
+            f.name[j] = mrand48();
+        for (uint8_t j = 0; j < SB_HASH; j++)
+            f.pass[j] = mrand48();
+
+        MCRYPT c = vstegfs_crypt_init(&f, i);
+
+        vblock_t b;
+        {
+            uint8_t path[SB_PATH];
+            uint8_t data[SB_DATA];
+            uint8_t next[SB_NEXT];
+
+            for (uint8_t j = 0; j < SB_PATH; j++)
+                path[j] = mrand48();
+            for (uint8_t j = 0; j < SB_DATA; j++)
+                data[j] = mrand48();
+            for (uint8_t j = 0; j < SB_NEXT; j++)
+                next[j] = mrand48();
+
+            memcpy(b.path, path, SB_PATH);
+            memcpy(b.data, data, SB_DATA);
+            memcpy(b.next, next, SB_NEXT);
+        }
+
+        vstegfs_block_save(fs, i, c, &b);
+
+        mcrypt_generic_deinit(c);
+        mcrypt_module_close(c);
     }
 
-    close(filesystem);
+    close(fs);
     return errno;
 }
 
-void show_help(void)
+uint64_t size_in_mb(char *s)
+{
+    /*
+     * parse the value for our file system size (if using a file on an
+     * existing file system) allowing for suffixes: MB, GB or TB - a
+     * size less than 1MB is silly :p and more than 1TB is insane
+     */
+    char *f;
+    uint64_t v = strtol(s, &f, 0);
+    switch (f[0])
+    {
+        case 'T':
+            v *= SM_1TB;
+            break;
+        case 'G':
+            v *= SM_1GB;
+            break;
+        case 'M':
+        default:
+            break;
+    }
+    return v;
+}
+
+int64_t show_help(void)
 {
     show_version();
-    fprintf(stderr, "\n");
     show_usage();
-    fprintf(stderr, "\n  -f, --filesystem  FILE SYSTEM  Where to write the file system to");
-    fprintf(stderr, "\n  -s, --size        SIZE         Size of the file system in MB");
-    fprintf(stderr, "\n  -x, --force                    Force overwriting an existing file");
-    fprintf(stderr, "\n  -h, --help                     Show this help list");
-    fprintf(stderr, "\n  -l, --licence                  Show overview of GNU GPL");
-    fprintf(stderr, "\n  -v, --version                  Show version information");
-    fprintf(stderr, "\n");
-    fprintf(stderr, "\n  A tool for creating vstegfs file system images. If a device is used");
-    fprintf(stderr, "\n  instead of a file (eg: /dev/sda1) a size is not needed as the file");
-    fprintf(stderr, "\n  system will use all available space on that device/partition.");
-    fprintf(stderr, "\n");
-}
-
-void show_licence(void)
-{
-    fprintf(stderr, "This program is free software: you can redistribute it and/or modify\n");
-    fprintf(stderr, "it under the terms of the GNU General Public License as published by\n");
-    fprintf(stderr, "the Free Software Foundation, either version 3 of the License, or\n");
-    fprintf(stderr, "(at your option) any later version.\n");
-    fprintf(stderr, "\n");
-    fprintf(stderr, "This program is distributed in the hope that it will be useful,\n");
-    fprintf(stderr, "but WITHOUT ANY WARRANTY; without even the implied warranty of\n");
-    fprintf(stderr, "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n");
-    fprintf(stderr, "GNU General Public License for more details.\n");
-    fprintf(stderr, "\n");
-    fprintf(stderr, "You should have received a copy of the GNU General Public License\n");
-    fprintf(stderr, "along with this program.  If not, see <http://www.gnu.org/licenses/>.\n");
-}
-
-void show_usage(void)
-{
-    fprintf(stderr, "Usage:\n  %s [OPTION] [ARGUMENT]\n", NAME);
-}
-
-void show_version(void)
-{
-    fprintf(stderr, "%s\n", NAME);
+    fprintf(stderr, "\nOptions:\n\n");
+    fprintf(stderr, "  -f, --filesystem  FILE SYSTEM  Where to write the file system to\n");
+    fprintf(stderr, "  -s, --size        SIZE         Size of the file system in MB\n");
+    fprintf(stderr, "  -x, --force                    Force overwriting an existing file\n");
+    fprintf(stderr, "  -h, --help                     Show this help list\n");
+    fprintf(stderr, "  -l, --licence                  Show overview of GNU GPL\n");
+    fprintf(stderr, "  -v, --version                  Show version information\n\n");
+    fprintf(stderr, "  A tool for creating vstegfs file system images. If a device is used\n");
+    fprintf(stderr, "  instead of a file (eg: /dev/sda1) a size is not needed as the file\n");
+    fprintf(stderr, "  system will use all available space on that device/partition.\n\n");
+    return EXIT_SUCCESS;
 }

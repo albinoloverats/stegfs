@@ -49,17 +49,16 @@ static uint64_t filesystem;
 
 static int vstegfs_getattr(const char *path, struct stat *stbuf)
 {
-    char *name = dir_get_file(path);
-    memset(stbuf, 0, sizeof( struct stat ));
+    char *this = dir_get_file(path);
     uint64_t inod = 0x0, size = 0x0;
-    if (strcmp(path, "/") == 0)
+    if (!strcmp(path, "/"))
     {
         stbuf->st_mode = S_IFDIR | 0700;
         stbuf->st_nlink = 2;
         stbuf->st_uid = fuse_get_context()->uid;
         stbuf->st_gid = fuse_get_context()->gid;
     }
-    else if (name[0] == '+')
+    else if (this[0] == '+')
     {
         stbuf->st_mode = S_IFDIR | 0700;
         stbuf->st_nlink = 2;
@@ -67,7 +66,7 @@ static int vstegfs_getattr(const char *path, struct stat *stbuf)
     else
     {
         char *p = NULL;
-        asprintf(&p, "vstegfs%s", path);
+        asprintf(&p, "%s%s", ROOT_PATH, path);
         msg("look up: %s", p);
         vstat_t vs;
         {
@@ -79,6 +78,9 @@ static int vstegfs_getattr(const char *path, struct stat *stbuf)
         }
         size = vstegfs_find(vs);
         free(p);
+        free(vs.name);
+        free(vs.path);
+        free(vs.pass);
         stbuf->st_mode = S_IFREG | 0600;
         stbuf->st_nlink = 1;
     }
@@ -89,6 +91,7 @@ static int vstegfs_getattr(const char *path, struct stat *stbuf)
     stbuf->st_blksize = SB_BLOCK;
     stbuf->st_blocks = (int)((size / SB_BLOCK) + 1);
 
+    free(this);
     return EXIT_SUCCESS;
 }
 
@@ -102,7 +105,7 @@ static int vstegfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, 
 static int vstegfs_unlink(const char *path)
 {
     char *p = NULL;
-    asprintf(&p, "vstegfs%s", path);
+    asprintf(&p, "%s%s", ROOT_PATH, path);
 
     vstat_t vk;
     {
@@ -115,6 +118,9 @@ static int vstegfs_unlink(const char *path)
     vstegfs_kill(vk);
 
     free(p);
+    free(vk.name);
+    free(vk.path);
+    free(vk.pass);
     return EXIT_SUCCESS;
 }
 
@@ -123,8 +129,7 @@ static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, 
     if (!offset)
     {
         char *p = NULL;
-        asprintf(&p, "vstegfs%s", path);
-        msg("read: %s", p);
+        asprintf(&p, "%s%s", ROOT_PATH, path);
 
         {
             vstat_t vs;
@@ -133,8 +138,13 @@ static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, 
             vs.name = dir_get_file(p);
             vs.path = dir_get_path(p);
             vs.pass = dir_get_pass(p);
+
             cache_read.size = vstegfs_find(vs);
             cache_read.data = realloc(cache_read.data, cache_read.size);
+
+            free(vs.name);
+            free(vs.path);
+            free(vs.pass);
         }
 
         FILE *stream = open_memstream((char **)&cache_read.data, &cache_read.size);
@@ -148,6 +158,10 @@ static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, 
             vs.pass = dir_get_pass(p);
 
             errno = vstegfs_open(vs);
+
+            free(vs.name);
+            free(vs.path);
+            free(vs.pass);
         }
 
         fclose(stream);
@@ -177,7 +191,7 @@ static int vstegfs_write(const char *path, const char *buf, size_t size, off_t o
         return size;
 
     char *p = NULL;
-    asprintf(&p, "vstegfs%s", path);
+    asprintf(&p, "%s%s", ROOT_PATH, path);
     msg("write: %s", p);
 
     FILE *stream = fmemopen(cache_write.data, cache_write.size, "r");
@@ -191,6 +205,10 @@ static int vstegfs_write(const char *path, const char *buf, size_t size, off_t o
         vs.pass = dir_get_pass(p);
 
         errno = vstegfs_save(vs);
+
+        free(vs.name);
+        free(vs.path);
+        free(vs.pass);
     }
 
     fclose(stream);
@@ -276,8 +294,8 @@ int main(int argc, char **argv)
             {"version"   , no_argument      , 0, 'v'},
             {0, 0, 0, 0}
         };
-        int32_t optex = 0;
-        int32_t opt = getopt_long(argc, argv, "df:m:hlv", long_options, &optex);
+        int optex = 0;
+        int opt = getopt_long(argc, argv, "df:m:hlv", long_options, &optex);
         if (opt == -1)
             break;
         switch (opt)

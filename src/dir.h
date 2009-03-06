@@ -24,13 +24,5 @@
   extern char *dir_get_file(const char *);
   extern char *dir_get_pass(const char *);
   extern char *dir_get_path(const char *);
-  extern char *dir_get_part(const char *, uint64_t);
-
-  extern uint64_t dir_count_sub(const char *);
-
-  extern uint64_t dir_is_file(const char *);
-
-  extern char *dir_strip_root(const char *);
-  extern char *dir_strip_tail(const char *);
 
 #endif /* _DIR_H_ */
