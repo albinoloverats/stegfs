@@ -477,7 +477,12 @@ static uint64_t calc_next_block(uint64_t fs, char *path)
      */
     char *p = dir_strip_tail(path);
     uint64_t ents = dir_count_sub(p);
-    for (uint64_t i = 1; i <= ents; i++)
+    /*
+     * we will skip past the root directory - files in the root can be
+     * overwritten by any other files, even those also in the root -
+     * this may seem a little odd, but trust me, it's for the best
+     */
+    for (uint64_t i = 2; i <= ents; i++)
     {
         char *ent = dir_get_part(p, i);
         uint8_t hash[SB_PATH] = { 0x00 };
