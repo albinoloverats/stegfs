@@ -53,6 +53,10 @@ static int vstegfs_getattr(const char *path, struct stat *stbuf)
     uint64_t inod = 0x0, size = 0x0;
     if (!strcmp(path, "/"))
     {
+        /*
+         * TODO the root dir could return size == total capacity
+         * (maybe?)
+         */
         stbuf->st_mode = S_IFDIR | 0700;
         stbuf->st_nlink = 2;
         stbuf->st_uid = fuse_get_context()->uid;
@@ -67,11 +71,12 @@ static int vstegfs_getattr(const char *path, struct stat *stbuf)
     {
         char *p = NULL;
         asprintf(&p, "%s%s", ROOT_PATH, path);
-        msg("look up: %s", p);
+        msg("look up = %s", p);
         vstat_t vs;
         {
             vs.fs   = filesystem;
             vs.file = NULL;
+            vs.size = NULL;
             vs.name = dir_get_file(p);
             vs.path = dir_get_path(p);
             vs.pass = dir_get_pass(p);
@@ -106,11 +111,13 @@ static int vstegfs_unlink(const char *path)
 {
     char *p = NULL;
     asprintf(&p, "%s%s", ROOT_PATH, path);
+    msg("unlink = %s", p);
 
     vstat_t vk;
     {
         vk.fs   = filesystem;
         vk.file = NULL;
+        vk.size = NULL;
         vk.name = dir_get_file(p);
         vk.path = dir_get_path(p);
         vk.pass = dir_get_pass(p);
@@ -130,11 +137,13 @@ static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, 
     {
         char *p = NULL;
         asprintf(&p, "%s%s", ROOT_PATH, path);
+        msg("read = %s", p);
 
         {
             vstat_t vs;
             vs.fs   = filesystem;
             vs.file = NULL;
+            vs.size = NULL;
             vs.name = dir_get_file(p);
             vs.path = dir_get_path(p);
             vs.pass = dir_get_pass(p);
@@ -153,6 +162,7 @@ static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, 
             vstat_t vs;
             vs.fs   = filesystem;
             vs.file = stream;
+            vs.size = NULL;
             vs.name = dir_get_file(p);
             vs.path = dir_get_path(p);
             vs.pass = dir_get_pass(p);
@@ -192,7 +202,7 @@ static int vstegfs_write(const char *path, const char *buf, size_t size, off_t o
 
     char *p = NULL;
     asprintf(&p, "%s%s", ROOT_PATH, path);
-    msg("write: %s", p);
+    msg("write = %s", p);
 
     FILE *stream = fmemopen(cache_write.data, cache_write.size, "r");
 
@@ -200,6 +210,7 @@ static int vstegfs_write(const char *path, const char *buf, size_t size, off_t o
     {
         vs.fs   = filesystem;
         vs.file = stream;
+        vs.size = &cache_write.size;
         vs.name = dir_get_file(p);
         vs.path = dir_get_path(p);
         vs.pass = dir_get_pass(p);

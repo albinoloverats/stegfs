@@ -36,9 +36,8 @@ extern int64_t vstegfs_save(vstat_t f)
      * some initial preparations - such as: is the file larger than the
      * file system? because that wouldn't be good :s
      */
-    uint64_t f_size = (fseek(f.file, 0, SEEK_END) ? 0 : ftell(f.file));
     uint64_t fs_size = lseek(f.fs, 0, SEEK_END);
-    if (MAX_COPIES * f_size > fs_size * 5 / 8)
+    if (MAX_COPIES * *f.size > fs_size * 5 / 8)
         return EFBIG;
     uint64_t fs_blocks = fs_size / SB_BLOCK;
     srand48(time(0));
@@ -104,7 +103,6 @@ extern int64_t vstegfs_save(vstat_t f)
              * save the block - if there is a problem, give up with IO
              * error
              */
-            hex((uint8_t *)&b, SB_BLOCK);
             if (vstegfs_block_save(f.fs, this, c, &b))
                 return EIO;
             /*
@@ -145,7 +143,7 @@ extern int64_t vstegfs_save(vstat_t f)
             memcpy(b.data + i * sizeof( uint64_t ), &start[i], sizeof( uint64_t ));
         for (uint8_t i = 1; i <= sizeof( uint64_t ); i++)
             b.data[SB_DATA - i] = mrand48();
-        memcpy(b.next, &f_size, sizeof( uint64_t ));
+        memcpy(b.next, f.size, SB_NEXT);
         for (uint8_t i = 0; i < MAX_COPIES; i++)
         {
             /*
@@ -212,11 +210,7 @@ extern int64_t vstegfs_open(vstat_t f)
         {
             vblock_t b;
             if (block_open(f.fs, next, c, &b))
-            {
-                hex((uint8_t *)&b, SB_BLOCK);
                 break;
-            }
-            hex((uint8_t *)&b, SB_BLOCK);
             /*
              * woo - we now have successfully decrypted another block
              * for this file
@@ -369,10 +363,11 @@ static uint64_t vstegfs_header(vstat_t *f, vblock_t *b)
         if (f_size)
             break;
     }
+    msg("file has size = %lu", f_size);
     return f_size;
 }
 
-extern MCRYPT vstegfs_crypt_init(vstat_t *f, uint8_t ivi)
+static MCRYPT vstegfs_crypt_init(vstat_t *f, uint8_t ivi)
 {
     MCRYPT c = mcrypt_module_open(MCRYPT_SERPENT, NULL, MCRYPT_CBC, NULL);
     uint8_t key[SB_TIGER] = { 0x00 };
@@ -401,7 +396,7 @@ extern MCRYPT vstegfs_crypt_init(vstat_t *f, uint8_t ivi)
     return c;
 }
 
-extern int64_t vstegfs_block_save(uint64_t fs, uint64_t pos, MCRYPT c, vblock_t *b)
+static int64_t vstegfs_block_save(uint64_t fs, uint64_t pos, MCRYPT c, vblock_t *b)
 {
     errno = EXIT_SUCCESS;
     /*

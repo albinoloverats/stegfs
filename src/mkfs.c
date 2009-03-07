@@ -102,7 +102,7 @@ int main(int argc, char **argv)
              * use a device as the file system
              */
             if ((fs = open(fs_name, O_WRONLY | F_WRLCK, S_IRUSR | S_IWUSR)) < 0)
-                die("could not create the file system");
+                die("could not open the block device");
             fs_size = lseek(fs, 0, SEEK_END) / SB_1MB;
             break;
         case S_IFREG:
@@ -189,42 +189,33 @@ int main(int argc, char **argv)
     /*
      * create lots of noise
      */
-    vstat_t f;
-    f.fs   = fs;
-    f.name = malloc(SB_PATH);
-    f.pass = malloc(SB_HASH);
-
-    for (uint64_t i = 0; i < fs_blocks; i++)
+    lseek(fs, 0, SEEK_SET);
+    for (uint64_t i = 0; i < fs_size; i++)
     {
-        for (uint8_t j = 0; j < SB_PATH; j++)
-            f.name[j] = mrand48();
-        for (uint8_t j = 0; j < SB_HASH; j++)
-            f.pass[j] = mrand48();
+        vblock_t buffer[BLOCK_PER_MB];
 
-        MCRYPT c = vstegfs_crypt_init(&f, i);
-
-        vblock_t b;
+        for (uint16_t j = 0; j < BLOCK_PER_MB; j++)
         {
             uint8_t path[SB_PATH];
             uint8_t data[SB_DATA];
+            uint8_t hash[SB_HASH];
             uint8_t next[SB_NEXT];
 
-            for (uint8_t j = 0; j < SB_PATH; j++)
-                path[j] = mrand48();
-            for (uint8_t j = 0; j < SB_DATA; j++)
-                data[j] = mrand48();
-            for (uint8_t j = 0; j < SB_NEXT; j++)
-                next[j] = mrand48();
+            for (uint8_t k = 0; k < SB_PATH; k++)
+                path[k] = mrand48();
+            for (uint8_t k = 0; k < SB_DATA; k++)
+                data[k] = mrand48();
+            for (uint8_t k = 0; k < SB_HASH; k++)
+                hash[k] = mrand48();
+            for (uint8_t k = 0; k < SB_NEXT; k++)
+                next[k] = mrand48();
 
-            memcpy(b.path, path, SB_PATH);
-            memcpy(b.data, data, SB_DATA);
-            memcpy(b.next, next, SB_NEXT);
+            memcpy(buffer[j].path, path, SB_PATH);
+            memcpy(buffer[j].data, data, SB_DATA);
+            memcpy(buffer[j].hash, hash, SB_HASH);
+            memcpy(buffer[j].next, next, SB_NEXT);
         }
-
-        vstegfs_block_save(fs, i, c, &b);
-
-        mcrypt_generic_deinit(c);
-        mcrypt_module_close(c);
+        write(fs, buffer, SB_1MB);
     }
 
     close(fs);
