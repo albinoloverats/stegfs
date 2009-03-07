@@ -32,7 +32,6 @@
 
 extern int64_t vstegfs_save(vstat_t f)
 {
-    msg("%s", __func__);
     /*
      * some initial preparations - such as: is the file larger than the
      * file system? because that wouldn't be good :s
@@ -174,7 +173,6 @@ extern int64_t vstegfs_save(vstat_t f)
 
 extern int64_t vstegfs_open(vstat_t f)
 {
-    msg("%s", __func__);
     uint64_t path[2];
     {
         MHASH h = mhash_init(MHASH_TIGER);
@@ -213,7 +211,6 @@ extern int64_t vstegfs_open(vstat_t f)
         while (is_block_ours(f.fs, next, path))
         {
             vblock_t b;
-            msg("read block...");
             if (block_open(f.fs, next, c, &b))
             {
                 hex((uint8_t *)&b, SB_BLOCK);
@@ -247,14 +244,12 @@ extern int64_t vstegfs_open(vstat_t f)
 
 extern uint64_t vstegfs_find(vstat_t f)
 {
-    msg("%s", __func__);
     vblock_t b;
     return vstegfs_header(&f, &b);
 }
 
 extern void vstegfs_kill(vstat_t f)
 {
-    msg("%s", __func__);
     /*
      * calculate the locations of the header blocks
      */
@@ -317,7 +312,6 @@ extern void vstegfs_kill(vstat_t f)
 
 static uint64_t vstegfs_header(vstat_t *f, vblock_t *b)
 {
-    msg("%s", __func__);
     /*
      * find the header blocks for the file
      */
@@ -380,7 +374,6 @@ static uint64_t vstegfs_header(vstat_t *f, vblock_t *b)
 
 extern MCRYPT vstegfs_crypt_init(vstat_t *f, uint8_t ivi)
 {
-    msg("%s", __func__);
     MCRYPT c = mcrypt_module_open(MCRYPT_SERPENT, NULL, MCRYPT_CBC, NULL);
     uint8_t key[SB_TIGER] = { 0x00 };
     {
@@ -410,7 +403,6 @@ extern MCRYPT vstegfs_crypt_init(vstat_t *f, uint8_t ivi)
 
 extern int64_t vstegfs_block_save(uint64_t fs, uint64_t pos, MCRYPT c, vblock_t *b)
 {
-    msg("%s", __func__);
     errno = EXIT_SUCCESS;
     /*
      * calculate the hash of the data
@@ -439,7 +431,6 @@ extern int64_t vstegfs_block_save(uint64_t fs, uint64_t pos, MCRYPT c, vblock_t 
 
 static int64_t block_open(uint64_t fs, uint64_t pos, MCRYPT c, vblock_t *b)
 {
-    msg("%s", __func__);
     errno = EXIT_SUCCESS;
     pread(fs, b, sizeof( vblock_t ), pos * SB_BLOCK);
     uint8_t d[SB_SERPENT * 7] = { 0x00 };
@@ -459,13 +450,11 @@ static int64_t block_open(uint64_t fs, uint64_t pos, MCRYPT c, vblock_t *b)
     }
     if (memcmp(hash, b->hash, SB_HASH))
         return EXIT_FAILURE;
-    msg("return %i", errno);
     return errno;
 }
 
 static bool is_block_ours(uint64_t fs, uint64_t pos, uint64_t *hash)
 {
-    msg("%s", __func__);
     uint8_t buf[SB_PATH] = { 0x00 };
     if (pread(fs, buf, SB_PATH, pos * SB_BLOCK) < 0)
         return false; /* we screwed up, so just assume it's not ours :p */
@@ -476,9 +465,8 @@ static bool is_block_ours(uint64_t fs, uint64_t pos, uint64_t *hash)
 
 static uint64_t calc_next_block(uint64_t fs, char *path)
 {
-    msg("%s", __func__);
     uint64_t fsb = lseek(fs, 0, SEEK_END) / SB_BLOCK;
-    uint64_t block = ((mrand48() << 0x20) | mrand48()) % fsb;
+    uint64_t block = (((uint64_t)mrand48() << 0x20) | mrand48()) % fsb;
     int16_t att = 0; /* give us up to 32767 attempts to find a block */
     bool found = true;
     /*
@@ -505,7 +493,7 @@ static uint64_t calc_next_block(uint64_t fs, char *path)
         }
         if (att++ < 0)
             break;
-        block = ((mrand48() << 0x20) | mrand48()) % fsb;
+        block = (((uint64_t)mrand48() << 0x20) | mrand48()) % fsb;
 
         if (is_block_ours(fs, block, (uint64_t *)hash))
             continue;
