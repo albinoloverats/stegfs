@@ -1,10 +1,7 @@
 vstegfs (Virtual Steganographic File System):
 
 Changes:
-    Fixed file/block size limit.
-    Ported to 32 bit GNU systems.
-    Fixed writing file system to block devices.
-    (And others...)
+    Now using: albinoloverats common code, mcrypt, mhash
 
 About:
     vstegfs is a steganographic file system in userspace.
@@ -41,6 +38,19 @@ About:
     and decrypting the file. In addition to this, as with the
     directory hierarchy and the file name, the password is also
     used to locate the header blocks for files.
+
+A quick note about mkvstegfs:
+    When creating a vstegfs file system, the size of the file created
+    (or the size of the partition on which it will be created) is shown;
+    this is the number of bytes (MB, GB, etc) which are used to house
+    everything, including header information, about the files on the
+    file system. Below this is the capacity available for actual file
+    data - 5/8 of a block is used for data (see below). Finally, the
+    maximum usable space under ideal conditions where no files are
+    compomised: each file is written 9 times to minimise the loss, and
+    maximise the chance of being able to recover it. Under normal
+    working conditionsit's highly likely this value will never be
+    achieved due to the Birthday Paradox.
 
 
 Technical Data:
