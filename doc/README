@@ -62,18 +62,18 @@ Technical Data:
         192-bit hash
          64-bit words
 
-    Standard (Header) File Block:
+    Standard (Header) [Superblock] File Block:
 
          Chunk Name        Size (in bits)
         +--------------------------------+ -+
         | Directory/Path Checksum    128 |  |
-        |                                |  +- Tiger128
+        |   [Superblock ID]              |  +- Tiger128
         |                                |  |
         |                                |  |
         +--------------------------------+ -+--------+
         | Data                       640 |           |
         |  (Starting blocks)             |           |
-        |                                |           |
+        |  [Nothing]                     |           |
         |                                |           |
         |                                |           |
         |                                |           |
@@ -93,14 +93,14 @@ Technical Data:
         |                                |           |
         +--------------------------------+ -+ -------+
         | Checksum                   192 |  |        |
-        |                                |  |        |
+        | ["vstegfs"]                    |  |        |
         |                                |  |        |
         |                                |  +- Tiger |
         |                                |  |        |
         |                                |  |        |
         +--------------------------------+ -+        |
         | Next block                  64 |           |
-        |  (File Size)                   |           |
+        |  (File size) [Total blocks]    |           |
         +--------------------------------+ ----------+
 
 

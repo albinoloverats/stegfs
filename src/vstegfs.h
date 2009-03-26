@@ -21,6 +21,8 @@
 #ifndef _VSTEGFS_H_
   #define _VSTEGFS_H_
 
+  #define APP "vstegfs"
+  #define VER "200904-"
 
   /* size (in bytes) for various blocks of data */
   #define SB_SERPENT 0x10               /*  16 bytes -- 128 bits */
@@ -32,11 +34,26 @@
   #define SB_HASH    SB_TIGER           /*  24 bytes */
   #define SB_NEXT    0x08               /*   8 bytes */
 
+  /* size in 64bit ints of parts of block */
+  #define SL_PATH 0x02
+  #define SL_DATA 0x0A
+  #define SL_HASH 0x03
+  #define SL_NEXT 0x01
+
   #define BLOCK_PER_MB 0x2000
+
+  #define SB_1MB 0x00100000 /* size in bytes of 1 MB */
+  #define SM_1GB 0x00000400 /* size in MB of 1 GB */
+  #define SM_1TB SB_1MB     /* size in MB of 1 TB (1:1 as B:MB) */
 
   #define MAX_COPIES 9
 
-  #define ROOT_PATH "vstegfs"
+  #define ROOT_PATH APP
+
+  #define SUPER_ID ROOT_PATH " " VER
+  #define MAGIC_0  0xA157AFA602CC9D1BLL
+  #define MAGIC_1  0x33BE2B298B76F2ACLL
+  #define MAGIC_2  0xC903284D7C593AF6LL
 
   typedef struct vstat_t
   {
@@ -51,10 +68,10 @@
 
   typedef struct vblock_t
   {
-      uint64_t path[0x02];              /*  16 bytes */
-      uint8_t  data[0x50];              /*  80 bytes */
-      uint64_t hash[0x03];              /*  24 bytes */
-      uint64_t next[0x01];              /*   8 bytes */
+      uint64_t path[SL_PATH];              /*  16 bytes */
+      uint8_t  data[SB_DATA];              /*  80 bytes */
+      uint64_t hash[SL_HASH];              /*  24 bytes */
+      uint64_t next[SL_NEXT];              /*   8 bytes */
   }
   vblock_t;
 
@@ -73,4 +90,4 @@
     static uint64_t calc_next_block(uint64_t, char *);
   #endif /* _VSTEG_S_ */
   
-#endif /* _VSTEGFS_H_ */
+#endif /* ! _VSTEGFS_H_ */

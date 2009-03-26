@@ -30,9 +30,6 @@
 #include "src/vstegfs.h"
 #include "src/dir.h"
 
-#define APP "vstegfs"
-#define VER "200903-"
-
 #define PAGESIZE 4096 /* the number of bytes given us by the kernel */
 
 typedef struct cache
@@ -337,6 +334,22 @@ int main(int argc, char **argv)
 
     if ((filesystem = open(fs, O_RDWR, S_IRUSR | S_IWUSR)) < 3)
         die("could not open file system");
+
+    /*
+     * check the first block to see if everything looks okay
+     */
+    {
+        vblock_t sb;
+
+        lseek(filesystem, 0, SEEK_SET);
+        read(filesystem, &sb, sizeof( vblock_t ));
+
+        if ((sb.hash[0] != MAGIC_0) || (sb.hash[1] != MAGIC_1) || (sb.hash[2] != MAGIC_2))
+        {
+            msg("magic number failure in superblock for %s", fs);
+            die("use mkvstegfs to restore superblock");
+        }
+    }
 
     char **args = calloc(debug ? 5 : 4, sizeof( char * ));
     args[0] = strdup(argv[0]);
