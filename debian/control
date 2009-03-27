@@ -7,7 +7,7 @@ Standards-Version: 3.7.2
 
 Package: vstegfs
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: libfuse2 (>= 2.7), libmcrypt4 (>= 2.5), libmhash2 (>= 0.9), ${shlibs:Depends}, ${misc:Depends}
 Description: vstegfs is a steganographic file system in userspace which
  uses uses the FUSE library. Steganographioc file systems are one step
  above traditional encrypted file systems because they grant the user

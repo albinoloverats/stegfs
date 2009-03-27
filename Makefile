@@ -17,14 +17,14 @@ mkfs:
 
 install:
 # install vstegfs
-	 @install -c -m 755 -s -D -T vstegfs /usr/bin/vstegfs
-	-@echo "installed \`vstegfs' --> \`/usr/bin/vstegfs'"
+	 @install -c -m 755 -s -D -T vstegfs $(PREFIX)/usr/bin/vstegfs
+	-@echo "installed \`vstegfs' --> \`$(PREFIX)/usr/bin/vstegfs'"
 # install the mkfs
-	 @install -c -m 755 -s -D -T mkvstegfs /usr/bin/mkvstegfs
-	-@echo "installed \`mkvstegfs' --> \`/usr/bin/vstegfs'"
+	 @install -c -m 755 -s -D -T mkvstegfs $(PREFIX)/usr/bin/mkvstegfs
+	-@echo "installed \`mkvstegfs' --> \`$(PREFIX)/usr/bin/vstegfs'"
 # finally the man page
-	 @install -c -m 644 -D -T doc/vstegfs.1.gz /usr/share/man/man1/vstegfs.1.gz
-	-@echo "installed \`doc/vstegfs.1.gz' --> \`/usr/share/man/man1/vstegfs.1.gz'"
+	 @install -c -m 644 -D -T doc/vstegfs.1.gz $(PREFIX)/usr/share/man/man1/vstegfs.1.gz
+	-@echo "installed \`doc/vstegfs.1.gz' --> \`$(PREFIX)/usr/share/man/man1/vstegfs.1.gz'"
 
 clean:
 	-@rm -fv vstegfs mkvstegfs
@@ -32,6 +32,6 @@ clean:
 distclean: clean
 
 uninstall:
-	 @rm -fv /usr/share/man/man1/vstegfs.1.gz
-	 @rm -fv /usr/bin/mkvstegfs
-	 @rm -fv /usr/bin/vstegfs
+	 @rm -fv $(PREFIX)/usr/share/man/man1/vstegfs.1.gz
+	 @rm -fv $(PREFIX)/usr/bin/mkvstegfs
+	 @rm -fv $(PREFIX)/usr/bin/vstegfs

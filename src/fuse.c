@@ -207,7 +207,7 @@ static int vstegfs_write(const char *path, const char *buf, size_t size, off_t o
     {
         vs.fs   = filesystem;
         vs.file = stream;
-        vs.size = &cache_write.size;
+        vs.size = (uint64_t *)&cache_write.size;
         vs.name = dir_get_file(p);
         vs.path = dir_get_path(p);
         vs.pass = dir_get_pass(p);
