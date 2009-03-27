@@ -121,3 +121,4 @@ void sigint(int s)
     msg("try again once more to force quit");
     c_sig = true;
 }
+

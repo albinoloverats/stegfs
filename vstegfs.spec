@@ -32,3 +32,4 @@ rm -rf %{buildroot}
 /usr/bin/vstegfs
 /usr/bin/mkvstegfs
 /usr/man/man1/vstegfs.1.gz
+

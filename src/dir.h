@@ -26,3 +26,4 @@
   extern char *dir_get_path(const char *);
 
 #endif /* _DIR_H_ */
+

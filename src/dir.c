@@ -57,3 +57,4 @@ extern char *dir_get_path(const char *path)
     msg("%s", __func__);
     return strndup(path, strrchr(path, '/') - path);
 }
+
