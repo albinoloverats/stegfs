@@ -1,0 +1,14 @@
+Source: vstegfs
+Section: accessories
+Priority: extra
+Maintainer: Ashley Anderson <amanderson@albinoloverats.net>
+Build-Depends: debhelper (>= 5)
+Standards-Version: 3.7.2
+
+Package: vstegfs
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: vstegfs is a steganographic file system in userspace which
+ uses uses the FUSE library. Steganographioc file systems are one step
+ above traditional encrypted file systems because they grant the user
+ plausible deniability
