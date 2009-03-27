@@ -35,4 +35,3 @@ uninstall:
 	 @rm -fv $(PREFIX)/usr/man/man1/vstegfs.1.gz
 	 @rm -fv $(PREFIX)/usr/bin/mkvstegfs
 	 @rm -fv $(PREFIX)/usr/bin/vstegfs
-

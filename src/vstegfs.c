@@ -502,4 +502,3 @@ static uint64_t calc_next_block(uint64_t fs, char *path)
     free(s);
     return found ? block : 0;
 }
-

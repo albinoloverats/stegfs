@@ -12,4 +12,3 @@ Description: vstegfs is a steganographic file system in userspace which
  uses uses the FUSE library. Steganographioc file systems are one step
  above traditional encrypted file systems because they grant the user
  plausible deniability
-

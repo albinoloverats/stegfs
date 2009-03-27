@@ -375,4 +375,3 @@ int64_t show_help(void)
     fprintf(stderr, "  Fuse executable to mount vstegfs file systems\n");
     return EXIT_SUCCESS;
 }
-

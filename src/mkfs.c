@@ -304,4 +304,3 @@ int64_t show_help(void)
     fprintf(stderr, "  use all available space on that device/partition.\n\n");
     return EXIT_SUCCESS;
 }
-
