@@ -19,10 +19,10 @@ encrypted file systems because they grant the user plausible deniability
 %build
 rm -rf %{buildroot}
 mkdir -p %{buildroot}/usr/{bin,man/man1}
-make gui-all PREFIX=%{buildroot}
+make PREFIX=%{buildroot}
 
 %install
-make install-all PREFIX=%{buildroot}
+make install PREFIX=%{buildroot}
 
 %clean
 rm -rf %{buildroot}
@@ -31,4 +31,4 @@ rm -rf %{buildroot}
 %defattr(-,root,root)
 /usr/bin/vstegfs
 /usr/bin/mkvstegfs
-/usr/man/man1/vstegfs.1a.gz
+/usr/man/man1/vstegfs.1.gz
