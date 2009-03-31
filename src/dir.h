@@ -21,8 +21,19 @@
 #ifndef _DIR_H_
   #define _DIR_H_
 
-  extern char *dir_get_file(const char *);
-  extern char *dir_get_pass(const char *);
-  extern char *dir_get_path(const char *);
+  #ifdef __cplusplus
+  extern "C"
+  {
+  #endif /* __cplusplus */
+
+  extern char    *dir_get_file(const char *);
+  extern uint16_t dir_get_deep(const char *);
+  extern char    *dir_get_part(const char *, uint16_t);
+  extern char    *dir_get_pass(const char *);
+  extern char    *dir_get_path(const char *);
+
+  #ifdef __cplusplus
+  }
+  #endif /* __cplusplus */
 
 #endif /* _DIR_H_ */

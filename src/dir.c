@@ -32,10 +32,43 @@
  */
 extern char *dir_get_file(const char *path)
 {
-    msg("%s", __func__);
     if (!strrchr(path, '/'))
         return strndup(path, strrchr(path, ':') - path);
-    return strndup(strrchr(path, '/') + 1, strrchr(path, ':') - strrchr(path, '/') - 1);
+    return strndup(strrchr(path, '/') + 1, strrchr(path, ':') - strrchr(path, '/'));
+}
+
+/*
+ * calculate how deep in the hierarchy we are (count number of '/')
+ */
+extern uint16_t dir_get_deep(const char *path)
+{
+    if (!strlen(path))
+        return 0;
+    uint16_t c = 0;
+    if (path[0] != '/')
+        c++;
+    char *p = strdupa(path);
+    char *e = strchrnul(path, ':');
+    while ((p = strchr(p, '/')))
+        if (++p >= e) /* if we run past the end of the string break */
+            break;
+        else
+            c++;
+    return ++c;
+}
+
+/*
+ * return a particular directory name from with the hierarchy
+ */
+extern char *dir_get_part(const char *path, uint16_t part)
+{
+    if (part > dir_get_deep(path))
+        return NULL;
+    char *p = strdupa(path);
+    char *s = NULL;
+    for (uint16_t i = 0; i <= part; i++)
+        s = strsep(&p, "/");
+    return s;
 }
 
 /*
@@ -43,7 +76,6 @@ extern char *dir_get_file(const char *path)
  */
 extern char *dir_get_pass(const char *path)
 {
-    msg("%s", __func__);
     if (!strrchr(path, ':'))
         return strdup("");
     return strdup(strrchr(path, ':')) + 1;
@@ -54,6 +86,5 @@ extern char *dir_get_pass(const char *path)
  */
 extern char *dir_get_path(const char *path)
 {
-    msg("%s", __func__);
     return strndup(path, strrchr(path, '/') - path);
 }

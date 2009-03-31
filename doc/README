@@ -1,7 +1,12 @@
-vstegfs (Virtual Steganographic File System):
+vstegfs - 200904                                         April 1st, 2009
+
 
 Changes:
-    Now using: albinoloverats common code, mcrypt, mhash
+    Now using: albinoloverats common code, mcrypt, mhash;
+    Major refactor of main file system functions;
+    Inclusion of file timestamps;
+    Remember directory entries and used blocks (until next unmount);
+
 
 About:
     vstegfs is a steganographic file system in userspace.
@@ -39,6 +44,7 @@ About:
     directory hierarchy and the file name, the password is also
     used to locate the header blocks for files.
 
+
 A quick note about mkvstegfs:
     When creating a vstegfs file system, the size of the file created
     (or the size of the partition on which it will be created) is shown;
@@ -51,6 +57,16 @@ A quick note about mkvstegfs:
     maximise the chance of being able to recover it. Under normal
     working conditionsit's highly likely this value will never be
     achieved due to the Birthday Paradox.
+
+
+Build/Installation notes:
+   Simply:
+     $ make Makefile
+     # make Makefile install
+
+   Eventually you may need the following
+     $ make Makefile clean
+     # make Makefile uninstall
 
 
 Technical Data:
@@ -72,8 +88,8 @@ Technical Data:
         |                                |  |
         +--------------------------------+ -+--------+
         | Data                       640 |           |
-        |  (Starting blocks)             |           |
-        |  [Nothing]                     |           |
+        |  (Starting blocks + timestamp) |           |
+        |  [Nothing - 0xFF]              |           |
         |                                |           |
         |                                |           |
         |                                |           |
@@ -93,7 +109,7 @@ Technical Data:
         |                                |           |
         +--------------------------------+ -+ -------+
         | Checksum                   192 |  |        |
-        | ["vstegfs"]                    |  |        |
+        | [Hash of "vstegfs"]            |  |        |
         |                                |  |        |
         |                                |  +- Tiger |
         |                                |  |        |

@@ -62,7 +62,7 @@
   int64_t show_usage(void);
   int64_t show_version(void);
 
-  void hex(uint8_t *, uint64_t);
+  void hex(void *, uint64_t);
   void msg(const char *, ...);
   void die(const char *, ...);
 
