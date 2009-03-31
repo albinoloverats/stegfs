@@ -195,6 +195,7 @@ extern int64_t vstegfs_save(vstat_t f)
             for (int8_t j = (sizeof( uint64_t ) / sizeof( uint16_t )); j >= 0; --j)
                 head = (head << 0x10) | header[i + j];
             head %= fs_blocks;
+
             /*
              * write this copy of the header
              */
@@ -306,6 +307,7 @@ extern char **vstegfs_known_list(const char *path)
     uint32_t i = 0, j = 0;
     while (known_files[j])
     {
+        if (!strcmp(path, known_files[j]->path))
         {
             list[i] = strdup(known_files[j]->name);
             list = realloc(list, (++i + 1) * sizeof( char * ));
