@@ -174,7 +174,7 @@ static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, 
             vs.fs   = filesystem;
             vs.file = NULL;
             vs.time = NULL;
-            vs.size = &cache_read.size;
+            vs.size = (uint64_t *)&cache_read.size;
             vs.name = dir_get_file(p);
             vs.path = dir_get_path(p);
             vs.pass = dir_get_pass(p);
