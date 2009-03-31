@@ -62,7 +62,6 @@ extern void vstegfs_init(int64_t fs, bool do_cache)
         uint64_t tblocks = 0x0;
         memcpy(&tblocks, &sb.next, SB_NEXT);
         known_blocks = calloc(tblocks / CHAR_BIT, sizeof( uint8_t ));
-        msg("allocated %lu bytes for %u block cache", tblocks / CHAR_BIT * sizeof( uint8_t ), tblocks);
     }
     else
     {
