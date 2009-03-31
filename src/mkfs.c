@@ -301,6 +301,6 @@ int64_t show_help(void)
     fprintf(stderr, "  -v, --version                  Show version information\n\n");
     fprintf(stderr, "  A tool for creating vstegfs images.  If a device is used instead of\n");
     fprintf(stderr, "  a file (eg: /dev/sda1) a size is not needed as the file system will\n");
-    fprintf(stderr, "  use all available space on that device/partition.\n\n");
+    fprintf(stderr, "  use all available space on that device/partition.\n");
     return EXIT_SUCCESS;
 }
