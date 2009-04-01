@@ -270,11 +270,14 @@ extern int64_t vstegfs_open(vstat_t f)
                 need = SB_DATA - (bytes - *f.size);
             fwrite (&b.data, sizeof( uint8_t ), need, f.file);
 
-            /*
-             * now we know this block is being used
-             */
-            lldiv_t a = lldiv(next, CHAR_BIT);
-            known_blocks[a.quot] = known_blocks[a.quot] | (0x01 << a.rem);
+            if (known_blocks)
+            {
+                /*
+                 * now we know this block is being used
+                 */
+                lldiv_t a = lldiv(next, CHAR_BIT);
+                known_blocks[a.quot] = known_blocks[a.quot] | (0x01 << a.rem);
+            }
 
             if (bytes >= *f.size)
             {
@@ -627,15 +630,18 @@ static uint64_t calc_next_block(uint64_t fs, char *path)
         /*
          * check the bitmap for this block
          */
-        lldiv_t a = lldiv(block, CHAR_BIT);
-        uint8_t b = known_blocks[a.quot] & (0x01 << a.rem);
-        if (b) /* try again */
-            continue;
-        /*
-         * block either was used but we didn't know about it, or
-         * it's about to be, add to bitmap
-         */
-        known_blocks[a.quot] |= (0x01 << a.rem);
+        if (known_blocks)
+        {
+            lldiv_t a = lldiv(block, CHAR_BIT);
+            uint8_t b = known_blocks[a.quot] & (0x01 << a.rem);
+            if (b) /* try again */
+                continue;
+            /*
+             * block either was used but we didn't know about it, or
+             * it's about to be, add to bitmap
+             */
+            known_blocks[a.quot] |= (0x01 << a.rem);
+        }
 
         bool used = false;
         char *cwd = NULL;
