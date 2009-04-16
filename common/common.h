@@ -28,6 +28,7 @@
 
   #define NOTSET 0
 
+  #include <ctype.h>
   #include <errno.h>
   #include <stdio.h>
   #include <signal.h>
