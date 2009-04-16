@@ -66,23 +66,25 @@ int64_t show_version(void)
 void hex(void *v, uint64_t l)
 {
     uint8_t *s = v;
-    char b[72] = { 0x00 };
+    char b[HEX_LINE_WIDTH] = { 0x00 };
     uint8_t c = 1;
     for (uint64_t i = 0; i < l; i++, c++)
     {
-        if (c > 24)
+        if (c > HEX_LINE_WRAP)
         {
             c = 1;
             msg(b);
             memset(b, 0x00, sizeof( b ));
         }
-        sprintf(b, "%s%02X%s", b, s[i], (c % 4) ? "" : " ");
+        sprintf(b, "%s%02X%s", b, s[i], (c % sizeof( uint32_t )) ? "" : " ");
     }
     msg(b);
 }
 
 void msg(const char *s, ...)
 {
+    if (!s)
+        return;
     va_list ap;
     va_start(ap, s);
     fprintf(stderr, "\r%s: ", c_app);
@@ -126,9 +128,11 @@ void sigint(int s)
         case SIGQUIT:
             ss = strdup("SIGQUIT");
             break;
+        default:
+            ss = strdup("UNKNOWN");
     }
-    msg("caught and ignoring signal %s", ss);
+    msg("caught and ignoring %s signal", ss);
     msg("try again once more to force quit");
+    free(ss);
     c_sig = true;
 }
-

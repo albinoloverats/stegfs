@@ -55,6 +55,9 @@
     #define SIGQUIT SIGBREAK
   #endif /*   _WIN32 */
 
+  #define HEX_LINE_WIDTH 72
+  #define HEX_LINE_WRAP  24
+
   int main(int, char **);
   void init(const char *, const char *);
 
@@ -74,4 +77,3 @@
   #endif /* __cplusplus */
 
 #endif /* _COMMON_LIB_H_ */
-
