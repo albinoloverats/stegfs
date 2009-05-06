@@ -82,7 +82,7 @@ int main(int argc, char **argv)
                 return show_version();
             case '?':
             default:
-                die("unknown option %c", opt);
+                die(_("unknown option %c"), opt);
         }
     }
     /*
@@ -98,7 +98,7 @@ int main(int argc, char **argv)
              * use a device as the file system
              */
             if ((fs = open(fs_name, O_WRONLY | F_WRLCK, S_IRUSR | S_IWUSR)) < 0)
-                die("could not open the block device");
+                die(_("could not open the block device"));
             fs_size = lseek(fs, 0, SEEK_END) / SB_1MB;
             break;
         case S_IFDIR:
@@ -106,10 +106,10 @@ int main(int argc, char **argv)
         case S_IFLNK:
         case S_IFSOCK:
         case S_IFIFO:
-            die("unable to create file system on specified device");
+            die(_("unable to create file system on specified device"));
         case S_IFREG:
             if (!force)
-                die("file by that name already exists - use -x to force");
+                die(_("file by that name already exists - use -x to force"));
         default:
             /*
              * file doesn't exist - good, lets create it...
@@ -119,14 +119,14 @@ int main(int argc, char **argv)
                 if (restore)
                     flags ^= O_TRUNC; /* don't truncate the file if we're restoring the sb */
                 if ((fs = open(fs_name, flags, S_IRUSR | S_IWUSR)) < 0)
-                    die("could not create the file system");
+                    die(_("could not create the file system"));
             }
             break;
     }
     uint64_t fs_blocks = 0x0;
     if (restore)
     {
-        msg("restoring superblock on %s", fs_name);
+        msg(_("restoring superblock on %s"), fs_name);
         fs_blocks = lseek(fs, 0, SEEK_END) / SB_BLOCK;
     }
     else
@@ -135,14 +135,14 @@ int main(int argc, char **argv)
          * check the size of the file system
          */
         if (fs_size < 1)
-            die("cannot have a file system with size < 1MB");
+            die(_("cannot have a file system with size < 1MB"));
         /*
          * display some information about the soon-to-be file system to the
          * user
          */
-        msg("location      : %s", fs_name);
+        msg(_("location      : %s"), fs_name);
         fs_blocks = fs_size * SB_1MB / SB_BLOCK;
-        msg("total blocks  : %8lu", fs_blocks);
+        msg(_("total blocks  : %8lu"), fs_blocks);
         {
             char *units = strdup("MB");
             float volume = fs_size;
@@ -156,7 +156,7 @@ int main(int argc, char **argv)
                 volume /= SM_1GB;
                 units = strdup("GB");
             }
-            msg("volume        : %8.2f %s", volume, units);
+            msg(_("volume        : %8.2f %s"), volume, units);
             free(units);
         }
         {
@@ -173,7 +173,7 @@ int main(int argc, char **argv)
                 fs_data /= SM_1GB;
                 units = strdup("GB");
             }
-            msg("data capacity : %8.2f %s", fs_data, units);
+            msg(_("data capacity : %8.2f %s"), fs_data, units);
             free(units);
         }
         {
@@ -191,7 +191,7 @@ int main(int argc, char **argv)
                 fs_avail /= SM_1GB;
                 units = strdup("GB");
             }
-            msg("usable space  : %8.2f %s", fs_avail, units);
+            msg(_("usable space  : %8.2f %s"), fs_avail, units);
             free(units);
         }
         /*
@@ -230,7 +230,8 @@ int main(int argc, char **argv)
                 memcpy(buffer[j].hash, hash, SB_HASH);
                 memcpy(buffer[j].next, next, SB_NEXT);
             }
-            write(fs, buffer, SB_1MB);
+            if (write(fs, buffer, SB_1MB) != SB_1MB)
+                msg(_("could not create the file system"));
         }
     }
     /*
@@ -254,7 +255,8 @@ int main(int argc, char **argv)
         memcpy(sb.next, &fs_blocks, SB_NEXT);
 
         lseek(fs, 0, SEEK_SET);
-        write(fs, &sb, sizeof( vblock_t ));
+        if ( write(fs, &sb, sizeof( vblock_t )) != sizeof( vblock_t ))
+            msg(_("could not create the file system"));
     }
 
     close(fs);
@@ -282,7 +284,7 @@ uint64_t size_in_mb(char *s)
         case '\0':
             break;
         default:
-            die("unknown size suffix %c", f[0]);
+            die(_("unknown size suffix %c"), f[0]);
     }
     return v;
 }

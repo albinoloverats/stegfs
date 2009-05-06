@@ -69,7 +69,8 @@ static int vstegfs_getattr(const char *path, struct stat *stbuf)
     else if (this[0] != '+')
     {
         char *p = NULL;
-        asprintf(&p, "%s%s", ROOT_PATH, path);
+        if (asprintf(&p, "%s%s", ROOT_PATH, path) < 0)
+            die(_("out of memory at %s:%i"), __FILE__, __LINE__);
         vstat_t vs;
         {
             vs.fs   = filesystem;
@@ -109,7 +110,8 @@ static int vstegfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, 
     if (!strcmp(path, "/"))
         p = strdup(ROOT_PATH);
     else
-        asprintf(&p, "%s%s", ROOT_PATH, path);
+        if (asprintf(&p, "%s%s", ROOT_PATH, path) < 0)
+            die(_("out of memory at %s:%i"), __FILE__, __LINE__);
     /*
      * always set . and ..
      */
@@ -135,7 +137,8 @@ static int vstegfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, 
 static int vstegfs_unlink(const char *path)
 {
     char *p = NULL;
-    asprintf(&p, "%s%s", ROOT_PATH, path);
+    if (asprintf(&p, "%s%s", ROOT_PATH, path) < 0)
+        die(_("out of memory at %s:%i"), __FILE__, __LINE__);
 
     vstat_t vk;
     {
@@ -168,7 +171,8 @@ static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, 
         die_next = false;
 
         char *p = NULL;
-        asprintf(&p, "%s%s", ROOT_PATH, path);
+        if (asprintf(&p, "%s%s", ROOT_PATH, path) < 0)
+            die(_("out of memory at %s:%i"), __FILE__, __LINE__);
         {
             vstat_t vs;
             vs.fs   = filesystem;
@@ -239,7 +243,8 @@ static int vstegfs_write(const char *path, const char *buf, size_t size, off_t o
         return size;
 
     char *p = NULL;
-    asprintf(&p, "%s%s", ROOT_PATH, path);
+    if (asprintf(&p, "%s%s", ROOT_PATH, path) < 0)
+        die(_("out of memory at %s:%i"), __FILE__, __LINE__);
 
     FILE *stream = fmemopen(cache_write.data, cache_write.size, "r");
 
@@ -369,7 +374,7 @@ int main(int argc, char **argv)
                 return show_version();
             case '?':
             default:
-                die("unknown option %c", opt);
+                die(_("unknown option %c"), opt);
         }
     }
 
@@ -377,7 +382,7 @@ int main(int argc, char **argv)
         return show_usage();
 
     if ((filesystem = open(fs, O_RDWR, S_IRUSR | S_IWUSR)) < 3)
-        die("could not open file system");
+        die(_("could not open file system %s"), fs);
 
     vstegfs_init(filesystem, do_cache);
 

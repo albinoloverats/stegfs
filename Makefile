@@ -1,9 +1,15 @@
 .PHONY: vstegfs mkfs all install clean distclean uninstall
 
+PO_MAKE      = 
+PO_INSTALL   = 
+PO_CLEAN     = 
+PO_UNINSTALL = 
+
 OPTIONS := `pkg-config fuse --cflags --libs` -lmhash -lmcrypt -std=gnu99 -O2 -Wall -pipe -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -I ./ -o
 COMMON  := src/vstegfs.c src/dir.c common/common.c
 
-all: vstegfs mkfs
+all: a
+-include po/*.mk
 
 vstegfs:
 # build the main fuse executable
@@ -15,7 +21,9 @@ mkfs:
 	 @gcc $(OPTIONS) mkvstegfs $(COMMON) src/mkfs.c
 	-@echo "compiled \`src/mkfs.c src/vstegfs.c src/dir.c common/common.c' --> \`mkvstegfs'"
 
-install:
+a: vstegfs mkfs $(PO_MAKE)
+
+install: $(PO_INSTALL)
 # install vstegfs
 	 @install -c -m 755 -s -D -T vstegfs $(PREFIX)/usr/bin/vstegfs
 	-@echo "installed \`vstegfs' --> \`$(PREFIX)/usr/bin/vstegfs'"
@@ -29,9 +37,9 @@ install:
 clean:
 	-@rm -fv vstegfs mkvstegfs
 
-distclean: clean
+distclean: clean $(PO_CLEAN)
 
-uninstall:
+uninstall: $(PO_UNINSTALL)
 	 @rm -fv $(PREFIX)/usr/man/man1/vstegfs.1.gz
 	 @rm -fv $(PREFIX)/usr/bin/mkvstegfs
 	 @rm -fv $(PREFIX)/usr/bin/vstegfs
