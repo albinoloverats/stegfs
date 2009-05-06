@@ -1,0 +1,50 @@
+msgid "could not open file system %s"
+msgstr "konnte nicht geöffnet Dateisystem %s"
+
+msgid "magic number failure in superblock for %s"
+msgstr "magische zahl ausfall superblock für %s"
+
+msgid "use mkvstegfs to restore superblock"
+msgstr "mkvstegfs verwendung zur wiederherstellung superblock"
+
+msgid "looking at copy %i"
+msgstr "mit blick auf artikel %i"
+
+msgid "no complete copy of file found; recovered %lu bytes"
+msgstr "keine vollständige kopie der datei gefunden, wieder %lu bytes"
+
+msgid "could not open the block device"
+msgstr "konnte nicht geöffnet werden dir block device"
+
+msgid "unable to create file system on specified device"
+msgstr "nicht in der lage, das dateisystem angegebene gerät"
+
+msgid "file by that name already exists - use -x to force"
+msgstr "datei mit diesem namen existiert bereits - benutzen, um -x"
+
+msgid "could not create the file system"
+msgstr "konnte nicht erstellt werden das dateisystem"
+
+msgid "restoring superblock on %s"
+msgstr "wiederherstellung der superblock auf %s"
+
+msgid "cannot have a file system with size < 1MB"
+msgstr "kann nicht sein, eine dateisystem mit größe < 1MB"
+
+msgid "location      : %s"
+msgstr "standort      : %s"
+
+msgid "total blocks  : %8lu"
+msgstr "blöcke        : %8lu"
+
+msgid "volume        : %8.2f %s"
+msgstr "volumen       : %8.2f %s"
+
+msgid "data capacity : %8.2f %s"
+msgstr "kapazität     : %8.2f %s"
+
+msgid "usable space  : %8.2f %s"
+msgstr "nutzfläche    : %8.2 %s"
+
+msgid "unknown size suffix %c"
+msgstr "unbekannte größe suffix %c"
