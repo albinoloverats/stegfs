@@ -1,0 +1,78 @@
+msgid "unknown option %c"
+msgstr "unbekannte option %c"
+
+msgid "could not set signal handler"
+msgstr "konnte nicht gesetzt signal-handler"
+
+msgid "caught and ignoring %s signal"
+msgstr "gegangen und ignoriert %s signal"
+
+msgid "try again once more to force quit"
+msgstr "versuchen sie es erneut noch einmal in sofort beenden"
+
+msgid "out of memory at %s:%i"
+msgstr "ausreichend RAM bei %s:%i"
+
+msgid "UNKNOWN"
+msgstr "UNBEKANNT"
+
+msgid "\nOptions:\n\n"
+msgstr "\nOptionen:\n\n"
+
+msgid "  -h, --help                 This help list\n"
+msgstr "  -h, --help                 Hilfe dieser Liste\n"
+
+msgid "  -l, --licence              An overview of the GNU GPL\n"
+msgstr "  -l, --licence              Überblick über die GNU GPL\n"
+
+msgid "  -v, --version              Show version number and quit\n\n"
+msgstr "  -v, --version              Versionsnummer zeigen\n\n"
+
+msgid "This program is free software: you can redistribute it and/or modify\n"
+      "it under the terms of the GNU General Public License as published by\n"
+      "the Free Software Foundation, either version 3 of the License, or\n"
+      "(at your option) any later version.\n\n"
+      "This program is distributed in the hope that it will be useful,\n"
+      "but WITHOUT ANY WARRANTY; without even the implied warranty of\n"
+      "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n"
+      "GNU General Public License for more details.\n\n"
+      "You should have received a copy of the GNU General Public License\n"
+      "along with this program.  If not, see <http://www.gnu.org/licenses/>.\n"
+msgstr "Dieses Programm ist freie Software. Sie können es unter den Bedingungen\n"
+	   "der GNU General Public License, wie von der Free Software Foundation\n"
+	   "veröffentlicht, weitergeben und/oder modifizieren, entweder gemäß\n"
+	   "Version 3 der Lizenz oder (nach Ihrer Option) jeder späteren Version.\n\n"
+	   "Die Veröffentlichung dieses Programms erfolgt in der Hoffnung, daß es\n"
+	   "Ihnen von Nutzen sein wird, aber OHNE IRGENDEINE GARANTIE, sogar ohne die\n"
+	   "implizite Garantie der MARKTREIFE oder der VERWENDBARKEIT FÜR EINEN\n"
+	   "BESTIMMTEN ZWECK. Details finden Sie in der GNU General Public License.\n\n"
+	   "Sie sollten ein Exemplar der GNU General Public License zusammen mit\n"
+	   "diesem Programm erhalten haben. Falls nicht, siehe\n"
+	   "<http://www.gnu.org/licenses/>.\n"
+
+msgid "Usage:\n"
+msgstr "Nutzung:\n"
+
+msgid "  %s [OPTION] [ARGUMENT] ...\n"
+msgstr "  %s [OPTION] [WERT] ...\n"
+
+msgid "%s version : %s\n%*s built on: %s %s\n"
+msgstr "%s version : %s\n%*s auf: %s %s\n"
+
+msgid "Select a File"
+msgstr "wählen Sie eine Datei"
+
+msgid "Please wait..."
+msgstr "Bitte warten..."
+
+msgid "_Save"
+msgstr "_Sichern"
+
+msgid "_Close"
+msgstr "S_chließen"
+
+msgid "_Quit"
+msgstr "Beenden"
+
+msgid "_About"
+msgstr "Über"
