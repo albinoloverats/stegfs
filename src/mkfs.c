@@ -114,14 +114,14 @@ int main(int argc, char **argv)
             /*
              * file doesn't exist - good, lets create it...
              */
-            {
-                int64_t flags = O_WRONLY | O_CREAT | O_TRUNC | F_WRLCK;
-                if (restore)
-                    flags ^= O_TRUNC; /* don't truncate the file if we're restoring the sb */
-                if ((fs = open(fs_name, flags, S_IRUSR | S_IWUSR)) < 0)
-                    die(_("could not create the file system"));
-            }
-            break;
+        {
+            int64_t flags = O_WRONLY | O_CREAT | O_TRUNC | F_WRLCK;
+            if (restore)
+                flags ^= O_TRUNC; /* don't truncate the file if we're restoring the sb */
+            if ((fs = open(fs_name, flags, S_IRUSR | S_IWUSR)) < 0)
+                die(_("could not create the file system"));
+        }
+        break;
     }
     uint64_t fs_blocks = 0x0;
     if (restore)

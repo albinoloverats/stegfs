@@ -19,6 +19,12 @@
  */
 
 #define FUSE_USE_VERSION 27
+#define PAGESIZE 4096 /* the number of bytes given us by the kernel/fuse module */
+
+#ifndef BUFFER_DEFAULT
+    #define BUFFER_DEFAULT 0x7F
+#endif
+#define MIN_FH 3
 
 #include <fuse.h>
 #include <fcntl.h>
@@ -30,18 +36,22 @@
 #include "src/vstegfs.h"
 #include "src/dir.h"
 
-#define PAGESIZE 4096 /* the number of bytes given us by the kernel */
-
-typedef struct cache
+typedef struct cache_t
 {
+    int64_t  status;
+    bool     used;
+    bool     done;
     uint8_t *data;
-    size_t   size;
+    uint64_t part;
+    uint64_t size;
 }
-cache;
+cache_t;
 
-static cache cache_write;
-static cache cache_read;
-
+/*
+ * still not thread safe, but better than it was
+ */
+static cache_t **cache;
+static uint64_t buffer_s = BUFFER_DEFAULT;
 static uint64_t filesystem;
 
 static int vstegfs_getattr(const char *path, struct stat *stbuf)
@@ -70,7 +80,8 @@ static int vstegfs_getattr(const char *path, struct stat *stbuf)
     {
         char *p = NULL;
         if (asprintf(&p, "%s%s", ROOT_PATH, path) < 0)
-            die(_("out of memory at %s:%i"), __FILE__, __LINE__);
+            return -ENOMEM;
+
         vstat_t vs;
         {
             vs.fs   = filesystem;
@@ -111,7 +122,7 @@ static int vstegfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, 
         p = strdup(ROOT_PATH);
     else
         if (asprintf(&p, "%s%s", ROOT_PATH, path) < 0)
-            die(_("out of memory at %s:%i"), __FILE__, __LINE__);
+            return -ENOMEM;
     /*
      * always set . and ..
      */
@@ -119,10 +130,10 @@ static int vstegfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, 
     filler(buf, "..", NULL, 0);
 
     char **list = vstegfs_known_list(p);
+    free(p);
     if (!list)
         return EXIT_SUCCESS;
-    free(p);
-    
+
     uint32_t i = 0;
     while (list[i])
     {
@@ -138,7 +149,7 @@ static int vstegfs_unlink(const char *path)
 {
     char *p = NULL;
     if (asprintf(&p, "%s%s", ROOT_PATH, path) < 0)
-        die(_("out of memory at %s:%i"), __FILE__, __LINE__);
+        return -ENOMEM;
 
     vstat_t vk;
     {
@@ -150,61 +161,60 @@ static int vstegfs_unlink(const char *path)
         vk.path = dir_get_path(p);
         vk.pass = dir_get_pass(p);
     }
-    vstegfs_kill(vk);
+    int64_t s = vstegfs_kill(vk);
 
     free(p);
     free(vk.name);
     free(vk.path);
     free(vk.pass);
-    return EXIT_SUCCESS;
+    return s;
 }
 
 static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
-    static int64_t err;
-    static uint64_t found;
-    static bool die_next;
-
     if (!offset)
     {
-        err = EXIT_SUCCESS;
-        die_next = false;
+        cache[fi->fh]->status = EXIT_SUCCESS;
+        cache[fi->fh]->done = false;
 
         char *p = NULL;
         if (asprintf(&p, "%s%s", ROOT_PATH, path) < 0)
-            die(_("out of memory at %s:%i"), __FILE__, __LINE__);
+            return -ENOMEM;
+
         {
             vstat_t vs;
             vs.fs   = filesystem;
             vs.file = NULL;
             vs.time = NULL;
-            vs.size = (uint64_t *)&cache_read.size;
+            vs.size = &cache[fi->fh]->size;
             vs.name = dir_get_file(p);
             vs.path = dir_get_path(p);
             vs.pass = dir_get_pass(p);
 
             vstegfs_find(vs);
-            cache_read.data = realloc(cache_read.data, cache_read.size);
+            if (!(cache[fi->fh]->data = malloc(cache[fi->fh]->size)))
+                return -ENOMEM;
+
 
             free(vs.name);
             free(vs.path);
             free(vs.pass);
         }
 
-        size_t expected = cache_read.size;
-        FILE *stream = open_memstream((char **)&cache_read.data, &expected);
+        uint64_t expected = cache[fi->fh]->size;
+        FILE *stream = open_memstream((char **)&cache[fi->fh]->data, &expected);
 
         {
             vstat_t vs;
             vs.fs   = filesystem;
             vs.file = stream;
-            vs.size = &found;
+            vs.size = &cache[fi->fh]->part;
             vs.time = NULL;
             vs.name = dir_get_file(p);
             vs.path = dir_get_path(p);
             vs.pass = dir_get_pass(p);
 
-            err = vstegfs_open(vs);
+            cache[fi->fh]->status = vstegfs_load(vs);
 
             free(vs.name);
             free(vs.path);
@@ -215,17 +225,22 @@ static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, 
         free(p);
     }
 
-    if (die_next)
-        return -err;
-
-    if ((found < cache_read.size) && (offset + size > found))
-        die_next = true;
-
-    if (offset < cache_read.size)
+    if (cache[fi->fh]->done)
     {
-        if (offset + size > cache_read.size)
-            size = cache_read.size - offset;
-        memcpy(buf, cache_read.data + offset, size);
+        free(cache[fi->fh]->data);
+        cache[fi->fh]->data = NULL;
+        cache[fi->fh]->used = false;
+        return -cache[fi->fh]->status;
+    }
+
+    if ((cache[fi->fh]->part < cache[fi->fh]->size) && (offset + size > cache[fi->fh]->part))
+        cache[fi->fh]->done = true;
+
+    if (offset < cache[fi->fh]->size)
+    {
+        if (offset + size > cache[fi->fh]->size)
+            size = cache[fi->fh]->size - offset;
+        memcpy(buf, cache[fi->fh]->data + offset, size);
     }
 
     return size;
@@ -233,33 +248,38 @@ static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, 
 
 static int vstegfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
-    int64_t err = EXIT_SUCCESS;
+    {
+        cache[fi->fh]->status = EXIT_SUCCESS;
+        cache[fi->fh]->size += size;
+        void *x = realloc(cache[fi->fh]->data, cache[fi->fh]->size + 1);
+        if (!x)
+            return -ENOMEM;
 
-    cache_write.size += size;
-    cache_write.data  = realloc(cache_write.data, cache_write.size + 1);
-    memcpy(cache_write.data + offset, buf, size);
+        cache[fi->fh]->data = x;
+        memcpy(cache[fi->fh]->data + offset, buf, size);
+    }
 
     if (size == PAGESIZE)
         return size;
 
     char *p = NULL;
     if (asprintf(&p, "%s%s", ROOT_PATH, path) < 0)
-        die(_("out of memory at %s:%i"), __FILE__, __LINE__);
+        return -ENOMEM;
 
-    FILE *stream = fmemopen(cache_write.data, cache_write.size, "r");
+    FILE *stream = fmemopen(cache[fi->fh]->data, cache[fi->fh]->size, "r");
 
     vstat_t vs;
     {
         vs.fs   = filesystem;
         vs.file = stream;
-        vs.size = (uint64_t *)&cache_write.size;
+        vs.size = &cache[fi->fh]->size;
         time_t now = time(NULL);
         vs.time = &now;
         vs.name = dir_get_file(p);
         vs.path = dir_get_path(p);
         vs.pass = dir_get_pass(p);
 
-        err = vstegfs_save(vs);
+        cache[fi->fh]->status = vstegfs_save(vs);
 
         free(vs.name);
         free(vs.path);
@@ -269,39 +289,80 @@ static int vstegfs_write(const char *path, const char *buf, size_t size, off_t o
     fclose(stream);
     free(p);
 
-    cache_write.size = 0x0;
-    free(cache_write.data);
-    cache_write.data = NULL;
+    free(cache[fi->fh]->data);
+    cache[fi->fh]->data = NULL;
+    cache[fi->fh]->used = false;
 
-    return err ? -err : size;
+    return cache[fi->fh]->status ? -cache[fi->fh]->status : size;
+}
+
+static int vstegfs_open(const char *path, struct fuse_file_info *fi)
+{
+    for (uint64_t i = MIN_FH; i < buffer_s; i++)
+        if (!cache[i]->used)
+        {
+            cache[i]->used = true;
+            fi->fh = i;
+            return EXIT_SUCCESS;
+        }
+
+    uint64_t z = buffer_s + BUFFER_DEFAULT;
+    if (z < buffer_s)
+        return -ENFILE;
+
+    void *x = realloc(cache, z * sizeof( cache_t * ));
+    if (!x)
+        return -ENOMEM;
+
+    cache = x;
+    for (uint64_t i = buffer_s; i < z; i++)
+        if (!(cache[i] = calloc(1, sizeof( cache_t ))))
+            return -ENOMEM;
+    buffer_s = z;
+
+    /*
+     * return ourself, we should easily then find the 1st newly created entry
+     */
+    return vstegfs_open(path, fi);
 }
 
 static int vstegfs_mknod(const char *path, mode_t mode, dev_t rdev)
 {
     return EXIT_SUCCESS;
+//    return -ENODEV;
 }
 
 static int vstegfs_truncate(const char *path, off_t offset)
 {
     return EXIT_SUCCESS;
+//    return -ENOTSUP;
 }
 
 static int vstegfs_utime(const char *path, struct utimbuf *utime)
 {
     return EXIT_SUCCESS;
+//    return -ENOTSUP;
 }
 
 static int vstegfs_chmod(const char *path, mode_t mode)
 {
     return EXIT_SUCCESS;
+//    return -EPERM;
 }
 
 static int vstegfs_chown(const char *path, uid_t uid, gid_t gid)
 {
     return EXIT_SUCCESS;
+//    return -EPERM;
 }
 
 static int vstegfs_null_0(const char *path, struct fuse_file_info *fi)
+{
+    return EXIT_SUCCESS;
+//    return -EXIT_FAILURE;
+}
+
+static int vstegfs_ignore(const char *p, ...)
 {
     return EXIT_SUCCESS;
 }
@@ -313,15 +374,15 @@ static struct fuse_operations vstegfs_oper =
     .unlink   = vstegfs_unlink,
     .read     = vstegfs_read,
     .write    = vstegfs_write,
+    .open     = vstegfs_open,
     /*
-     * null functions (return success every time)
+     * null functions
      */
     .mknod    = vstegfs_mknod,
     .truncate = vstegfs_truncate,
     .utime    = vstegfs_utime,
     .chmod    = vstegfs_chmod,
     .chown    = vstegfs_chown,
-    .open     = vstegfs_null_0,
     .release  = vstegfs_null_0,
     .flush    = vstegfs_null_0
 };
@@ -335,6 +396,7 @@ int main(int argc, char **argv)
 
     char *fs = NULL, *mount = NULL;
     bool debug = false, do_cache = true;
+
     while (true)
     {
         static struct option long_options[] =
@@ -343,13 +405,14 @@ int main(int argc, char **argv)
             {"filesystem", required_argument, 0, 'f'},
             {"mount"     , required_argument, 0, 'm'},
             {"nocache"   , no_argument      , 0, 'n'},
+            {"buffer"    , required_argument, 0, 'b'},
             {"help"      , no_argument      , 0, 'h'},
             {"licence"   , no_argument      , 0, 'l'},
             {"version"   , no_argument      , 0, 'v'},
             {0, 0, 0, 0}
         };
         int optex = 0;
-        int opt = getopt_long(argc, argv, "df:m:nhlv", long_options, &optex);
+        int opt = getopt_long(argc, argv, "df:m:b:nhlv", long_options, &optex);
         if (opt == -1)
             break;
         switch (opt)
@@ -366,6 +429,9 @@ int main(int argc, char **argv)
             case 'n':
                 do_cache = false;
                 break;
+            case 'b':
+                buffer_s = strtol(optarg, NULL, 10);
+                break;
             case 'h':
                 return show_help();
             case 'l':
@@ -381,18 +447,29 @@ int main(int argc, char **argv)
     if (!mount || !fs)
         return show_usage();
 
+    if (buffer_s < MIN_FH)
+        buffer_s = BUFFER_DEFAULT;
+
     if ((filesystem = open(fs, O_RDWR, S_IRUSR | S_IWUSR)) < 3)
         die(_("could not open file system %s"), fs);
 
     vstegfs_init(filesystem, do_cache);
 
     char **args = calloc(debug ? 5 : 4, sizeof( char * ));
+    if (!args)
+        die(_("out of memory @ %s:%i"), __FILE__, __LINE__);
     args[0] = strdup(argv[0]);
     args[1] = strdup("-o");
     args[2] = strdup("use_ino");
     if (debug)
         args[3] = strdup("-d");
     args[debug ? 4 : 3] = strdup(mount);
+
+    if (!(cache = calloc(buffer_s, sizeof( cache_t * ))))
+        die(_("out of memory @ %s:%i"), __FILE__, __LINE__);
+    for (uint64_t i = MIN_FH; i < buffer_s; i++)
+        if (!(cache[i] = calloc(1, sizeof( cache_t ))))
+            die(_("out of memory @ %s:%i"), __FILE__, __LINE__);
 
     return fuse_main(debug ? 5 : 4, args, &vstegfs_oper, NULL);
 }
@@ -405,6 +482,7 @@ int64_t show_help(void)
     fprintf(stderr, "  -f, --filesystem  FILE SYSTEM  Location of the file system to mount\n");
     fprintf(stderr, "  -m, --mount       MOUNT POINT  Where to mount the file system\n");
     fprintf(stderr, "  -n, --nocache                  Do not cache directory entries and used blocks\n");
+    fprintf(stderr, "  -b, --buffer      BUFFER       Initial buffer size (default is: %i)\n", BUFFER_DEFAULT);
     fprintf(stderr, "  -h, --help                     Show this help list\n");
     fprintf(stderr, "  -l, --licence                  Show overview of GNU GPL\n");
     fprintf(stderr, "  -v, --version                  Show version information\n\n");

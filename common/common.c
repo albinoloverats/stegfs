@@ -24,7 +24,7 @@ static bool  c_sig = false;
 static char *c_app = NULL;
 static char *c_ver = NULL;
 
-extern void init(const char *a, const char *v)
+extern void init(const char * const restrict a, const char * const restrict v)
 {
     errno = 0;
     if (c_app)
@@ -36,9 +36,58 @@ extern void init(const char *a, const char *v)
     /*
      * set locale
      */
+#if 0
     setlocale(LC_ALL, "");
     bindtextdomain(c_app, "/usr/share/locale");
     textdomain(c_app);
+#endif
+}
+
+extern conf_t **config(const char * const restrict f)
+{
+    FILE *file = fopen(f, "r");
+    if (!file)
+    {
+        msg(_("could not open configuration file %s"), f);
+        return NULL;
+    }
+    conf_t **x  = malloc(sizeof(conf_t *));
+    x[0] = NULL;
+    size_t i = 0;
+
+    char  *line = NULL;
+    size_t size = 0;
+    while (getline(&line, &size, file) != -1)
+    {
+        if (line[0] != '#' && line[0] != '\n')
+        {
+            char *l = strdupa(line);
+            char *o = strtok(l, " \t\n\r#");
+            char *v = strtok(NULL, "\t\n\r#"); /* don't delimit by space this time */
+
+            if (o && v && strlen(o) && strlen(v))
+            {
+                if (!(x = realloc(x, (i + 2) * sizeof( conf_t * ))))
+                    die(_("out of memory @ %s:%i"), __FILE__, __LINE__ - 1);
+                if (!(x[i] = malloc(sizeof( conf_t ))))
+                    die(_("out of memory @ %s:%i"), __FILE__, __LINE__ - 1);
+
+                if (!(x[i]->option = strdup(o)))
+                    die(_("out of memory @ %s:%i"), __FILE__, __LINE__ - 1);
+                if (!(x[i]->value  = strdup(v)))
+                    die(_("out of memory @ %s:%i"), __FILE__, __LINE__ - 1);
+
+                x[++i] = NULL;
+            }
+        }
+
+        free(line);
+        line = NULL;
+        size = 0;
+    }
+    fclose(file);
+
+    return x;
 }
 
 extern int64_t show_licence(void)
@@ -87,7 +136,7 @@ extern void msg(const char *s, ...)
     fprintf(stderr, "\r%s: ", c_app);
     vfprintf(stderr, s, ap);
     fprintf(stderr, "\n");
-	fflush(stderr);
+    fflush(stderr);
     va_end(ap);
 }
 
@@ -132,4 +181,12 @@ extern void sigint(int s)
     msg(_("try again once more to force quit"));
     free(ss);
     c_sig = true;
+}
+
+extern void wait(uint32_t s)
+{
+    div_t a = div(s, 1000);
+    struct timespec t = { a.quot, a.rem * 10 };
+    struct timespec r = { 0, 0 };
+    nanosleep(&t, &r);
 }

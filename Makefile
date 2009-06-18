@@ -5,7 +5,7 @@ PO_INSTALL   =
 PO_CLEAN     = 
 PO_UNINSTALL = 
 
-OPTIONS := `pkg-config fuse --cflags --libs` -lmhash -lmcrypt -std=gnu99 -O2 -Wall -pipe -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -I ./ -o
+OPTIONS := `pkg-config fuse --cflags --libs` -lmhash -lmcrypt -std=gnu99 -O0 -g -Wall -pipe -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -I ./ -o
 COMMON  := src/vstegfs.c src/dir.c common/common.c
 
 all: a

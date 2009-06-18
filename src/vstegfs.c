@@ -110,6 +110,8 @@ extern int64_t vstegfs_save(vstat_t f)
          * (based on the filename, password and copy number)
          */
         MCRYPT c = vstegfs_crypt_init(&f, i);
+        if (!c)
+            return ENOMEM;
         /*
          * make sure we're at the beginning of the file, our data buffer
          * is clean and we're looking at the correct starting block on
@@ -166,7 +168,7 @@ extern int64_t vstegfs_save(vstat_t f)
          */
         char *fp = NULL;
         if (asprintf(&fp, "%s/%s:%s", f.path, f.name, f.pass ?: ROOT_PATH) < 0)
-            die(_("out of memory at %s:%i"), __FILE__, __LINE__);
+            return ENOMEM;
         MHASH h = mhash_init(MHASH_TIGER);
         mhash(h, fp, strlen(fp));
         uint8_t *ph = mhash_end(h);
@@ -201,6 +203,8 @@ extern int64_t vstegfs_save(vstat_t f)
              * write this copy of the header
              */
             MCRYPT c = vstegfs_crypt_init(&f, i);
+            if (!c)
+                return ENOMEM;
             if (vstegfs_block_save(f.fs, head, c, &b))
                 return EIO;
             mcrypt_generic_deinit(c);
@@ -217,7 +221,7 @@ extern int64_t vstegfs_save(vstat_t f)
     return EXIT_SUCCESS;
 }
 
-extern int64_t vstegfs_open(vstat_t f)
+extern int64_t vstegfs_load(vstat_t f)
 {
     uint64_t path[SL_PATH] = { 0x0 };
     {
@@ -250,6 +254,8 @@ extern int64_t vstegfs_open(vstat_t f)
     {
         msg(_("looking at copy %i"), i + 1);
         MCRYPT c = vstegfs_crypt_init(&f, i);
+        if (!c)
+            return ENOMEM;
         rewind(f.file); /* back to the beginning */
         uint64_t next = start[i];
         uint64_t bytes = 0x0;
@@ -327,7 +333,7 @@ static void add_known_list(vstat_t f)
     if (!known_files)
         return;
     uint32_t i = 0;
-    while(true)
+    while (true)
     {
         if (!known_files[i])
         {
@@ -390,7 +396,7 @@ extern uint64_t vstegfs_find(vstat_t f)
     return vstegfs_header(&f, &b);
 }
 
-extern void vstegfs_kill(vstat_t f)
+extern int64_t vstegfs_kill(vstat_t f)
 {
     /*
      * calculate the locations of the header blocks
@@ -399,7 +405,7 @@ extern void vstegfs_kill(vstat_t f)
     {
         char *fp = NULL;
         if (asprintf(&fp, "%s/%s:%s", f.path, f.name, f.pass ?: ROOT_PATH) < 0)
-            die(_("out of memory at %s:%i"), __FILE__, __LINE__);
+            return ENOMEM;
         MHASH h = mhash_init(MHASH_TIGER);
         mhash(h, fp, strlen(fp));
         uint8_t *ph = mhash_end(h);
@@ -429,6 +435,8 @@ extern void vstegfs_kill(vstat_t f)
              */
             vblock_t b;
             MCRYPT c = vstegfs_crypt_init(&f, i);
+            if (!c)
+                return ENOMEM;
 
             uint8_t path[SB_PATH];
             uint8_t data[SB_DATA];
@@ -452,7 +460,7 @@ extern void vstegfs_kill(vstat_t f)
         }
     }
     del_known_list(f);
-    return;
+    return EXIT_SUCCESS;
 }
 
 static uint64_t vstegfs_header(vstat_t *f, vblock_t *b)
@@ -464,7 +472,7 @@ static uint64_t vstegfs_header(vstat_t *f, vblock_t *b)
     {
         char *fp = NULL;
         if (asprintf(&fp, "%s/%s:%s", f->path, f->name, f->pass ?: ROOT_PATH) < 0)
-            die(_("out of memory at %s:%i"), __FILE__, __LINE__);
+            return ENOMEM;
         MHASH h = mhash_init(MHASH_TIGER);
         mhash(h, fp, strlen(fp));
         uint8_t *ph = mhash_end(h);
@@ -501,6 +509,8 @@ static uint64_t vstegfs_header(vstat_t *f, vblock_t *b)
              * its contents we're in business
              */
             MCRYPT c = vstegfs_crypt_init(f, i);
+            if (!c)
+                return ENOMEM;
             if (!block_open(f->fs, head, c, b))
             {
                 /*
@@ -532,7 +542,7 @@ static MCRYPT vstegfs_crypt_init(vstat_t *f, uint8_t ivi)
     {
         char *fk = NULL;
         if (asprintf(&fk, "%s:%s", f->name, f->pass ?: ROOT_PATH) < 0)
-            die(_("out of memory at %s:%i"), __FILE__, __LINE__);
+            return NULL;
         MHASH h = mhash_init(MHASH_TIGER);
         mhash(h, fk, strlen(fk));
         uint8_t *ph = mhash_end(h);
@@ -544,7 +554,7 @@ static MCRYPT vstegfs_crypt_init(vstat_t *f, uint8_t ivi)
     {
         char *iv_s = NULL;
         if (asprintf(&iv_s, "%s+%i", f->name, ivi) < 0)
-            die(_("out of memory at %s:%i"), __FILE__, __LINE__);
+            return NULL;
         MHASH h = mhash_init(MHASH_TIGER);
         mhash(h, iv_s, strlen(iv_s));
         uint8_t *ph = mhash_end(h);
@@ -558,7 +568,6 @@ static MCRYPT vstegfs_crypt_init(vstat_t *f, uint8_t ivi)
 
 static int64_t vstegfs_block_save(uint64_t fs, uint64_t pos, MCRYPT c, vblock_t *b)
 {
-    errno = EXIT_SUCCESS;
     /*
      * calculate the hash of the data
      */
@@ -581,15 +590,15 @@ static int64_t vstegfs_block_save(uint64_t fs, uint64_t pos, MCRYPT c, vblock_t 
      * write the encrypted block to this block location
      */
     if (pwrite(fs, b, sizeof( vblock_t ), pos * SB_BLOCK) != sizeof( vblock_t ))
-        msg(strerror(errno));
-    return errno;
+        return errno;
+    return EXIT_SUCCESS;
 }
 
 static int64_t block_open(uint64_t fs, uint64_t pos, MCRYPT c, vblock_t *b)
 {
-    int64_t err = EXIT_SUCCESS;
+    errno = EXIT_SUCCESS;
     if (pread(fs, b, sizeof( vblock_t ), pos * SB_BLOCK) != sizeof( vblock_t ))
-        msg(strerror(errno));
+        return errno;
     uint8_t d[SB_SERPENT * 7] = { 0x00 };
     memmove(d, ((uint8_t *)b) + SB_SERPENT, SB_BLOCK - SB_PATH);
     mdecrypt_generic(c, d, sizeof( d ));
@@ -607,7 +616,7 @@ static int64_t block_open(uint64_t fs, uint64_t pos, MCRYPT c, vblock_t *b)
     }
     if (memcmp(hash, b->hash, SB_HASH))
         return EXIT_FAILURE;
-    return err;
+    return EXIT_SUCCESS;
 }
 
 static bool is_block_ours(uint64_t fs, uint64_t pos, uint64_t *hash)
@@ -657,7 +666,7 @@ static uint64_t calc_next_block(uint64_t fs, char *path)
         {
             char *p = dir_get_part(path, i);
             if (asprintf(&cwd, "%s/%s%s", cwd ? cwd : "", cwd ? "" : "\b", p) < 0)
-                die(_("out of memory at %s:%i"), __FILE__, __LINE__);
+                return ENOMEM;
 
             uint64_t hash[SL_PATH] = { 0x0 };
             {
