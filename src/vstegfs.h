@@ -33,7 +33,7 @@
 #define SB_TIGER   0x18               /*  24 bytes -- 192 bits */
 
 #define SB_BLOCK   0x80               /* 128 bytes -- full block */
-#define SB_PATH    SB_TIGER*2/3       /*  16 bytes -- 2/3 size of full tiger hash */
+#define SB_PATH    SB_TIGER * 2 / 3   /*  16 bytes -- 2/3 size of full tiger hash */
 #define SB_DATA    0x50               /*  80 bytes */
 #define SB_HASH    SB_TIGER           /*  24 bytes */
 #define SB_NEXT    0x08               /*   8 bytes */
@@ -62,6 +62,9 @@
 #define ONE_MILLION 1000000
 #define SS_48B 3
 
+#define ARGS_MINIMUM 2
+#define ARGS_DEFAULT 4
+
 typedef struct vstat_t
 {
     uint64_t  fs;
@@ -76,10 +79,10 @@ vstat_t;
 
 typedef struct vblock_t
 {
-    uint64_t path[SL_PATH];              /*  16 bytes */
-    uint8_t  data[SB_DATA];              /*  80 bytes */
-    uint64_t hash[SL_HASH];              /*  24 bytes */
-    uint64_t next[SL_NEXT];              /*   8 bytes */
+    uint64_t path[SL_PATH]; /*  16 bytes */
+    uint8_t  data[SB_DATA]; /*  80 bytes */
+    uint64_t hash[SL_HASH]; /*  24 bytes */
+    uint64_t next[SL_NEXT]; /*   8 bytes */
 }
 vblock_t;
 

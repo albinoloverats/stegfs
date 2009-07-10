@@ -38,7 +38,7 @@
 
 typedef struct cache_t
 {
-    int64_t  status;
+    int64_t  stat;
     bool     used;
     bool     done;
     uint8_t *data;
@@ -52,7 +52,7 @@ cache_t;
  */
 static cache_t **cache;
 static uint64_t buffer_s = BUFFER_DEFAULT;
-static uint64_t filesystem;
+static int64_t filesystem;
 
 static int vstegfs_getattr(const char *path, struct stat *stbuf)
 {
@@ -174,7 +174,7 @@ static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, 
 {
     if (!offset)
     {
-        cache[fi->fh]->status = EXIT_SUCCESS;
+        cache[fi->fh]->stat = EXIT_SUCCESS;
         cache[fi->fh]->done = false;
 
         char *p = NULL;
@@ -214,7 +214,7 @@ static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, 
             vs.path = dir_get_path(p);
             vs.pass = dir_get_pass(p);
 
-            cache[fi->fh]->status = vstegfs_load(vs);
+            cache[fi->fh]->stat = vstegfs_load(vs);
 
             free(vs.name);
             free(vs.path);
@@ -230,7 +230,7 @@ static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, 
         free(cache[fi->fh]->data);
         cache[fi->fh]->data = NULL;
         cache[fi->fh]->used = false;
-        return -cache[fi->fh]->status;
+        return -cache[fi->fh]->stat;
     }
 
     if ((cache[fi->fh]->part < cache[fi->fh]->size) && (offset + size > cache[fi->fh]->part))
@@ -249,7 +249,7 @@ static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, 
 static int vstegfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     {
-        cache[fi->fh]->status = EXIT_SUCCESS;
+        cache[fi->fh]->stat = EXIT_SUCCESS;
         cache[fi->fh]->size += size;
         void *x = realloc(cache[fi->fh]->data, cache[fi->fh]->size + 1);
         if (!x)
@@ -279,7 +279,7 @@ static int vstegfs_write(const char *path, const char *buf, size_t size, off_t o
         vs.path = dir_get_path(p);
         vs.pass = dir_get_pass(p);
 
-        cache[fi->fh]->status = vstegfs_save(vs);
+        cache[fi->fh]->stat = vstegfs_save(vs);
 
         free(vs.name);
         free(vs.path);
@@ -293,7 +293,7 @@ static int vstegfs_write(const char *path, const char *buf, size_t size, off_t o
     cache[fi->fh]->data = NULL;
     cache[fi->fh]->used = false;
 
-    return cache[fi->fh]->status ? -cache[fi->fh]->status : size;
+    return cache[fi->fh]->stat ? -cache[fi->fh]->stat : size;
 }
 
 static int vstegfs_open(const char *path, struct fuse_file_info *fi)
@@ -329,40 +329,29 @@ static int vstegfs_open(const char *path, struct fuse_file_info *fi)
 static int vstegfs_mknod(const char *path, mode_t mode, dev_t rdev)
 {
     return EXIT_SUCCESS;
-//    return -ENODEV;
 }
 
 static int vstegfs_truncate(const char *path, off_t offset)
 {
     return EXIT_SUCCESS;
-//    return -ENOTSUP;
 }
 
 static int vstegfs_utime(const char *path, struct utimbuf *utime)
 {
     return EXIT_SUCCESS;
-//    return -ENOTSUP;
 }
 
 static int vstegfs_chmod(const char *path, mode_t mode)
 {
     return EXIT_SUCCESS;
-//    return -EPERM;
 }
 
 static int vstegfs_chown(const char *path, uid_t uid, gid_t gid)
 {
     return EXIT_SUCCESS;
-//    return -EPERM;
 }
 
-static int vstegfs_null_0(const char *path, struct fuse_file_info *fi)
-{
-    return EXIT_SUCCESS;
-//    return -EXIT_FAILURE;
-}
-
-static int vstegfs_ignore(const char *p, ...)
+static int vstegfs_null(const char *path, struct fuse_file_info *fi)
 {
     return EXIT_SUCCESS;
 }
@@ -383,15 +372,15 @@ static struct fuse_operations vstegfs_oper =
     .utime    = vstegfs_utime,
     .chmod    = vstegfs_chmod,
     .chown    = vstegfs_chown,
-    .release  = vstegfs_null_0,
-    .flush    = vstegfs_null_0
+    .release  = vstegfs_null,
+    .flush    = vstegfs_null
 };
 
 int main(int argc, char **argv)
 {
     init(APP, VER);
 
-    if (argc < 2)
+    if (argc < ARGS_MINIMUM)
         return show_usage();
 
     char *fs = NULL, *mount = NULL;
@@ -413,7 +402,7 @@ int main(int argc, char **argv)
         };
         int optex = 0;
         int opt = getopt_long(argc, argv, "df:m:b:nhlv", long_options, &optex);
-        if (opt == -1)
+        if (opt < 0)
             break;
         switch (opt)
         {
@@ -455,23 +444,28 @@ int main(int argc, char **argv)
 
     vstegfs_init(filesystem, do_cache);
 
-    char **args = calloc(debug ? 5 : 4, sizeof( char * ));
+    char **args = calloc(debug ? ARGS_DEFAULT + 1 : ARGS_DEFAULT, sizeof( char * ));
     if (!args)
         die(_("out of memory @ %s:%i"), __FILE__, __LINE__);
-    args[0] = strdup(argv[0]);
-    args[1] = strdup("-o");
-    args[2] = strdup("use_ino");
-    if (debug)
-        args[3] = strdup("-d");
-    args[debug ? 4 : 3] = strdup(mount);
+
+    {
+        uint8_t i = 0;
+        args[i++] = strdup(argv[0]);
+        args[i++] = strdup("-o");
+        args[i++] = strdup("use_ino");
+        if (debug)
+            args[i++] = strdup("-d");
+        args[i++] = strdup(mount);
+    }
 
     if (!(cache = calloc(buffer_s, sizeof( cache_t * ))))
         die(_("out of memory @ %s:%i"), __FILE__, __LINE__);
+
     for (uint64_t i = MIN_FH; i < buffer_s; i++)
         if (!(cache[i] = calloc(1, sizeof( cache_t ))))
             die(_("out of memory @ %s:%i"), __FILE__, __LINE__);
 
-    return fuse_main(debug ? 5 : 4, args, &vstegfs_oper, NULL);
+    return fuse_main(debug ? ARGS_DEFAULT + 1 : ARGS_DEFAULT, args, &vstegfs_oper, NULL);
 }
 
 int64_t show_help(void)

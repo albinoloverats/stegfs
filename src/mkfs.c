@@ -42,7 +42,7 @@ int main(int argc, char **argv)
     bool force   = false;
     bool restore = false;
 
-    if (argc < 2)
+    if (argc < ARGS_MINIMUM)
         return show_usage();
     while (true)
     {
@@ -59,7 +59,7 @@ int main(int argc, char **argv)
         };
         int32_t optex = 0;
         int32_t opt = getopt_long(argc, argv, "f:s:xrhlv", long_options, &optex);
-        if (opt == -1)
+        if (opt < 0)
             break;
         switch (opt)
         {

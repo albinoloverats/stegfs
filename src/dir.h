@@ -26,11 +26,11 @@ extern "C"
 {
 #endif
 
-    extern char    *dir_get_file(const char *);
-    extern uint16_t dir_get_deep(const char *);
-    extern char    *dir_get_part(const char *, uint16_t);
-    extern char    *dir_get_pass(const char *);
-    extern char    *dir_get_path(const char *);
+extern char    *dir_get_file(const char *);
+extern uint16_t dir_get_deep(const char *);
+extern char    *dir_get_part(const char *, uint16_t);
+extern char    *dir_get_pass(const char *);
+extern char    *dir_get_path(const char *);
 
 #ifdef __cplusplus
 }
