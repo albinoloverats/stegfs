@@ -32,9 +32,13 @@
  */
 extern char *dir_get_file(const char *path)
 {
+    char *p = strdupa(path);
+    char *f = strrchr(p, ':');
+    char *e = strchrnul(p, ':');
+    *e = 0x00;
     if (!strrchr(path, '/'))
-        return strndup(path, strrchr(path, ':') - path);
-    return strndup(strrchr(path, '/') + 1, strrchr(path, ':') - strrchr(path, '/'));
+        return strndup(path, f - p);
+    return strndup(strrchr(p, '/') + 1, f - strrchr(p, '/'));
 }
 
 /*
@@ -49,6 +53,7 @@ extern uint16_t dir_get_deep(const char *path)
         c++;
     char *p = strdupa(path);
     char *e = strchrnul(path, ':');
+    *e = 0x00;
     while ((p = strchr(p, '/')))
         if (++p >= e) /* if we run past the end of the string break */
             break;
@@ -78,7 +83,7 @@ extern char *dir_get_pass(const char *path)
 {
     if (!strrchr(path, ':'))
         return strdup("");
-    return strdup(strrchr(path, ':')) + 1;
+    return strdup(strrchr(path, ':') + 1);
 }
 
 /*
