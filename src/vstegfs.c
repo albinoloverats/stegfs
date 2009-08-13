@@ -35,7 +35,7 @@
 static vlist_t **known_files;
 static uint8_t *known_blocks;
 
-extern void vstegfs_init(int64_t fs, bool do_cache)
+extern void vstegfs_init(int64_t fs, const char *fsname, bool do_cache)
 {
     rng_seed();
     /*
@@ -49,7 +49,7 @@ extern void vstegfs_init(int64_t fs, bool do_cache)
 
     if ((sb.hash[0] != MAGIC_0) || (sb.hash[1] != MAGIC_1) || (sb.hash[2] != MAGIC_2))
     {
-        msg(_("magic number failure in superblock for %s"), fs);
+        msg(_("magic number failure in superblock for %s"), fsname);
         die(_("use mkvstegfs to restore superblock"));
     }
     /*
@@ -128,8 +128,10 @@ extern int64_t vstegfs_save(vstat_t f)
          * check if we have more than a full block of data, if we don't
          * then handle that as a special case
          */
-        while (fread(data, sizeof( uint8_t ), SB_DATA, f.file) > 0)
+        for (uint64_t j = 0; j < *f.size; j += SB_DATA)
         {
+            if (fread(data, sizeof( uint8_t ), SB_DATA, f.file) <= 0)
+                return EIO;
             vblock_t b;
             uint64_t this = next;
             if (!(next = calc_next_block(f.fs, f.path)))
@@ -541,7 +543,7 @@ static MCRYPT vstegfs_crypt_init(vstat_t *f, uint8_t ivi)
     uint8_t key[SB_TIGER] = { 0x00 };
     {
         char *fk = NULL;
-        if (asprintf(&fk, "%s:%s", f->name, f->pass ?: ROOT_PATH) < 0)
+        if (asprintf(&fk, "%s:%s", f->name, strlen(f->pass) ? f->pass : ROOT_PATH) < 0)
             return NULL;
         MHASH h = mhash_init(MHASH_TIGER);
         mhash(h, fk, strlen(fk));

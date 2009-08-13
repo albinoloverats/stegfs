@@ -22,7 +22,7 @@
 #define _VSTEGFS_H_
 
 #define APP "vstegfs"
-#define VER "200907-"
+#define VER "200909-"
 
 #ifndef EDIED /* EDIED is more fitting, but not always defined */
 #define EDIED ENODATA
@@ -93,7 +93,7 @@ typedef struct vlist_t
 }
 vlist_t;
 
-extern   void   vstegfs_init(int64_t, bool);
+extern   void   vstegfs_init(int64_t, const char *, bool);
 extern  int64_t vstegfs_save(vstat_t);
 extern  int64_t vstegfs_load(vstat_t);
 extern uint64_t vstegfs_find(vstat_t);
