@@ -14,12 +14,12 @@ all: a
 vstegfs:
 # build the main fuse executable
 	 @gcc $(OPTIONS) vstegfs $(COMMON) src/fuse.c
-	-@echo "compiled \`src/fuse.c srv/vstegfs.c src/dir.c common/common.c' --> \`vstegfs'"
+	-@echo "compiled \`src/fuse.c $(COMMON)' --> \`vstegfs'"
 
 mkfs:
 # build the mkfs utility
 	 @gcc $(OPTIONS) mkvstegfs $(COMMON) src/mkfs.c
-	-@echo "compiled \`src/mkfs.c src/vstegfs.c src/dir.c common/common.c' --> \`mkvstegfs'"
+	-@echo "compiled \`src/mkfs.c $(COMMON)' --> \`mkvstegfs'"
 
 a: vstegfs mkfs $(PO_MAKE)
 
