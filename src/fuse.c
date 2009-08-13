@@ -36,11 +36,14 @@
 #include "src/vstegfs.h"
 #include "src/dir.h"
 
+typedef enum rw_e { READ, WRITE } rw_e;
+
 typedef struct cache_t
 {
     int64_t  stat;
     bool     used;
     bool     done;
+    rw_e     rwop;
     uint8_t *data;
     uint64_t part;
     uint64_t size;
@@ -53,6 +56,7 @@ cache_t;
 static cache_t **cache;
 static uint64_t buffer_s = BUFFER_DEFAULT;
 static int64_t filesystem;
+static uint64_t fs_size;
 
 static int vstegfs_getattr(const char *path, struct stat *stbuf)
 {
@@ -74,7 +78,7 @@ static int vstegfs_getattr(const char *path, struct stat *stbuf)
 
     if (!strcmp(path, "/"))
     {
-        stbuf->st_size = lseek(filesystem, 0, SEEK_END);
+        stbuf->st_size = fs_size;
     }
     else if (this[0] != '+')
     {
@@ -176,6 +180,7 @@ static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, 
     {
         cache[fi->fh]->stat = EXIT_SUCCESS;
         cache[fi->fh]->done = false;
+        cache[fi->fh]->rwop = READ;
 
         char *p = NULL;
         if (asprintf(&p, "%s%s", ROOT_PATH, path) < 0)
@@ -192,16 +197,17 @@ static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, 
             vs.pass = dir_get_pass(p);
 
             vstegfs_find(vs);
+            if (*vs.size > fs_size)
+                return -EFBIG;
             if (!(cache[fi->fh]->data = malloc(cache[fi->fh]->size)))
                 return -ENOMEM;
-
 
             free(vs.name);
             free(vs.path);
             free(vs.pass);
         }
 
-        uint64_t expected = cache[fi->fh]->size;
+        size_t expected = cache[fi->fh]->size;
         FILE *stream = open_memstream((char **)&cache[fi->fh]->data, &expected);
 
         {
@@ -248,52 +254,20 @@ static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, 
 
 static int vstegfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
+    cache[fi->fh]->stat = EXIT_SUCCESS;
+    cache[fi->fh]->size += size;
+    cache[fi->fh]->rwop = WRITE;
+    void *x = realloc(cache[fi->fh]->data, cache[fi->fh]->size + 1);
+    if (!x)
     {
-        cache[fi->fh]->stat = EXIT_SUCCESS;
-        cache[fi->fh]->size += size;
-        void *x = realloc(cache[fi->fh]->data, cache[fi->fh]->size + 1);
-        if (!x)
-            return -ENOMEM;
-
-        cache[fi->fh]->data = x;
-        memcpy(cache[fi->fh]->data + offset, buf, size);
-    }
-
-    if (size == PAGESIZE)
-        return size;
-
-    char *p = NULL;
-    if (asprintf(&p, "%s%s", ROOT_PATH, path) < 0)
+        msg(_("out of memory @ %s:%i"), __FILE__, __LINE__);
         return -ENOMEM;
-
-    FILE *stream = fmemopen(cache[fi->fh]->data, cache[fi->fh]->size, "r");
-
-    vstat_t vs;
-    {
-        vs.fs   = filesystem;
-        vs.file = stream;
-        vs.size = &cache[fi->fh]->size;
-        time_t now = time(NULL);
-        vs.time = &now;
-        vs.name = dir_get_file(p);
-        vs.path = dir_get_path(p);
-        vs.pass = dir_get_pass(p);
-
-        cache[fi->fh]->stat = vstegfs_save(vs);
-
-        free(vs.name);
-        free(vs.path);
-        free(vs.pass);
     }
 
-    fclose(stream);
-    free(p);
+    cache[fi->fh]->data = x;
+    memcpy(cache[fi->fh]->data + offset, buf, size);
 
-    free(cache[fi->fh]->data);
-    cache[fi->fh]->data = NULL;
-    cache[fi->fh]->used = false;
-
-    return cache[fi->fh]->stat ? -cache[fi->fh]->stat : size;
+    return size;
 }
 
 static int vstegfs_open(const char *path, struct fuse_file_info *fi)
@@ -324,6 +298,46 @@ static int vstegfs_open(const char *path, struct fuse_file_info *fi)
      * return ourself, we should easily then find the 1st newly created entry
      */
     return vstegfs_open(path, fi);
+}
+
+static int vstegfs_release(const char *path, struct fuse_file_info *fi)
+{
+    if (cache[fi->fh]->rwop != WRITE)
+        return EXIT_SUCCESS;
+
+    if (cache[fi->fh]->size > fs_size)
+        return EFBIG;
+
+    char *p = NULL;
+    if (asprintf(&p, "%s%s", ROOT_PATH, path) < 0)
+        return -ENOMEM;
+
+    FILE *stream = fmemopen(cache[fi->fh]->data, cache[fi->fh]->size, "r");
+
+    vstat_t vs;
+    vs.fs   = filesystem;
+    vs.file = stream;
+    vs.size = &cache[fi->fh]->size;
+    time_t now = time(NULL);
+    vs.time = &now;
+    vs.name = dir_get_file(p);
+    vs.path = dir_get_path(p);
+    vs.pass = dir_get_pass(p);
+
+    cache[fi->fh]->stat = vstegfs_save(vs);
+
+    free(vs.name);
+    free(vs.path);
+    free(vs.pass);
+
+    fclose(stream);
+    free(p);
+
+    free(cache[fi->fh]->data);
+    cache[fi->fh]->data = NULL;
+    cache[fi->fh]->used = false;
+
+    return EXIT_SUCCESS;
 }
 
 static int vstegfs_mknod(const char *path, mode_t mode, dev_t rdev)
@@ -372,7 +386,7 @@ static struct fuse_operations vstegfs_oper =
     .utime    = vstegfs_utime,
     .chmod    = vstegfs_chmod,
     .chown    = vstegfs_chown,
-    .release  = vstegfs_null,
+    .release  = vstegfs_release,
     .flush    = vstegfs_null
 };
 
@@ -442,7 +456,8 @@ int main(int argc, char **argv)
     if ((filesystem = open(fs, O_RDWR, S_IRUSR | S_IWUSR)) < 3)
         die(_("could not open file system %s"), fs);
 
-    vstegfs_init(filesystem, do_cache);
+    vstegfs_init(filesystem, fs, do_cache);
+    fs_size = lseek(filesystem, 0, SEEK_END);
 
     char **args = calloc(debug ? ARGS_DEFAULT + 1 : ARGS_DEFAULT, sizeof( char * ));
     if (!args)
