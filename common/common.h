@@ -127,14 +127,14 @@ extern "C"
      * \param[in]  a     The application name to use when displaying messages
      * \param[in]  v     The version of the application
      */
-    extern void init(const char * const restrict a, const char * const restrict v);
+    extern void init(const char * const restrict a, const char * const restrict v) __attribute__((nonnull(1, 2)));
 
     /*!
      * \brief            Parse configuration file for options
      * \paran[in]  f     Configuration file to parse
      * \return           Pointer to array of parameters
      */
-    extern conf_t **config(const char const * restrict f);
+    extern conf_t **config(const char const * restrict f) __attribute__((nonnull(1)));
 
     /*!
      * \brief            Show list of command line options
@@ -166,19 +166,19 @@ extern "C"
      * \param[in]  v     Data to display
      * \param[in]  l     Length of data in bytes
      */
-    extern void hex(void *v, uint64_t l);
+    extern void hex(void *v, uint64_t l) __attribute__((nonnull(1)));
 
     /*!
      * \brief            Display messages to the user on STDERR
      * \param[in]  s     String format, followed by optional additional variables
      */
-    extern void msg(const char *s, ...);
+    extern void msg(const char *s, ...) __attribute__((format(printf, 1, 2)));
 
     /*!
      * \brief            Display fatal error to user and quit application
      * \param[in]  s     String format, followed by optional additional variables
      */
-    extern void die(const char *s, ...);
+    extern void die(const char *s, ...) __attribute__((format(printf, 1, 2))) __attribute__((noreturn));
 
     /*!
      * \brief            Capture known signals and handle them accordingly
