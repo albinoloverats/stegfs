@@ -22,7 +22,7 @@
 #define _VSTEGFS_H_
 
 #define APP "vstegfs"
-#define VER "200909-"
+#define VER "200910"
 
 #ifndef EDIED /* EDIED is more fitting, but not always defined */
 #define EDIED ENODATA
@@ -100,6 +100,8 @@ extern uint64_t vstegfs_find(vstat_t);
 extern  int64_t vstegfs_kill(vstat_t);
 extern   char **vstegfs_known_list(const char *);
 
+#endif /* ! _VSTEGFS_H_ */
+
 #ifdef _VSTEG_S_
 static   void   add_known_list(vstat_t);
 static   void   del_known_list(vstat_t);
@@ -111,5 +113,3 @@ static   bool   is_block_ours(uint64_t, uint64_t, uint64_t *);
 static uint64_t calc_next_block(uint64_t, char *);
 static   void   rng_seed(void);
 #endif /* _VSTEG_S_ */
-
-#endif /* ! _VSTEGFS_H_ */
