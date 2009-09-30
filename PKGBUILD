@@ -2,7 +2,7 @@
 pkgname=vstegfs
 pkgver=200910
 pkgrel=1
-pkgdesc="A steganographic file system based on FUSE."
+pkgdesc="vstegfs is a steganographic file system in userspace which uses the FUSE library. Steganographioc file systems are one step above traditional encrypted file systems because they grant the user plausible deniability."
 arch=(i686 x86_64)
 url="https://albinoloverats.net/vstegfs"
 license=('GPL')

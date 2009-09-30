@@ -1,6 +1,6 @@
 Summary: A fuse based steganographic file system
 Name: vstegfs
-Version: 200904
+Version: 200910
 Release: 1
 Source: https://albinoloverats.net/downloads/%{name}.tar.bz2
 URL: https://albinoloverats.net/%{name}
@@ -11,7 +11,8 @@ Group: Applications/File
 %description
 vstegfs is a steganographic file system in userspace which uses the FUSE
 library. Steganographioc file systems are one step above traditional
-encrypted file systems because they grant the user plausible deniability
+encrypted file systems because they grant the user plausible
+deniability.
  
 %prep
 %setup -q

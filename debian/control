@@ -11,4 +11,4 @@ Depends: libfuse2 (>= 2.7), libmcrypt4 (>= 2.5), libmhash2 (>= 0.9), ${shlibs:De
 Description: vstegfs is a steganographic file system in userspace which
  uses uses the FUSE library. Steganographioc file systems are one step
  above traditional encrypted file systems because they grant the user
- plausible deniability
+ plausible deniability.
