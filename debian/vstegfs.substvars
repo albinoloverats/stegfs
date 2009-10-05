@@ -1,0 +1,1 @@
+shlibs:Depends=libc6 (>= 2.7-1), libfuse2 (>= 2.6), libmcrypt4, libmhash2
