@@ -19,7 +19,7 @@ deniability.
 
 %build
 rm -rf %{buildroot}
-mkdir -p %{buildroot}/usr/{bin,man/man1}
+mkdir -p %{buildroot}/usr/{bin,man/man1,share/locale/de/LC_MESSAGES}
 make PREFIX=%{buildroot}
 
 %install
@@ -33,3 +33,4 @@ rm -rf %{buildroot}
 /usr/bin/vstegfs
 /usr/bin/mkvstegfs
 /usr/man/man1/vstegfs.1.gz
+/usr/share/locale/de/LC_MESSAGES/vstegfs.mo
