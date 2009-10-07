@@ -18,11 +18,11 @@ deniability.
 %setup -q
 
 %build
-rm -rf %{buildroot}
-mkdir -p %{buildroot}/usr/{bin,man/man1,share/locale/de/LC_MESSAGES}
-make PREFIX=%{buildroot}
+make
 
 %install
+rm -rf %{buildroot}
+mkdir -p %{buildroot}/usr/{bin,man/man1,share/locale/de/LC_MESSAGES}
 make install PREFIX=%{buildroot}
 
 %clean
