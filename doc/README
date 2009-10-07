@@ -1,11 +1,8 @@
-vstegfs - 200904                                         April 1st, 2009
+vstegfs - 200910                                       October 7th, 2009
 
 
 Changes:
-    Now using: albinoloverats common code, mcrypt, mhash;
-    Major refactor of main file system functions;
-    Inclusion of file timestamps;
-    Remember directory entries and used blocks (until next unmount);
+    Fixes for minor bugs
 
 
 About:
