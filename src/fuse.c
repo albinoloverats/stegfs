@@ -242,7 +242,7 @@ static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, 
     if ((cache[fi->fh]->part < cache[fi->fh]->size) && (offset + size > cache[fi->fh]->part))
         cache[fi->fh]->done = true;
 
-    if (offset < cache[fi->fh]->size)
+    if ((uint64_t)offset < cache[fi->fh]->size)
     {
         if (offset + size > cache[fi->fh]->size)
             size = cache[fi->fh]->size - offset;
