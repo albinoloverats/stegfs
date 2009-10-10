@@ -78,24 +78,23 @@ static int vstegfs_getattr(const char *path, struct stat *stbuf)
 
     if (!strcmp(path, "/"))
     {
+        free(this);
         stbuf->st_size = fs_size;
     }
     else if (this[0] != '+')
     {
+        free(this);
         char *p = NULL;
         if (asprintf(&p, "%s%s", ROOT_PATH, path) < 0)
             return -ENOMEM;
 
         vstat_t vs;
-        {
-            vs.fs   = filesystem;
-            vs.file = NULL;
-            vs.size = calloc(1, sizeof( uint64_t ));
-            vs.time = calloc(1, sizeof( time_t ));
-            vs.name = dir_get_file(p);
-            vs.path = dir_get_path(p);
-            vs.pass = dir_get_pass(p);
-        }
+        vs.fs   = filesystem;
+        vs.size = calloc(1, sizeof( uint64_t ));
+        vs.time = calloc(1, sizeof( time_t ));
+        vs.name = dir_get_file(p);
+        vs.path = dir_get_path(p);
+        vs.pass = dir_get_pass(p);
 
         stbuf->st_ino   = vstegfs_find(vs);
 
@@ -112,10 +111,11 @@ static int vstegfs_getattr(const char *path, struct stat *stbuf)
         free(vs.pass);
         free(p);
     }
+    else
+        free(this); /* just in case */
 
     stbuf->st_blocks = (int)(stbuf->st_size / stbuf->st_blksize);
 
-    free(this);
     return EXIT_SUCCESS;
 }
 
@@ -156,15 +156,13 @@ static int vstegfs_unlink(const char *path)
         return -ENOMEM;
 
     vstat_t vk;
-    {
-        vk.fs   = filesystem;
-        vk.file = NULL;
-        vk.size = NULL;
-        vk.time = NULL;
-        vk.name = dir_get_file(p);
-        vk.path = dir_get_path(p);
-        vk.pass = dir_get_pass(p);
-    }
+    vk.fs   = filesystem;
+    vk.size = NULL;
+    vk.time = NULL;
+    vk.name = dir_get_file(p);
+    vk.path = dir_get_path(p);
+    vk.pass = dir_get_pass(p);
+
     int64_t s = vstegfs_kill(vk);
 
     free(p);
@@ -186,49 +184,41 @@ static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, 
         if (asprintf(&p, "%s%s", ROOT_PATH, path) < 0)
             return -ENOMEM;
 
-        {
-            vstat_t vs;
-            vs.fs   = filesystem;
-            vs.file = NULL;
-            vs.time = NULL;
-            vs.size = &cache[fi->fh]->size;
-            vs.name = dir_get_file(p);
-            vs.path = dir_get_path(p);
-            vs.pass = dir_get_pass(p);
+        vstat_t vs;
+        vs.fs   = filesystem;
+        vs.data = NULL;
+        vs.size = &cache[fi->fh]->size;
+        vs.time = NULL;
+        vs.name = dir_get_file(p);
+        vs.path = dir_get_path(p);
+        vs.pass = dir_get_pass(p);
 
-            vstegfs_find(vs);
-            if (*vs.size > fs_size)
-                return -EFBIG;
-            if (!(cache[fi->fh]->data = malloc(cache[fi->fh]->size)))
-                return -ENOMEM;
-
-            free(vs.name);
-            free(vs.path);
-            free(vs.pass);
-        }
-
-        size_t expected = cache[fi->fh]->size;
-        FILE *stream = open_memstream((char **)&cache[fi->fh]->data, &expected);
-
-        {
-            vstat_t vs;
-            vs.fs   = filesystem;
-            vs.file = stream;
-            vs.size = &cache[fi->fh]->part;
-            vs.time = NULL;
-            vs.name = dir_get_file(p);
-            vs.path = dir_get_path(p);
-            vs.pass = dir_get_pass(p);
-
-            cache[fi->fh]->stat = vstegfs_load(vs);
-
-            free(vs.name);
-            free(vs.path);
-            free(vs.pass);
-        }
-
-        fclose(stream);
         free(p);
+
+        vstegfs_find(vs);
+        if (*vs.size > fs_size)
+        {
+            free(vs.name);
+            free(vs.path);
+            free(vs.pass);
+            return -EFBIG;
+        }
+        if (!(cache[fi->fh]->data = malloc(cache[fi->fh]->size)))
+        {
+            free(vs.name);
+            free(vs.path);
+            free(vs.pass);
+            return -ENOMEM;
+        }
+
+        vs.data =  cache[fi->fh]->data;
+        vs.size = &cache[fi->fh]->part;
+
+        cache[fi->fh]->stat = vstegfs_load(&vs);
+
+        free(vs.name);
+        free(vs.path);
+        free(vs.pass);
     }
 
     if (cache[fi->fh]->done)
@@ -312,11 +302,9 @@ static int vstegfs_release(const char *path, struct fuse_file_info *fi)
     if (asprintf(&p, "%s%s", ROOT_PATH, path) < 0)
         return -ENOMEM;
 
-    FILE *stream = fmemopen(cache[fi->fh]->data, cache[fi->fh]->size, "r");
-
     vstat_t vs;
     vs.fs   = filesystem;
-    vs.file = stream;
+    vs.data =  cache[fi->fh]->data;
     vs.size = &cache[fi->fh]->size;
     time_t now = time(NULL);
     vs.time = &now;
@@ -324,13 +312,12 @@ static int vstegfs_release(const char *path, struct fuse_file_info *fi)
     vs.path = dir_get_path(p);
     vs.pass = dir_get_pass(p);
 
-    cache[fi->fh]->stat = vstegfs_save(vs);
+    cache[fi->fh]->stat = vstegfs_save(&vs);
 
     free(vs.name);
     free(vs.path);
     free(vs.pass);
 
-    fclose(stream);
     free(p);
 
     free(cache[fi->fh]->data);

@@ -72,14 +72,14 @@ extern void vstegfs_init(int64_t fs, const char *fsname, bool do_cache)
     return;
 }
 
-extern int64_t vstegfs_save(vstat_t f)
+extern int64_t vstegfs_save(vstat_t *f)
 {
     /*
      * some initial preparations - such as: is the file larger than the
      * file system? because that wouldn't be good :s
      */
-    uint64_t fs_size = lseek(f.fs, 0, SEEK_END);
-    if (MAX_COPIES * *f.size > fs_size * 5 / 8)
+    uint64_t fs_size = lseek(f->fs, 0, SEEK_END);
+    if (MAX_COPIES * *f->size > fs_size * 5 / 8)
         return EFBIG;
     uint64_t fs_blocks = fs_size / SB_BLOCK;
     rng_seed();
@@ -89,7 +89,7 @@ extern int64_t vstegfs_save(vstat_t f)
     uint64_t path[SL_PATH] = { 0x0 };
     {
         MHASH h = mhash_init(MHASH_TIGER);
-        mhash(h, f.path, strlen(f.path));
+        mhash(h, f->path, strlen(f->path));
         uint8_t *ph = mhash_end(h);
         memmove(path, ph, SB_PATH); /* we only need the 1st 128 bits ATM */
         free(ph);
@@ -103,13 +103,13 @@ extern int64_t vstegfs_save(vstat_t f)
         /*
          * find somewhere to start this copy of the file
          */
-        if (!(start[i] = calc_next_block(f.fs, f.path)))
+        if (!(start[i] = calc_next_block(f->fs, f->path)))
             return ENOSPC;
         /*
          * initialise the mcrypt library routines, and create a new IV
          * (based on the filename, password and copy number)
          */
-        MCRYPT c = vstegfs_crypt_init(&f, i);
+        MCRYPT c = vstegfs_crypt_init(f, i);
         if (!c)
             return ENOMEM;
         /*
@@ -117,7 +117,7 @@ extern int64_t vstegfs_save(vstat_t f)
          * is clean and we're looking at the correct starting block on
          * the file system
          */
-        rewind(f.file);
+        uint64_t pos = 0x0;
         uint8_t data[SB_DATA] = { 0x00 };
         uint64_t next = start[i];
         /*
@@ -128,13 +128,13 @@ extern int64_t vstegfs_save(vstat_t f)
          * check if we have more than a full block of data, if we don't
          * then handle that as a special case
          */
-        for (uint64_t j = 0; j < *f.size; j += SB_DATA)
+        for (uint64_t j = 0; j < *f->size; j += SB_DATA)
         {
-            if (fread(data, sizeof( uint8_t ), SB_DATA, f.file) <= 0)
-                return EIO;
+            memmove(data, f->data + pos, SB_DATA);
+            pos += SB_DATA;
             vblock_t b;
             uint64_t this = next;
-            if (!(next = calc_next_block(f.fs, f.path)))
+            if (!(next = calc_next_block(f->fs, f->path)))
                 return ENOSPC;
             /*
              * build the block; this includes putting in the data,
@@ -143,13 +143,13 @@ extern int64_t vstegfs_save(vstat_t f)
              */
             memmove(b.path,  path, SB_PATH);
             memmove(b.data,  data, SB_DATA);
-            memset(b.hash,  0x00, SB_HASH);
+            memset(b.hash,   0x00, SB_HASH);
             memmove(b.next, &next, SB_NEXT);
             /*
              * save the block - if there is a problem, give up with IO
              * error
              */
-            if (vstegfs_block_save(f.fs, this, c, &b))
+            if (vstegfs_block_save(f->fs, this, c, &b))
                 return EIO;
             /*
              * get ready for the next chunk of data...
@@ -169,7 +169,7 @@ extern int64_t vstegfs_save(vstat_t f)
          * should be located
          */
         char *fp = NULL;
-        if (asprintf(&fp, "%s/%s:%s", f.path, f.name, f.pass ?: ROOT_PATH) < 0)
+        if (asprintf(&fp, "%s/%s:%s", f->path, f->name, f->pass ?: ROOT_PATH) < 0)
             return ENOMEM;
         MHASH h = mhash_init(MHASH_TIGER);
         mhash(h, fp, strlen(fp));
@@ -189,8 +189,8 @@ extern int64_t vstegfs_save(vstat_t f)
         uint8_t i = 0;
         for (i = 0; i < MAX_COPIES; i++)
             memmove(b.data + i * sizeof( uint64_t ), &start[i], sizeof( uint64_t ));
-        memmove(b.data + i * sizeof( uint64_t ), f.time, sizeof( time_t ));
-        memmove(b.next, f.size, SB_NEXT);
+        memmove(b.data + i * sizeof( uint64_t ), f->time, sizeof( time_t ));
+        memmove(b.next, f->size, SB_NEXT);
         for (uint8_t i = 0; i < MAX_COPIES; i++)
         {
             /*
@@ -204,10 +204,10 @@ extern int64_t vstegfs_save(vstat_t f)
             /*
              * write this copy of the header
              */
-            MCRYPT c = vstegfs_crypt_init(&f, i);
+            MCRYPT c = vstegfs_crypt_init(f, i);
             if (!c)
                 return ENOMEM;
-            if (vstegfs_block_save(f.fs, head, c, &b))
+            if (vstegfs_block_save(f->fs, head, c, &b))
                 return EIO;
             mcrypt_generic_deinit(c);
             mcrypt_module_close(c);
@@ -216,19 +216,19 @@ extern int64_t vstegfs_save(vstat_t f)
     /*
      * add file to list of known filenames
      */
-    add_known_list(f);
+    add_known_list(*f);
     /*
      * success :D
      */
     return EXIT_SUCCESS;
 }
 
-extern int64_t vstegfs_load(vstat_t f)
+extern int64_t vstegfs_load(vstat_t *f)
 {
     uint64_t path[SL_PATH] = { 0x0 };
     {
         MHASH h = mhash_init(MHASH_TIGER);
-        mhash(h, f.path, strlen(f.path));
+        mhash(h, f->path, strlen(f->path));
         uint8_t *ph = mhash_end(h);
         memmove(path, ph, SB_PATH);
         free(ph);
@@ -237,12 +237,12 @@ extern int64_t vstegfs_load(vstat_t f)
      * find a valid header block
      */
     vblock_t hb;
-    vstegfs_header(&f, &hb);
+    vstegfs_header(f, &hb);
     /*
      * if we don't know the size of the file then we didn't find an
      * uncorrupted header - give up
      */
-    if (!*f.size)
+    if (!*f->size)
         return ENODATA;
     uint64_t start[MAX_COPIES] = { 0x0 };
     memmove(start, hb.data, sizeof( uint64_t ) * MAX_COPIES);
@@ -255,19 +255,19 @@ extern int64_t vstegfs_load(vstat_t f)
     for (uint8_t i = 0; i < MAX_COPIES; i++)
     {
         msg(_("looking at copy %i"), i + 1);
-        MCRYPT c = vstegfs_crypt_init(&f, i);
+        MCRYPT c = vstegfs_crypt_init(f, i);
         if (!c)
             return ENOMEM;
-        rewind(f.file); /* back to the beginning */
         uint64_t next = start[i];
         uint64_t bytes = 0x0;
+        uint64_t pos = 0x0;
         /*
          * now we're ready to read this copy of the file
          */
-        while (is_block_ours(f.fs, next, path))
+        while (is_block_ours(f->fs, next, path))
         {
             vblock_t b;
-            if (block_open(f.fs, next, c, &b))
+            if (block_open(f->fs, next, c, &b))
                 break;
             /*
              * woo - we now have successfully decrypted another block
@@ -275,10 +275,11 @@ extern int64_t vstegfs_load(vstat_t f)
              */
             bytes += SB_DATA;
             uint8_t need = SB_DATA;
-            if (bytes > *f.size)
+            if (bytes > *f->size)
                 /* that was the final block, but we don't need all of it */
-                need = SB_DATA - (bytes - *f.size);
-            fwrite (&b.data, sizeof( uint8_t ), need, f.file);
+                need = SB_DATA - (bytes - *f->size);
+            memmove(f->data + pos, &b.data, need);
+            pos += need;
 
             if (known_blocks)
             {
@@ -289,9 +290,9 @@ extern int64_t vstegfs_load(vstat_t f)
                 known_blocks[a.quot] = known_blocks[a.quot] | (0x01 << a.rem);
             }
 
-            if (bytes >= *f.size)
+            if (bytes >= *f->size)
             {
-                add_known_list(f); /* we now know this files exists :) */
+                add_known_list(*f); /* we now know this files exists :) */
                 return EXIT_SUCCESS; /* done */
             }
 
@@ -305,8 +306,8 @@ extern int64_t vstegfs_load(vstat_t f)
     /*
      * if we make it this far something has gone wrong
      */
-    *f.size = total;
-    msg(_("no complete copy of file found; recovered %lu bytes"), *f.size);
+    *f->size = total;
+    msg(_("no complete copy of file found; recovered %lu bytes"), *f->size);
     return EDIED;
 }
 
@@ -330,7 +331,7 @@ extern char **vstegfs_known_list(const char *path)
     return list;
 }
 
-static void add_known_list(vstat_t f)
+static void add_known_list(const vstat_t f)
 {
     if (!known_files)
         return;

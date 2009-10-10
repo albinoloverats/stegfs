@@ -68,7 +68,7 @@
 typedef struct vstat_t
 {
     uint64_t  fs;
-    FILE     *file;
+    uint8_t  *data;
     uint64_t *size;
     time_t   *time;
     char     *name;
@@ -94,16 +94,14 @@ typedef struct vlist_t
 vlist_t;
 
 extern   void   vstegfs_init(int64_t, const char *, bool);
-extern  int64_t vstegfs_save(vstat_t);
-extern  int64_t vstegfs_load(vstat_t);
+extern  int64_t vstegfs_save(vstat_t *);
+extern  int64_t vstegfs_load(vstat_t *);
 extern uint64_t vstegfs_find(vstat_t);
 extern  int64_t vstegfs_kill(vstat_t);
 extern   char **vstegfs_known_list(const char *);
 
-#endif /* ! _VSTEGFS_H_ */
-
 #ifdef _VSTEG_S_
-static   void   add_known_list(vstat_t);
+static   void   add_known_list(const vstat_t);
 static   void   del_known_list(vstat_t);
 static MCRYPT   vstegfs_crypt_init(vstat_t *, uint8_t);
 static uint64_t vstegfs_header(vstat_t *, vblock_t *);
@@ -113,3 +111,5 @@ static   bool   is_block_ours(uint64_t, uint64_t, uint64_t *);
 static uint64_t calc_next_block(uint64_t, char *);
 static   void   rng_seed(void);
 #endif /* _VSTEG_S_ */
+
+#endif /* ! _VSTEGFS_H_ */
