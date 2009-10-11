@@ -184,6 +184,8 @@ static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, 
         if (asprintf(&p, "%s%s", ROOT_PATH, path) < 0)
             return -ENOMEM;
 
+        errno = EXIT_SUCCESS;
+
         vstat_t vs;
         vs.fs   = filesystem;
         vs.data = NULL;
@@ -192,33 +194,26 @@ static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, 
         vs.name = dir_get_file(p);
         vs.path = dir_get_path(p);
         vs.pass = dir_get_pass(p);
-
         free(p);
 
         vstegfs_find(vs);
         if (*vs.size > fs_size)
-        {
-            free(vs.name);
-            free(vs.path);
-            free(vs.pass);
-            return -EFBIG;
-        }
+            errno = -EFBIG;
         if (!(cache[fi->fh]->data = malloc(cache[fi->fh]->size)))
-        {
-            free(vs.name);
-            free(vs.path);
-            free(vs.pass);
-            return -ENOMEM;
-        }
+            errno = -ENOMEM;
 
         vs.data =  cache[fi->fh]->data;
         vs.size = &cache[fi->fh]->part;
 
-        cache[fi->fh]->stat = vstegfs_load(&vs);
+        if (errno == EXIT_SUCCESS)
+            cache[fi->fh]->stat = vstegfs_load(&vs);
 
         free(vs.name);
         free(vs.path);
         free(vs.pass);
+
+        if (errno != EXIT_SUCCESS)
+            return errno;
     }
 
     if (cache[fi->fh]->done)
@@ -247,8 +242,8 @@ static int vstegfs_write(const char *path, const char *buf, size_t size, off_t o
     cache[fi->fh]->stat = EXIT_SUCCESS;
     cache[fi->fh]->size += size;
     cache[fi->fh]->rwop = WRITE;
-    void *x = realloc(cache[fi->fh]->data, cache[fi->fh]->size + 1);
-    if (!x)
+    void *x = NULL;
+    if (!(x = realloc(cache[fi->fh]->data, cache[fi->fh]->size + 1)))
     {
         msg(_("out of memory @ %s:%i"), __FILE__, __LINE__);
         return -ENOMEM;
@@ -274,8 +269,8 @@ static int vstegfs_open(const char *path, struct fuse_file_info *fi)
     if (z < buffer_s)
         return -ENFILE;
 
-    void *x = realloc(cache, z * sizeof( cache_t * ));
-    if (!x)
+    void *x = NULL;
+    if (!(x = realloc(cache, z * sizeof( cache_t * ))))
         return -ENOMEM;
 
     cache = x;
@@ -446,8 +441,8 @@ int main(int argc, char **argv)
     vstegfs_init(filesystem, fs, do_cache);
     fs_size = lseek(filesystem, 0, SEEK_END);
 
-    char **args = calloc(debug ? ARGS_DEFAULT + 1 : ARGS_DEFAULT, sizeof( char * ));
-    if (!args)
+    char **args = NULL;
+    if (!(args = calloc(debug ? ARGS_DEFAULT + 1 : ARGS_DEFAULT, sizeof( char * ))))
         die(_("out of memory @ %s:%i"), __FILE__, __LINE__);
 
     {

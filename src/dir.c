@@ -32,13 +32,17 @@
  */
 extern char *dir_get_file(const char *path)
 {
-    char *p = strdupa(path);
+    char *p = strdup(path);
     char *f = strrchr(p, ':');
-    char *e = strchrnul(p, ':');
+    char *e = strchr(p, ':') ? : p + strlen(p);
+    char *r = NULL;
     *e = 0x00;
     if (!strrchr(path, '/'))
-        return strndup(path, f - p);
-    return strndup(strrchr(p, '/') + 1, f - strrchr(p, '/'));
+        r = strndup(path, f - p);
+    else
+        r = strndup(strrchr(p, '/') + 1, f - strrchr(p, '/'));
+    free(p);
+    return r;
 }
 
 /*
@@ -51,14 +55,15 @@ extern uint16_t dir_get_deep(const char *path)
     uint16_t c = 0;
     if (path[0] != '/')
         c++;
-    char *p = strdupa(path);
-    char *e = strchrnul(path, ':');
+    char *p = strdup(path);
+    char *e = strchr(p, ':') ? : p + strlen(p);
     *e = 0x00;
     while ((p = strchr(p, '/')))
         if (++p >= e) /* if we run past the end of the string break */
             break;
         else
             c++;
+    free(p);
     return ++c;
 }
 
@@ -69,10 +74,11 @@ extern char *dir_get_part(const char *path, uint16_t part)
 {
     if (part > dir_get_deep(path))
         return NULL;
-    char *p = strdupa(path);
+    char *p = strdup(path);
     char *s = NULL;
     for (uint16_t i = 0; i <= part; i++)
         s = strsep(&p, "/");
+    free(p);
     return s;
 }
 

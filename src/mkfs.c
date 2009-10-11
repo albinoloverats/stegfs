@@ -115,11 +115,14 @@ int main(int argc, char **argv)
              * file doesn't exist - good, lets create it...
              */
         {
-            int64_t flags = O_WRONLY | O_CREAT | O_TRUNC | F_WRLCK;
+            int64_t flags = O_WRONLY | O_CREAT | O_TRUNC;
+#ifdef _GNU_SOURCE
+            flags |= F_WRLCK;
+#endif
             if (restore)
                 flags ^= O_TRUNC; /* don't truncate the file if we're restoring the sb */
             if ((fs = open(fs_name, flags, S_IRUSR | S_IWUSR)) < 0)
-                die(_("could not create the file system"));
+                die(_("could not open the file system"));
         }
         break;
     }

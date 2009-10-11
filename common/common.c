@@ -61,7 +61,7 @@ extern conf_t **config(const char * const restrict f)
     {
         if (line[0] != '#' && line[0] != '\n')
         {
-            char *l = strdupa(line);
+            char *l = strdup(line);
             char *o = strtok(l, " \t\n\r#");
             char *v = strtok(NULL, "\t\n\r#"); /* don't delimit by space this time */
 
@@ -79,6 +79,7 @@ extern conf_t **config(const char * const restrict f)
 
                 x[++i] = NULL;
             }
+            free(l);
         }
 
         free(line);
@@ -147,7 +148,7 @@ extern void die(const char *s, ...)
     if (errno)
     {
         char *e = strdup(strerror(errno));
-        for (uint8_t i = 0; i < strlen(e); i++)
+        for (uint32_t i = 0; i < strlen(e); i++)
             e[i] = tolower(e[i]);
         msg("%s", e);
         free(e);
@@ -189,4 +190,31 @@ extern void wait(uint32_t s)
     struct timespec t = { a.quot, a.rem * 10 };
     struct timespec r = { 0, 0 };
     nanosleep(&t, &r);
+}
+
+extern ssize_t getline(char **lineptr, size_t *n, FILE *stream)
+{
+    ssize_t r = 0;
+    uint32_t step = 0xFF;
+    char *buffer = malloc(step);
+    
+    for (r = 0; ; r++)
+    {
+        int c = fgetc(stream);
+        if (c == EOF)
+            break;
+        buffer[r] = c;
+        if (c == '\n')
+            break;
+        if (r >= step - 0x10)
+        {
+            step += 0xFF;
+            buffer = realloc(buffer, step);
+        }
+    }
+    if (*lineptr)
+        free(*lineptr);
+    *lineptr = buffer;
+
+    return r;
 }

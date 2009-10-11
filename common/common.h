@@ -51,23 +51,23 @@ extern "C"
 #include <inttypes.h>
 
 #ifdef HAVE_CONFIG_H
-  #include <config.h>
+#include <config.h>
 #endif /* HAVE_CONFIG_H */
 
 #ifndef _WIN32
-  #include <dlfcn.h>
+#include <dlfcn.h>
     /*!
      * \brief  O_BINARY is only used on MS systems, we'll need to pretend it exists on Unix systems
      */
-  #define O_BINARY NOTSET
+#define O_BINARY NOTSET
 #else  /* ! _WIN32 */
-  #include <windows.h>
-  #define srand48 srand
-  #define lrand48 rand
-  #define F_RDLCK NOTSET
-  #define F_WRLCK NOTSET
-  #define O_FSYNC NOTSET
-  #define SIGQUIT SIGBREAK
+#include <windows.h>
+#define srand48 srand
+#define lrand48 rand
+#define F_RDLCK NOTSET
+#define F_WRLCK NOTSET
+#define O_FSYNC NOTSET
+#define SIGQUIT SIGBREAK
 #endif /*   _WIN32 */
 
     /*!
@@ -191,6 +191,13 @@ extern "C"
      * \param[in]  s     Number of milliseconds
      */
     extern void wait(uint32_t s);
+
+	/*!
+	 * \brief            Wrapper function for systems without getline
+	 */
+#ifndef _GUN_SOURCE
+	extern ssize_t getline(char **lineptr, size_t *n, FILE *stream);
+#endif /* ! _GNU_SOURCE */
 
 #ifdef __cplusplus
 }
