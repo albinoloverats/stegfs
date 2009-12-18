@@ -1,10 +1,10 @@
 # Contributor: Ashley Anderson <amanderson@albinoloverats.net>
-pkgname=vstegfs
+pkgname=stegfs
 pkgver=201001
 pkgrel=1
-pkgdesc="vstegfs is a steganographic file system in userspace which uses the FUSE library. Steganographioc file systems are one step above traditional encrypted file systems because they grant the user plausible deniability."
+pkgdesc="stegfs is a steganographic file system in userspace which uses the FUSE library. Steganographioc file systems are one step above traditional encrypted file systems because they grant the user plausible deniability."
 arch=(i686 x86_64)
-url="https://albinoloverats.net/vstegfs"
+url="https://albinoloverats.net/stegfs"
 license=('GPL')
 groups=()
 depends=('fuse' 'libmcrypt' 'mhash')

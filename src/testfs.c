@@ -24,7 +24,9 @@
 #include <pthread.h>
 
 #include "common/common.h"
-#include "src/vstegfs.h"
+
+#include "src/fuse-stegfs.h"
+#include "src/lib-stegfs.h"
 
 static void *tmain(void *);
 
@@ -61,9 +63,9 @@ int main(int argc, char **argv)
     keypad(stdscr, true);
     timeout(60000);
 
-    mvprintw(0, 0, "%s Concurrent File Test", APP);
+    mvprintw(0, 0, _("%s Concurrent File Test"), APP);
     for (int8_t i = 0; i < max_files; i++)
-        mvprintw(i + 2, 2, "Tread #%2i:   0%%", i);
+        mvprintw(i + 2, 2, _("File # %2i:   0%%"), i);
 
     pthread_t threads[max_files];
     pthread_attr_t attr;
@@ -86,7 +88,7 @@ int main(int argc, char **argv)
         free(tid[i]);
     }
 
-    mvprintw(LINES - 2, 0, "Press any key to quit...");
+    mvprintw(LINES - 2, 0, _("Press any key to quit..."));
     move(0, 0);
     while (getch() == ERR);
 
@@ -119,7 +121,7 @@ static void *tmain(void *arg)
             break;
         }
         pthread_mutex_lock(&tmutex);
-        mvprintw(tid + 2, 2, "Thread #%2i: %3i%% (%i/%i)", tid, 100 * i / max, i, max);
+        mvprintw(tid + 2, 2, _("File # %2i: %3i%% (%i/%i)"), tid, 100 * i / max, i, max);
         move(0, 0);
         refresh();
         pthread_mutex_unlock(&tmutex);
@@ -135,7 +137,7 @@ static void *tmain(void *arg)
     pthread_mutex_lock(&tmutex);
     if (errno)
         failed = true;
-    mvprintw(tid + 2, 2, "Thread #%2i: %s          ", tid, failed ? "FAILED" : "PASSED");
+    mvprintw(tid + 2, 2, _("File # %2i: %s          "), tid, failed ? _("FAILED") : _("PASSED"));
     move(0, 0);
     refresh();
     pthread_mutex_unlock(&tmutex);

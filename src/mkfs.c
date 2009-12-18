@@ -28,13 +28,14 @@
 
 #include "common/common.h"
 
-#include "src/vstegfs.h"
+#include "src/fuse-stegfs.h"
+#include "src/lib-stegfs.h"
 
 static uint64_t size_in_mb(char *);
 
 int main(int argc, char **argv)
 {
-    init("mk" APP, VER);
+    init("mk" APP, VER, NULL);
 
     uint64_t  fs_size = 0x0;
     char     *fs_name = NULL;
@@ -203,7 +204,7 @@ int main(int argc, char **argv)
         lseek(fs, 0, SEEK_SET);
         for (uint64_t i = 0; i < fs_size; i++)
         {
-            vblock_t buffer[BLOCK_PER_MB];
+            stegfs_block_t buffer[BLOCK_PER_MB];
 
             for (uint16_t j = 0; j < BLOCK_PER_MB; j++)
             {
@@ -241,7 +242,7 @@ int main(int argc, char **argv)
      * write a 'super' block at the beginning
      */
     {
-        vblock_t sb;
+        stegfs_block_t sb;
 
         char sid[SB_PATH] = { 0x00 };
         strncpy(sid + 1, SUPER_ID, sizeof( sid ) - 2);
@@ -258,7 +259,7 @@ int main(int argc, char **argv)
         memcpy(sb.next, &fs_blocks, SB_NEXT);
 
         lseek(fs, 0, SEEK_SET);
-        if ( write(fs, &sb, sizeof( vblock_t )) != sizeof( vblock_t ))
+        if ( write(fs, &sb, sizeof( stegfs_block_t )) != sizeof( stegfs_block_t ))
             msg(_("could not create the file system"));
     }
 

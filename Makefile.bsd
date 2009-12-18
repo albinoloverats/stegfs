@@ -1,50 +1,58 @@
-.PHONY: vstegfs mkfs all install clean distclean uninstall
+.PHONY: stegfs mkfs all install clean distclean uninstall
 
 PO_MAKE      = 
 PO_INSTALL   = 
 PO_CLEAN     = 
 PO_UNINSTALL = 
 
-OPTIONS := -L /usr/pkg/lib -lmhash -lmcrypt -lgettextlib -lrefuse -std=c99 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-char-subscripts -pipe -D_FILE_OFFSET_BITS=64 -I ./ -I /usr/pkg/include/ -o
-COMMON  := src/vstegfs.c src/dir.c common/common.c
+OPTIONS := -L /usr/pkg/lib -lmhash -lmcrypt -lpthread -lgettextlib -lrefuse -std=c99 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-char-subscripts -pipe -D_FILE_OFFSET_BITS=64 -I ./ -I /usr/pkg/include/ -o
+COMMON  := src/lib-stegfs.c src/dir.c common/common.c common/list.c
 
-all: a
+most: a
 -include po/*.mk
 
-vstegfs:
+stegfs:
 # build the main fuse executable
-	 @cc $(OPTIONS) vstegfs $(COMMON) src/fuse.c
-	-@echo "compiled \`src/fuse.c $(COMMON)' --> \`vstegfs'"
+	 @cc $(OPTIONS) stegfs $(COMMON) src/fuse-stegfs.c
+	-@echo "compiled \`src/fuse-stegfs.c $(COMMON)' --> \`stegfs'"
 
 mkfs:
 # build the mkfs utility
-	 @cc $(OPTIONS) mkvstegfs $(COMMON) src/mkfs.c
-	-@echo "compiled \`src/mkfs.c $(COMMON)' --> \`mkvstegfs'"
+	 @cc $(OPTIONS) mkstegfs $(COMMON) src/mkfs.c
+	-@echo "compiled \`src/mkfs.c $(COMMON)' --> \`mkstegfs'"
 
-a: vstegfs mkfs $(PO_MAKE)
+testfs:
+# build the testfs utility
+	 @cc -lncurses $(OPTIONS) teststegfs $(COMMON) src/testfs.c
+	-@echo "compiled \`src/testfs.c $(COMMON)' --> \`teststegfs'"
+
+a: stegfs mkfs $(PO_MAKE)
+
+all: a testfs
 
 install: $(PO_INSTALL)
-# install vstegfs
-	 @install -c -m 755 -s -D -T vstegfs $(PREFIX)/usr/bin/vstegfs
-	-@echo "installed \`vstegfs' --> \`$(PREFIX)/usr/bin/vstegfs'"
+# install stegfs
+	 @install -c -m 755 -s -D -T stegfs $(PREFIX)/usr/bin/stegfs
+	-@echo "installed \`stegfs' --> \`$(PREFIX)/usr/bin/stegfs'"
 # install the mkfs
-	 @install -c -m 755 -s -D -T mkvstegfs $(PREFIX)/usr/bin/mkvstegfs
-	-@echo "installed \`mkvstegfs' --> \`$(PREFIX)/usr/bin/vstegfs'"
+	 @install -c -m 755 -s -D -T mkstegfs $(PREFIX)/usr/bin/mkstegfs
+	-@echo "installed \`mkstegfs' --> \`$(PREFIX)/usr/bin/stegfs'"
 # finally the man page
-	 @install -c -m 644 -D -T doc/vstegfs.1.gz $(PREFIX)/usr/man/man1/vstegfs.1.gz
-	-@echo "installed \`doc/vstegfs.1.gz' --> \`$(PREFIX)/usr/man/man1/vstegfs.1.gz'"
+	 @install -c -m 644 -D -T doc/stegfs.1.gz $(PREFIX)/usr/man/man1/stegfs.1.gz
+	-@echo "installed \`doc/stegfs.1.gz' --> \`$(PREFIX)/usr/man/man1/stegfs.1.gz'"
 
 clean: $(PO_CLEAN)
-	-@rm -f vstegfs mkvstegfs
-	-@echo "removed \`vstegfs'"
-	-@echo "removed \`mkvstegfs'"
+	-@rm -f stegfs mkstegfs
+	-@echo "removed \`stegfs'"
+	-@echo "removed \`mkstegfs'"
 
 distclean: clean
+	-@/bin/rm -fv teststegfs
 
 uninstall: $(PO_UNINSTALL)
-	-@rm -f $(PREFIX)/usr/man/man1/vstegfs.1.gz
-	-@echo "removed \`$(PREFIX)/usr/man/man1/vstegfs.1.gz'"
-	-@rm -f $(PREFIX)/usr/bin/mkvstegfs
-	-@echo "removed \`$(PREFIX)/usr/bin/mkvstegfs'"
-	-@rm -f $(PREFIX)/usr/bin/vstegfs
-	-@echo "removed \`$(PREFIX)/usr/bin/vstegfs'"
+	-@rm -f $(PREFIX)/usr/man/man1/stegfs.1.gz
+	-@echo "removed \`$(PREFIX)/usr/man/man1/stegfs.1.gz'"
+	-@rm -f $(PREFIX)/usr/bin/mkstegfs
+	-@echo "removed \`$(PREFIX)/usr/bin/mkstegfs'"
+	-@rm -f $(PREFIX)/usr/bin/stegfs
+	-@echo "removed \`$(PREFIX)/usr/bin/stegfs'"

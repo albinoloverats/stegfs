@@ -4,14 +4,23 @@ msgstr "konnte nicht geöffnet Dateisystem %s"
 msgid "magic number failure in superblock for %s"
 msgstr "magische zahl ausfall superblock für %s"
 
-msgid "use mkvstegfs to restore superblock"
-msgstr "mkvstegfs verwendung zur wiederherstellung superblock"
+msgid "use mkstegfs to restore superblock"
+msgstr "mkstegfs verwendung zur wiederherstellung superblock"
 
 msgid "looking at copy %i"
 msgstr "mit blick auf artikel %i"
 
 msgid "no complete copy of file found; recovered %lu bytes"
 msgstr "keine vollständige kopie der datei gefunden, wieder %lu bytes"
+
+msgid "file %#016lx not opened for reading"
+msgstr "%#016lx datei nicht zum lesen geöffnet"
+
+msgid "file %#016lx not opened for writing"
+msgstr "%#016lx datei nicht zum schreiben geöffnet"
+
+msgid "could not find space in cache for file \"%s\""
+msgstr "konnte sie nicht finden platz im cache für die datei \"%s\""
 
 msgid "could not open the block device"
 msgstr "konnte nicht geöffnet werden dir block device"
@@ -48,3 +57,24 @@ msgstr "nutzfläche    : %8.2 %s"
 
 msgid "unknown size suffix %c"
 msgstr "unbekannte größe suffix %c"
+
+msgid "%s Concurrent File Test"
+msgstr "%s Gleichzeitige Prüfung Der Dateien"
+
+msgid "Press any key to quit..."
+msgstr "Drücken einer beliebigen Taste beenden..."
+
+msgid "File # %2i:   0%%"
+msgstr "Datei # %2i:   0%%"
+
+msgid "File # %2i: %3i%% (%i/%i)"
+msgstr "Datei # %2i: %3i%% (%i/%i)"
+
+msgid "File # %2i: %s          "
+msgstr "Datei # %2i: %s          "
+
+msgid "PASSED"
+msgstr "ÜBERGEBEN"
+
+msgid "FAILED"
+msgstr "GESCHEITERT"

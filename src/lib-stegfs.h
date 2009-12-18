@@ -1,7 +1,7 @@
 /*
- * vstegfs ~ a virtual steganographic file system for linux
+ * stegfs ~ a steganographic file system for linux
  * Copyright (c) 2007-2009, albinoloverats ~ Software Development
- * email: vstegfs@albinoloverats.net
+ * email: stegfs@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,112 +18,132 @@
  *
  */
 
-#ifndef _VSTEGFS_H_
-#define _VSTEGFS_H_
+#ifndef _LIB_STEGFS_H_
+    #define _LIB_STEGFS_H_
 
-#define APP "vstegfs"
-#define VER "200910"
+    #include "common/list.h"
 
-#ifndef EDIED /* EDIED is more fitting, but not always defined */
-#define EDIED ENODATA
-#endif
+    #ifndef EDIED /* EDIED is more fitting, but not always defined */
+        #define EDIED ENODATA
+    #endif /* ! EDIED */
 
-/* size (in bytes) for various blocks of data */
-#define SB_SERPENT 0x10               /*  16 bytes -- 128 bits */
-#define SB_TIGER   0x18               /*  24 bytes -- 192 bits */
+    /* size (in bytes) for various blocks of data */
+    #define SB_SERPENT 0x10               /*  16 bytes -- 128 bits */
+    #define SB_TIGER   0x18               /*  24 bytes -- 192 bits */
 
-#define SB_BLOCK   0x80               /* 128 bytes -- full block */
-#define SB_PATH    SB_TIGER * 2 / 3   /*  16 bytes -- 2/3 size of full tiger hash */
-#define SB_DATA    0x50               /*  80 bytes */
-#define SB_HASH    SB_TIGER           /*  24 bytes */
-#define SB_NEXT    0x08               /*   8 bytes */
+    #define SB_BLOCK   0x80               /* 128 bytes -- full block */
+    #define SB_PATH    SB_TIGER * 2 / 3   /*  16 bytes -- 2/3 size of full tiger hash */
+    #define SB_DATA    0x50               /*  80 bytes */
+    #define SB_HASH    SB_TIGER           /*  24 bytes */
+    #define SB_NEXT    0x08               /*   8 bytes */
 
-/* size in 64bit ints of parts of block */
-#define SL_PATH 0x02
-#define SL_DATA 0x0A
-#define SL_HASH 0x03
-#define SL_NEXT 0x01
+    /* size in 64bit ints of parts of block */
+    #define SL_PATH 0x02
+    #define SL_DATA 0x0A
+    #define SL_HASH 0x03
+    #define SL_NEXT 0x01
 
-#define BLOCK_PER_MB 0x2000
+    #define BLOCK_PER_MB 0x2000
 
-#define SB_1MB 0x00100000 /* size in bytes of 1 MB */
-#define SM_1GB 0x00000400 /* size in MB of 1 GB */
-#define SM_1TB SB_1MB     /* size in MB of 1 TB (1:1 as B:MB) */
+    #define SB_1MB 0x00100000 /* size in bytes of 1 MB */
+    #define SM_1GB 0x00000400 /* size in MB of 1 GB */
+    #define SM_1TB SB_1MB     /* size in MB of 1 TB (1:1 as B:MB) */
 
-#define MAX_COPIES 9
+    #define PATH_ROOT "stegfs"
 
-#define ROOT_PATH APP
+    #define MAX_COPIES 9
 
-#define SUPER_ID ROOT_PATH " " VER
-#define MAGIC_0  0xA157AFA602CC9D1BLL
-#define MAGIC_1  0x33BE2B298B76F2ACLL
-#define MAGIC_2  0xC903284D7C593AF6LL
+    #define INIT_HEADER { 0x0000, 0x0000, 0x0000,\
+                          0x0000, 0x0000, 0x0000,\
+                          0x0000, 0x0000, 0x0000 }
 
-#define ONE_MILLION 1000000
-#define SS_48B 3
+    #define INIT_PATH { 0x0000000000000000LL, 0x0000000000000000LL }
 
-#define MAX_BLOCK_LOOKUP (int16_t)1024 /* 32767 */
+    #define SUPER_ID PATH_ROOT " " VER
 
-#define ARGS_MINIMUM 2
-#define ARGS_DEFAULT 4
+    #define MAGIC_0  0xA157AFA602CC9D1BLL
+    #define MAGIC_1  0x33BE2B298B76F2ACLL
+    #define MAGIC_2  0xC903284D7C593AF6LL
 
-#define VSTEGFS_LOCK(M)     pthread_mutex_lock(&M)
-#define VSTEGFS_UNLOCK(M)   pthread_mutex_unlock(&M)
+    #define MAX_BLOCK_LOOKUP (int16_t)4096 /* 32767 */
 
-typedef struct vstat_t
-{
-    uint64_t  fs;
-    uint8_t  *data;
-    uint64_t *size;
-    time_t   *time;
-    char     *name;
-    char     *path;
-    char     *pass;
-}
-vstat_t;
+    #define STEGFS_LOCK(M)     pthread_mutex_lock(&M)
+    #define STEGFS_UNLOCK(M)   pthread_mutex_unlock(&M)
 
-typedef struct vblock_t
-{
-    uint64_t path[SL_PATH]; /*  16 bytes */
-    uint8_t  data[SB_DATA]; /*  80 bytes */
-    uint64_t hash[SL_HASH]; /*  24 bytes */
-    uint64_t next[SL_NEXT]; /*   8 bytes */
-}
-vblock_t;
+    typedef struct stegfs_file_system_t
+    {
+        uint64_t id;
+        uint64_t size;
+        uint64_t blocks;
+        uint8_t *bitmap;
+        list_t  *files;
+    }
+    stegfs_fs_info_t;
 
-typedef struct vlist_t
-{
-    char *name;
-    char *path;
-}
-vlist_t;
+    typedef enum stegfs_mode_e
+    {
+        STEGFS_READ,
+        STEGFS_WRITE
+    }
+    stegfs_mode_e;
 
-typedef struct vinfo_t
-{
+    typedef struct stegfs_file_t
+    {
+        uintptr_t     id;
+        uint64_t      size;
+        time_t        time;
+        stegfs_mode_e mode;
+        char         *name;
+        char         *path;
+        char         *pass;
+        void         *data;
+    }
+    stegfs_file_t;
 
-}
-vinfo_t;
+    typedef struct stegfs_block_t
+    {
+        uint64_t path[SL_PATH]; /*  16 bytes */
+        uint8_t  data[SB_DATA]; /*  80 bytes */
+        uint64_t hash[SL_HASH]; /*  24 bytes */
+        uint64_t next[SL_NEXT]; /*   8 bytes */
+    }
+    stegfs_block_t;
 
-/*
- * NB: none of these functions are thread safe!
- */
-extern   void   vstegfs_init(int64_t, const char *, bool);
-extern  int64_t vstegfs_save(vstat_t *);
-extern  int64_t vstegfs_load(vstat_t *);
-extern uint64_t vstegfs_find(vstat_t);
-extern  int64_t vstegfs_kill(vstat_t);
-extern   char **vstegfs_known_list(const char *);
+    typedef struct stegfs_cache_t
+    {
+        uintptr_t id;
+        char     *name;
+        char     *path;
+    }
+    stegfs_cache_t;
 
-#ifdef _VSTEG_S_
-static   void   add_known_list(const vstat_t);
-static   void   del_known_list(vstat_t);
-static MCRYPT   vstegfs_crypt_init(vstat_t *, uint8_t);
-static uint64_t vstegfs_header(vstat_t *, vblock_t *);
-static  int64_t block_open(uint64_t, uint64_t, MCRYPT, vblock_t *);
-static  int64_t vstegfs_block_save(uint64_t, uint64_t, MCRYPT, vblock_t *);
-static   bool   is_block_ours(uint64_t, uint64_t, uint64_t *);
-static uint64_t calc_next_block(uint64_t, char *);
-static   void   rng_seed(void);
-#endif /* _VSTEG_S_ */
+    extern void lib_stegfs_init(const char *, bool);
+    extern void lib_stegfs_info(stegfs_fs_info_t *);
 
-#endif /* ! _VSTEGFS_H_ */
+    extern list_t *lib_stegfs_cache_get(void);
+    extern uint8_t *lib_stegfs_cache_map(void);
+
+    extern int64_t lib_stegfs_stat(stegfs_file_t *, stegfs_block_t *);
+    extern int64_t lib_stegfs_kill(stegfs_file_t *);
+    extern int64_t lib_stegfs_load(stegfs_file_t *);
+    extern int64_t lib_stegfs_save(stegfs_file_t *);
+
+#endif /* ! _LIB_STEGFS_H_ */
+
+#ifdef _IN_LIB_STEGFS_
+    #include <mcrypt.h>
+
+    static void lib_stegfs_init_hash(stegfs_file_t *, void *, void *);
+    static MCRYPT lib_stegfs_init_crypt(stegfs_file_t *, uint8_t);
+
+    static void lib_stegfs_cache_add(stegfs_file_t *);
+    static void lib_stegfs_cache_del(stegfs_file_t *);
+
+    static int64_t lib_stegfs_block_save(uint64_t, MCRYPT, stegfs_block_t *);
+    static int64_t lib_stegfs_block_load(uint64_t, MCRYPT, stegfs_block_t *);
+
+    static uint64_t lib_stegfs_block_find(char *);
+    static bool lib_stegfs_block_ours(uint64_t, uint64_t *);
+
+    static stegfs_fs_info_t *file_system;
+#endif /* _IN_LIB_STEGFS_ */

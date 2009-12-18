@@ -1,7 +1,7 @@
 /*
- * vstegfs ~ a virtual steganographic file system for linux
+ * stegfs ~ a steganographic file system for linux
  * Copyright (c) 2007-2009, albinoloverats ~ Software Development
- * email: vstegfs@albinoloverats.net
+ * email: stegfs@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,55 +19,29 @@
  */
 
 #define FUSE_USE_VERSION 27
-#define PAGESIZE 4096 /* the number of bytes given us by the kernel/fuse module */
-
-#ifndef BUFFER_DEFAULT
-    #define BUFFER_DEFAULT 0x7F
-#endif
-#define MIN_FH 3
 
 #include <fuse.h>
 #include <fcntl.h>
 #include <getopt.h>
-#include <unistd.h>
 #include <pthread.h>
 
 #include "common/common.h"
+#include "common/list.h"
 
-#include "src/vstegfs.h"
+#define _IN_FUSE_STEGFS_
+#include "src/fuse-stegfs.h"
+#undef _IN_FUSE_STEGFS_
 #include "src/dir.h"
 
-typedef enum rw_e { READ, WRITE } rw_e;
 
-typedef struct cache_t
+static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
 {
-    int64_t  stat;
-    bool     used;
-    bool     done;
-    rw_e     rwop;
-    uint8_t *data;
-    uint64_t part;
-    uint64_t size;
-}
-cache_t;
+    STEGFS_LOCK(fuse_lock);
 
-/*
- * still not thread safe, but better than it was
- */
-static cache_t **cache;
-static uint64_t buffer_s = BUFFER_DEFAULT;
-static int64_t filesystem;
-static uint64_t fs_size;
-
-static pthread_mutex_t vstegfs_mutex_fuse;
-
-static int vstegfs_getattr(const char *path, struct stat *stbuf)
-{
-    VSTEGFS_LOCK(vstegfs_mutex_fuse);
-    char *this = dir_get_file(path);
-
+    int e = -EXIT_SUCCESS;
+    char *f = dir_get_file(path);
     /*
-     * common attributes for files/directories
+     * common attributes for root/files/directories
      */
     stbuf->st_ino     = 0x0;
     stbuf->st_mode    = S_IFDIR | 0700;
@@ -79,359 +53,432 @@ static int vstegfs_getattr(const char *path, struct stat *stbuf)
     stbuf->st_mtime   = time(NULL);
     stbuf->st_size    = 0x0;
     stbuf->st_blksize = SB_BLOCK;
-
-    if (!strcmp(path, "/"))
+    if (!strcmp(path, FILE_ROOT))
     {
-        free(this);
-        stbuf->st_size = fs_size;
+        /*
+         * get basic info about the file system itself
+         */
+        stegfs_fs_info_t info;
+        lib_stegfs_info(&info);
+        stbuf->st_size = info.size;
     }
-    else if (this[0] != '+')
+    else if (!strncmp(path, PATH_BMAP, strlen(PATH_BMAP)) && strcmp(path, PATH_BMAP))
     {
-        free(this);
-        char *p = NULL;
-        if (asprintf(&p, "%s%s", ROOT_PATH, path) < 0)
-        {
-            VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
-            return -ENOMEM;
-        }
-
-        vstat_t vs;
-        vs.fs   = filesystem;
-        vs.size = calloc(1, sizeof( uint64_t ));
-        vs.time = calloc(1, sizeof( time_t ));
-        vs.name = dir_get_file(p);
-        vs.path = dir_get_path(p);
-        vs.pass = dir_get_pass(p);
-
-        stbuf->st_ino   = vstegfs_find(vs);
-
-        stbuf->st_mode  = S_IFREG | 0600;
+        /*
+         * if we're looking at files in /+proc/+bitmap, treat them as blocks; however, treat
+         * /proc/+bitmap itself as a directory
+         */
+        stbuf->st_mode  = S_IFBLK;
         stbuf->st_nlink = 1;
-        stbuf->st_ctime = *vs.time;
-        stbuf->st_mtime = *vs.time;
-        stbuf->st_size  = *vs.size;
-
-        free(vs.size);
-        free(vs.time);
-        free(vs.name);
-        free(vs.path);
-        free(vs.pass);
-        free(p);
+        stbuf->st_size  = 0;
     }
-    else
-        free(this); /* just in case */
+    else if (!strcmp(path, FILE_PROC))
+    {
+        stbuf->st_mode = S_IFDIR | 0500;
+    }
+    else if (!strncmp(path, FILE_PROC, strlen(FILE_PROC)) && strcmp(path, PATH_BMAP))
+    {
+        stbuf->st_mode = S_IFLNK | 0600;
+    }
+    else if (f[0] != SYMBOL_DIR && strcmp(path, FILE_ROOT))
+    {
+        /*
+         * find info about a file
+         */
+        char *p = NULL;
+        if (asprintf(&p, "%s%s", PATH_ROOT, path))
+        {
+            stegfs_file_t this;
+            this.mode = STEGFS_READ;
+            this.name = dir_get_file(p);
+            this.path = dir_get_path(p);
+            this.pass = dir_get_pass(p);
+            this.data = NULL;
+            stbuf->st_ino = lib_stegfs_stat(&this, NULL);
+            stbuf->st_mode  = S_IFREG | 0600;
+            stbuf->st_nlink = 1;
+            stbuf->st_ctime = this.time;
+            stbuf->st_mtime = this.time;
+            stbuf->st_size  = this.size;
+            free(p);
+        }
+        else
+        {
+            msg(_("out of memory @ %s:%i"), __FILE__, __LINE__);
+            e = -ENOMEM;
+        }
+    }
+    stbuf->st_blocks = (int)(stbuf->st_size / stbuf->st_blksize) + 1;
+    free(f);
 
-    stbuf->st_blocks = (int)(stbuf->st_size / stbuf->st_blksize);
-
-    VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
-    return EXIT_SUCCESS;
+    STEGFS_UNLOCK(fuse_lock);
+    return -e;
 }
 
-static int vstegfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
+static int fuse_stegfs_readlink(const char *path, char *buf, size_t size)
 {
-    char *p = NULL;
-    if (!strcmp(path, "/"))
+    STEGFS_LOCK(fuse_lock);
+
+    int e = -EXIT_SUCCESS;
+    if (!strncmp(path, FILE_PROC, strlen(FILE_PROC)))
     {
-        if (!(p = strdup(ROOT_PATH)))
-            return -ENOMEM;
+        snprintf(buf, size, "../%s", path + strlen(FILE_PROC) + strlen(FILE_ROOT));
+        for (uint64_t i = 0; i < strlen(buf); i++)
+            if (buf[i] == SYMBOL_LINK)
+                buf[i] = SYMBOL_SEP;
     }
     else
     {
-        if (asprintf(&p, "%s%s", ROOT_PATH, path) < 0)
-            return -ENOMEM;
+        msg(NULL);
+        e = -ENOENT;
     }
-    /*
-     * always set . and ..
-     */
+
+    STEGFS_UNLOCK(fuse_lock);
+    return e;
+}
+
+static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *info)
+{
+    STEGFS_LOCK(fuse_lock);
+
+    int e = -EXIT_SUCCESS;
     filler(buf,  ".", NULL, 0);
     filler(buf, "..", NULL, 0);
-
-    VSTEGFS_LOCK(vstegfs_mutex_fuse);
-    char **list = vstegfs_known_list(p);
-    VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
-
-    free(p);
-    if (!list)
-        return EXIT_SUCCESS;
-
-    uint32_t i = 0;
-    while (list[i])
+    if (!strcmp(path, FILE_ROOT))
+        filler(buf, FILE_PROC + 1, NULL, 0);
+    if (!strcmp(path, FILE_PROC))
+        filler(buf, FILE_BMAP, NULL, 0);
+    if (!strcmp(path, PATH_BMAP))
     {
-        filler(buf, list[i], NULL, 0);
-        free(list[i]);
-        i++;
+        /*
+         * read the list of used blocks from the bitmap
+         */
+        stegfs_fs_info_t fs;
+        lib_stegfs_info(&fs);
+        uint64_t size = fs.blocks * sizeof( uint8_t ) / CHAR_BIT;
+        uint8_t *map = lib_stegfs_cache_map();
+        if (map)
+            for (uint64_t i = 0; i < size; i++)
+                for (uint8_t j = 0; j < CHAR_BIT; j++)
+                    if (map[i] & (0x01 << j))
+                    {
+                        char *m = NULL;
+                        if (asprintf(&m, "%lu", i * CHAR_BIT + j))
+                        {
+                            filler(buf, m, NULL, 0);
+                            free(m);
+                        }
+                        else
+                        {
+                            msg(_("out of memory @ %s:%i"), __FILE__, __LINE__);
+                            e = -ENOMEM;
+                        }
+                    }
     }
-    free(list);
-    return EXIT_SUCCESS;
-}
-
-static int vstegfs_unlink(const char *path)
-{
-    char *p = NULL;
-    if (asprintf(&p, "%s%s", ROOT_PATH, path) < 0)
-        return -ENOMEM;
-
-    VSTEGFS_LOCK(vstegfs_mutex_fuse);
-
-    vstat_t vk;
-    vk.fs   = filesystem;
-    vk.size = NULL;
-    vk.time = NULL;
-    vk.name = dir_get_file(p);
-    vk.path = dir_get_path(p);
-    vk.pass = dir_get_pass(p);
-
-    int64_t s = vstegfs_kill(vk);
-
-    free(p);
-    free(vk.name);
-    free(vk.path);
-    free(vk.pass);
-
-    VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
-    return s;
-}
-
-static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
-{
-    if (!offset)
+    else
     {
-        char *p = NULL;
-        if (asprintf(&p, "%s%s", ROOT_PATH, path) < 0)
-            return -ENOMEM;
+        list_t *files = lib_stegfs_cache_get();
+        if (files)
+        {
+            char *p = NULL;
+            if (asprintf(&p, "%s%s", PATH_ROOT, strcmp(path, FILE_ROOT) ? path : ""))
+            {
+                uint64_t max = list_size(files);
+                for (uint64_t i = 0; i < max; i++)
+                {
+                    stegfs_cache_t *x = (stegfs_cache_t *)(list_get(files, i)->object);
+                    if (!strcmp(p, PATH_PROC) && strlen(x->name))
+                    {
+                        char *f = NULL;
+                        if (asprintf(&f, "%s/%s", x->path + strlen(PATH_ROOT), x->name))
+                        {
+                            for (uint64_t j = 0; j < strlen(f); j++)
+                                if (f[j] == SYMBOL_SEP)
+                                    f[j] = SYMBOL_LINK;
+                            filler(buf, f + 1, NULL, 0);
+                            free(f);
+                        }
+                        else
+                        {
+                            msg(_("out of memory @ %s:%i"), __FILE__, __LINE__);
+                            e = -ENOMEM;
+                        }
+                    }
+                    else if (!strcmp(p, x->path))
+                        filler(buf, x->name, NULL, 0);
+                }
+                free(p);
+            }
+            else
+            {
+                msg(_("out of memory @ %s:%i"), __FILE__, __LINE__);
+                e = -ENOMEM;
+            }
+        }
+    }
 
-        VSTEGFS_LOCK(vstegfs_mutex_fuse);
+    STEGFS_UNLOCK(fuse_lock);
+    return e;
+}
 
-        cache[fi->fh]->stat = EXIT_SUCCESS;
-        cache[fi->fh]->done = false;
-        cache[fi->fh]->rwop = READ;
+static int fuse_stegfs_unlink(const char *path)
+{
+    STEGFS_LOCK(fuse_lock);
 
-        errno = EXIT_SUCCESS;
-
-        vstat_t vs;
-        vs.fs   = filesystem;
-        vs.data = NULL;
-        vs.size = &cache[fi->fh]->size;
-        vs.time = NULL;
-        vs.name = dir_get_file(p);
-        vs.path = dir_get_path(p);
-        vs.pass = dir_get_pass(p);
+    int e = -EXIT_SUCCESS;
+    char *p = NULL;
+    if (asprintf(&p, "%s%s", PATH_ROOT, path))
+    {
+        stegfs_file_t this;
+        this.mode = STEGFS_READ;
+        this.name = dir_get_file(p);
+        this.path = dir_get_path(p);
+        this.pass = dir_get_pass(p);
+        this.data = NULL;
+        lib_stegfs_kill(&this);
         free(p);
-
-        vstegfs_find(vs);
-
-        uint64_t sz = fs_size;
-        if (*vs.size > sz)
-            errno = -EFBIG;
-
-        if (!(cache[fi->fh]->data = malloc(cache[fi->fh]->size)))
-            errno = -ENOMEM;
-
-        vs.data =  cache[fi->fh]->data;
-        vs.size = &cache[fi->fh]->part;
-
-        if (errno == EXIT_SUCCESS)
-            cache[fi->fh]->stat = vstegfs_load(&vs);
-
-        free(vs.name);
-        free(vs.path);
-        free(vs.pass);
-
-        VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
-        if (errno != EXIT_SUCCESS)
-            return errno;
     }
-
-    VSTEGFS_LOCK(vstegfs_mutex_fuse);
-    if (cache[fi->fh]->done)
+    else
     {
-        free(cache[fi->fh]->data);
-        cache[fi->fh]->data = NULL;
-        cache[fi->fh]->used = false;
-        int64_t r = -cache[fi->fh]->stat;
-        VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
-        return r;
+        msg(_("out of memory @ %s:%i"), __FILE__, __LINE__);
+        e = -ENOMEM;
     }
 
-    if ((cache[fi->fh]->part < cache[fi->fh]->size) && (offset + size > cache[fi->fh]->part))
-        cache[fi->fh]->done = true;
-
-    if ((uint64_t)offset < cache[fi->fh]->size)
-    {
-        if (offset + size > cache[fi->fh]->size)
-            size = cache[fi->fh]->size - offset;
-        memcpy(buf, cache[fi->fh]->data + offset, size);
-    }
-
-    VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
-    return size;
+    STEGFS_UNLOCK(fuse_lock);
+    return e;
 }
 
-static int vstegfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
+static int fuse_stegfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *info)
 {
-    VSTEGFS_LOCK(vstegfs_mutex_fuse);
+    STEGFS_LOCK(fuse_lock);
 
-    cache[fi->fh]->stat = EXIT_SUCCESS;
-    cache[fi->fh]->size += size;
-    cache[fi->fh]->rwop = WRITE;
-    void *x = NULL;
-    if (!(x = realloc(cache[fi->fh]->data, cache[fi->fh]->size + 1)))
+    int e = -EXIT_SUCCESS;
+    bool found = false;
+    uint64_t max = list_size(fuse_cache);
+    for (uint64_t i = 0; i < max; i++)
     {
-        VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
-        return -ENOMEM;
-    }
-
-    cache[fi->fh]->data = x;
-    memcpy(cache[fi->fh]->data + offset, buf, size);
-
-    VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
-    return size;
-}
-
-static int vstegfs_open(const char *path, struct fuse_file_info *fi)
-{
-    VSTEGFS_LOCK(vstegfs_mutex_fuse);
-    uint64_t bf = buffer_s;
-    for (uint64_t i = MIN_FH; i < bf; i++)
-        if (!cache[i]->used)
+        stegfs_file_t *this = (stegfs_file_t *)(list_get(fuse_cache, i)->object);
+        if (this->id == info->fh)
         {
-            cache[i]->used = true;
-            fi->fh = i;
-            VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
-            return EXIT_SUCCESS;
+            if ((this->mode == STEGFS_READ) && (this->size))
+            {
+                if (offset + size > this->size)
+                    size = this->size - offset;
+                memcpy(buf, this->data + offset, size);
+                e = size;
+            }
+            else
+            {
+                msg(_("file %#016lx not opened for reading"), this->id);
+                e = -EBADF;
+            }
+            found = true;
+            break;
         }
-
-    uint64_t z = bf + BUFFER_DEFAULT;
-    if (z < bf)
-    {
-        VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
-        return -ENFILE;
     }
+    if (!found)
+        e = -EBADF;
 
-    void *x = NULL;
-    if (!(x = realloc(cache, z * sizeof( cache_t * ))))
-    {
-        VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
-        return -ENOMEM;
-    }
-
-    cache = x;
-    for (uint64_t i = bf; i < z; i++)
-        if (!(cache[i] = calloc(1, sizeof( cache_t ))))
-        {
-            VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
-            return -ENOMEM;
-        }
-    buffer_s = z;
-
-    /*
-     * return ourself, we should easily then find the 1st newly created entry
-     */
-    VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
-    return vstegfs_open(path, fi);
+    STEGFS_UNLOCK(fuse_lock);
+    return e;
 }
 
-static int vstegfs_release(const char *path, struct fuse_file_info *fi)
+static int fuse_stegfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *info)
 {
-    VSTEGFS_LOCK(vstegfs_mutex_fuse);
-    if (cache[fi->fh]->rwop != WRITE)
-    {
-        VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
-        return EXIT_SUCCESS;
-    }
-    if (cache[fi->fh]->size > fs_size)
-    {
-        VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
-        return -EFBIG;
-    }
+    STEGFS_LOCK(fuse_lock);
 
+    int e = -EXIT_SUCCESS;
+    bool found = false;
+    uint64_t max = list_size(fuse_cache);
+    for (uint64_t i = 0; i < max; i++)
+    {
+        stegfs_file_t *this = (stegfs_file_t *)(list_get(fuse_cache, i)->object);
+        if (this->id == info->fh)
+        {
+            if (this->mode == STEGFS_WRITE)
+            {
+                /*
+                 * only increae the buffer if we need to
+                 */
+                void *x = NULL;
+                if (offset + size > this->size)
+                {
+                    this->size = offset + size;
+                    x = realloc(this->data, this->size + 1);
+                }
+                else
+                    x = this->data;
+                if (x)
+                {
+                    this->data = x;
+                    memcpy(this->data + offset, buf, size);
+                    e = size;
+                }
+                else
+                {
+                    msg(_("out of memory @ %s:%i"), __FILE__, __LINE__);
+                    e = -ENOMEM;
+                }
+            }
+            else
+            {
+                msg(_("file %#016lx not opened for writing"), this->id);
+                e = -EBADF;
+            }
+            found = true;
+            break;
+        }
+    }
+    if (!found)
+        e = -EBADF;
+
+    STEGFS_UNLOCK(fuse_lock);
+    return e;
+}
+
+static int fuse_stegfs_open(const char *path, struct fuse_file_info *info)
+{
+    STEGFS_LOCK(fuse_lock);
+
+    int e = -EXIT_SUCCESS;
     char *p = NULL;
-    if (asprintf(&p, "%s%s", ROOT_PATH, path) < 0)
+    if (asprintf(&p, "%s%s", PATH_ROOT, path) < 0)
     {
-        VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
-        return -ENOMEM;
+        msg(_("out of memory @ %s:%i"), __FILE__, __LINE__);
+        e = -ENOMEM;
+    }
+    stegfs_file_t *this = calloc(1, sizeof( stegfs_file_t ));
+    if (this)
+    {
+        uint64_t max = list_size(fuse_cache);
+        for (uint64_t i = 0; i < max; i++)
+        {
+            stegfs_file_t *x = (stegfs_file_t *)(list_get(fuse_cache, i)->object);
+            if (x->id > i)
+            {
+                this->id = i;
+                break;
+            }
+        }
+        if (!this->id)
+            this->id = max + 1;
+        this->size = 0;
+        this->time = time(NULL);
+        this->name = dir_get_file(p);
+        this->path = dir_get_path(p);
+        this->pass = dir_get_pass(p);
+        this->data = NULL;
+        if (info->flags & O_WRONLY)
+        {
+            this->mode = STEGFS_WRITE;
+        }
+        else
+        {
+            this->mode = STEGFS_READ;
+            lib_stegfs_load(this);
+        }
+        free(p);
+        list_append(&fuse_cache, this);
+        info->fh = this->id;
+    }
+    else
+    {
+        msg(_("could not find space in cache for file \"%s\""), path);
+        e = -ENOMEM;
     }
 
-    vstat_t vs;
-    vs.fs   = filesystem;
-
-    vs.data =  cache[fi->fh]->data;
-    vs.size = &cache[fi->fh]->size;
-    time_t now = time(NULL);
-    vs.time = &now;
-    vs.name = dir_get_file(p);
-    vs.path = dir_get_path(p);
-    vs.pass = dir_get_pass(p);
-
-    cache[fi->fh]->stat = vstegfs_save(&vs);
-
-    free(vs.name);
-    free(vs.path);
-    free(vs.pass);
-
-    free(p);
-
-    free(cache[fi->fh]->data);
-    cache[fi->fh]->data = NULL;
-    cache[fi->fh]->used = false;
-
-    VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
-    return EXIT_SUCCESS;
+    STEGFS_UNLOCK(fuse_lock);
+    return e;
 }
 
-static int vstegfs_mknod(const char *path, mode_t mode, dev_t rdev)
+static int fuse_stegfs_release(const char *path, struct fuse_file_info *info)
 {
-    return EXIT_SUCCESS;
+    STEGFS_LOCK(fuse_lock);
+
+    int e = -EXIT_SUCCESS;
+    bool found = false;
+    uint64_t max = list_size(fuse_cache);
+    for (uint64_t i = 0; i < max; i++)
+    {
+        stegfs_file_t *this = (stegfs_file_t *)(list_get(fuse_cache, i)->object);
+        if (this->id == info->fh)
+        {
+            found = true;
+            free(this->name);
+            free(this->path);
+            free(this->pass);
+            if (this->data)
+                free(this->data);
+            list_remove(&fuse_cache, i);
+            break;
+        }
+    }
+    if (!found)
+        e = -EBADF;
+
+    STEGFS_UNLOCK(fuse_lock);
+    return e;
 }
 
-static int vstegfs_truncate(const char *path, off_t offset)
+static int fuse_stegfs_flush(const char *path, struct fuse_file_info *info)
 {
-    return EXIT_SUCCESS;
+    STEGFS_LOCK(fuse_lock);
+
+    int e = -EXIT_SUCCESS;
+    bool found = false;
+    uint64_t max = list_size(fuse_cache);
+    for (uint64_t i = 0; i < max; i++)
+    {
+        stegfs_file_t *this = (stegfs_file_t *)(list_get(fuse_cache, i)->object);
+        if (this->id == info->fh)
+        {
+            found = true;
+            if (this->mode == STEGFS_WRITE && this->size)
+                e = lib_stegfs_save(this);
+            break;
+        }
+    }
+    if (!found)
+        e = -EBADF;
+
+    STEGFS_UNLOCK(fuse_lock);
+    return e;
 }
 
-static int vstegfs_utime(const char *path, struct utimbuf *utime)
+static int fuse_stegfs_truncate(const char *path, off_t offset)
 {
-    return EXIT_SUCCESS;
-}
-
-static int vstegfs_chmod(const char *path, mode_t mode)
-{
-    return EXIT_SUCCESS;
-}
-
-static int vstegfs_chown(const char *path, uid_t uid, gid_t gid)
-{
-    return EXIT_SUCCESS;
-}
-
-static int vstegfs_null(const char *path, struct fuse_file_info *fi)
-{
-    return EXIT_SUCCESS;
-}
-
-static struct fuse_operations vstegfs_oper =
-{
-    .getattr  = vstegfs_getattr,
-    .readdir  = vstegfs_readdir,
-    .unlink   = vstegfs_unlink,
-    .read     = vstegfs_read,
-    .write    = vstegfs_write,
-    .open     = vstegfs_open,
     /*
-     * null functions
+     * this will always succeed because whenever a file is opened its buffer is always 0
      */
-    .mknod    = vstegfs_mknod,
-    .truncate = vstegfs_truncate,
-    .utime    = vstegfs_utime,
-    .chmod    = vstegfs_chmod,
-    .chown    = vstegfs_chown,
-    .release  = vstegfs_release,
-    .flush    = vstegfs_null
-};
+    return -EXIT_SUCCESS;
+}
+
+/*
+ * empty functions; required by fuse, but not used by stegfs
+ */
+static int fuse_stegfs_mknod(const char *path, mode_t mode, dev_t rdev)
+{
+    return -ENOTSUP;
+}
+
+static int fuse_stegfs_utime(const char *path, struct utimbuf *utime)
+{
+    return -ENOTSUP;
+}
+
+static int fuse_stegfs_chmod(const char *path, mode_t mode)
+{
+    return -ENOTSUP;
+}
+
+static int fuse_stegfs_chown(const char *path, uid_t uid, gid_t gid)
+{
+    return -ENOTSUP;
+}
 
 int main(int argc, char **argv)
 {
-    init(APP, VER);
+    init(APP, VER, LOG);
 
     if (argc < ARGS_MINIMUM)
         return show_usage();
@@ -447,10 +494,6 @@ int main(int argc, char **argv)
             {"filesystem", required_argument, 0, 'f'},
             {"mount"     , required_argument, 0, 'm'},
             {"nocache"   , no_argument      , 0, 'n'},
-            {"buffer"    , required_argument, 0, 'b'},
-            {"help"      , no_argument      , 0, 'h'},
-            {"licence"   , no_argument      , 0, 'l'},
-            {"version"   , no_argument      , 0, 'v'},
             {0, 0, 0, 0}
         };
         int optex = 0;
@@ -471,15 +514,6 @@ int main(int argc, char **argv)
             case 'n':
                 do_cache = false;
                 break;
-            case 'b':
-                buffer_s = strtol(optarg, NULL, 10);
-                break;
-            case 'h':
-                return show_help();
-            case 'l':
-                return show_licence();
-            case 'v':
-                return show_version();
             case '?':
             default:
                 die(_("unknown option %c"), opt);
@@ -489,14 +523,11 @@ int main(int argc, char **argv)
     if (!mount || !fs)
         return show_usage();
 
-    if (buffer_s < MIN_FH)
-        buffer_s = BUFFER_DEFAULT;
+    lib_stegfs_init(fs, do_cache);
 
-    if ((filesystem = open(fs, O_RDWR, S_IRUSR | S_IWUSR)) < 3)
-        die(_("could not open file system %s"), fs);
-
-    vstegfs_init(filesystem, fs, do_cache);
-    fs_size = lseek(filesystem, 0, SEEK_END);
+    fuse_cache = list_create();
+    stegfs_file_t *x = calloc(1, sizeof( stegfs_file_t ));
+    list_append(&fuse_cache, x);
 
     char **args = NULL;
     if (!(args = calloc(debug ? ARGS_DEFAULT + 1 : ARGS_DEFAULT, sizeof( char * ))))
@@ -512,28 +543,5 @@ int main(int argc, char **argv)
         args[i++] = strdup(mount);
     }
 
-    if (!(cache = calloc(buffer_s, sizeof( cache_t * ))))
-        die(_("out of memory @ %s:%i"), __FILE__, __LINE__);
-
-    for (uint64_t i = MIN_FH; i < buffer_s; i++)
-        if (!(cache[i] = calloc(1, sizeof( cache_t ))))
-            die(_("out of memory @ %s:%i"), __FILE__, __LINE__);
-
-    return fuse_main(debug ? ARGS_DEFAULT + 1 : ARGS_DEFAULT, args, &vstegfs_oper, NULL);
-}
-
-int64_t show_help(void)
-{
-    show_version();
-    show_usage();
-    fprintf(stderr, "\nOptions:\n\n");
-    fprintf(stderr, "  -f, --filesystem  FILE SYSTEM  Location of the file system to mount\n");
-    fprintf(stderr, "  -m, --mount       MOUNT POINT  Where to mount the file system\n");
-    fprintf(stderr, "  -n, --nocache                  Do not cache directory entries and used blocks\n");
-    fprintf(stderr, "  -b, --buffer      BUFFER       Initial buffer size (default is: %i)\n", BUFFER_DEFAULT);
-    fprintf(stderr, "  -h, --help                     Show this help list\n");
-    fprintf(stderr, "  -l, --licence                  Show overview of GNU GPL\n");
-    fprintf(stderr, "  -v, --version                  Show version information\n\n");
-    fprintf(stderr, "  Fuse executable to mount vstegfs file systems\n");
-    return EXIT_SUCCESS;
+    return fuse_main(debug ? ARGS_DEFAULT + 1 : ARGS_DEFAULT, args, &fuse_stegfs_functions, NULL);
 }
