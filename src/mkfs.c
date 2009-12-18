@@ -1,7 +1,7 @@
 /*
- * vstegfs ~ a virtual steganographic file system for linux
+ * stegfs ~ a virtual steganographic file system for linux
  * Copyright (c) 2007-2009, albinoloverats ~ Software Development
- * email: vstegfs@albinoloverats.net
+ * email: stegfs@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -295,17 +295,20 @@ uint64_t size_in_mb(char *s)
 
 int64_t show_help(void)
 {
+    /*
+     * TODO translate
+     */
     show_version();
     show_usage();
     fprintf(stderr, "\nOptions:\n\n");
     fprintf(stderr, "  -f, --filesystem  FILE SYSTEM  Where to write the file system to\n");
     fprintf(stderr, "  -s, --size        SIZE         Size of the file system in MB\n");
     fprintf(stderr, "  -x, --force                    Force overwriting an existing file\n");
-    fprintf(stderr, "  -r, --restore                  Restore the default vstegfs superblock\n");
+    fprintf(stderr, "  -r, --restore                  Restore the default stegfs superblock\n");
     fprintf(stderr, "  -h, --help                     Show this help list\n");
     fprintf(stderr, "  -l, --licence                  Show overview of GNU GPL\n");
     fprintf(stderr, "  -v, --version                  Show version information\n\n");
-    fprintf(stderr, "  A tool for creating vstegfs images.  If a device is used instead of\n");
+    fprintf(stderr, "  A tool for creating stegfs images.  If a device is used instead of\n");
     fprintf(stderr, "  a file (eg: /dev/sda1) a size is not needed as the file system will\n");
     fprintf(stderr, "  use all available space on that device/partition.\n");
     return EXIT_SUCCESS;

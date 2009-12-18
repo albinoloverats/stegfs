@@ -494,10 +494,13 @@ int main(int argc, char **argv)
             {"filesystem", required_argument, 0, 'f'},
             {"mount"     , required_argument, 0, 'm'},
             {"nocache"   , no_argument      , 0, 'n'},
+            {"help"      , no_argument      , 0, 'h'},
+            {"licence"   , no_argument      , 0, 'l'},
+            {"version"   , no_argument      , 0, 'v'},
             {0, 0, 0, 0}
         };
         int optex = 0;
-        int opt = getopt_long(argc, argv, "df:m:b:nhlv", long_options, &optex);
+        int opt = getopt_long(argc, argv, "df:m:nhlv", long_options, &optex);
         if (opt < 0)
             break;
         switch (opt)
@@ -514,6 +517,12 @@ int main(int argc, char **argv)
             case 'n':
                 do_cache = false;
                 break;
+            case 'h':
+                return show_help();
+            case 'l':
+                return show_licence();
+            case 'v':
+                return show_version();
             case '?':
             default:
                 die(_("unknown option %c"), opt);
@@ -544,4 +553,22 @@ int main(int argc, char **argv)
     }
 
     return fuse_main(debug ? ARGS_DEFAULT + 1 : ARGS_DEFAULT, args, &fuse_stegfs_functions, NULL);
+}
+
+int64_t show_help(void)
+{
+    /*
+     * TODO translate
+     */
+    show_version();
+    show_usage();
+    fprintf(stderr, "\nOptions:\n\n");
+    fprintf(stderr, "  -f, --filesystem  FILE SYSTEM  Location of the file system to mount\n");
+    fprintf(stderr, "  -m, --mount       MOUNT POINT  Where to mount the file system\n");
+    fprintf(stderr, "  -n, --nocache                  Do not cache directory entries and used blocks\n");
+    fprintf(stderr, "  -h, --help                     Show this help list\n");
+    fprintf(stderr, "  -l, --licence                  Show overview of GNU GPL\n");
+    fprintf(stderr, "  -v, --version                  Show version information\n\n");
+    fprintf(stderr, "  Fuse executable to mount vstegfs file systems\n");
+    return EXIT_SUCCESS;
 }

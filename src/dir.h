@@ -1,7 +1,7 @@
 /*
- * vstegfs ~ a virtual steganographic file system for linux
+ * stegfs ~ a virtual steganographic file system for linux
  * Copyright (c) 2007-2009, albinoloverats ~ Software Development
- * email: vstegfs@albinoloverats.net
+ * email: stegfs@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

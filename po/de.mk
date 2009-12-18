@@ -10,11 +10,11 @@ de:
 	-@echo "generated \`po/de.po' --> \`de.mo'"
 
 install-de:
-	 @install -c -m 644 -D -T de.mo $(PREFIX)/usr/share/locale/de/LC_MESSAGES/vstegfs.mo
-	-@echo "installed \`de.mo' --> \`$(PREFIX)/usr/share/locale/de/LC_MESSAGES/vstegfs.mo'"
+	 @install -c -m 644 -D -T de.mo $(PREFIX)/usr/share/locale/de/LC_MESSAGES/stegfs.mo
+	-@echo "installed \`de.mo' --> \`$(PREFIX)/usr/share/locale/de/LC_MESSAGES/stegfs.mo'"
 
 clean-de:
 	-@/bin/rm -fv de.mo
 
 uninstall-de:
-	-@/bin/rm -fv $(PREFIX)/usr/share/locale/de/LC_MESSAGES/vstegfs.mo
+	-@/bin/rm -fv $(PREFIX)/usr/share/locale/de/LC_MESSAGES/stegfs.mo
