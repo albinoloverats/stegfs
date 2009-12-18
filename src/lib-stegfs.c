@@ -1,5 +1,5 @@
 /*
- * stegfs ~ a steganographic file system for linux
+ * stegfs ~ a steganographic file system for unix-like systems
  * Copyright (c) 2007-2010, albinoloverats ~ Software Development
  * email: stegfs@albinoloverats.net
  *
