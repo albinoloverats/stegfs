@@ -1,11 +1,11 @@
-.PHONY: vstegfs mkfs all install clean distclean uninstall
+.PHONY: vstegfs mkfs testfs all install clean distclean uninstall
 
 PO_MAKE      = 
 PO_INSTALL   = 
 PO_CLEAN     = 
 PO_UNINSTALL = 
 
-OPTIONS := `pkg-config fuse --cflags --libs` -lmhash -lmcrypt -std=gnu99 -O2 -Wall -Wextra -Wno-unused-parameter -pipe -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -I ./ -o
+OPTIONS := `pkg-config fuse --cflags --libs` -lmhash -lmcrypt -lpthread -std=gnu99 -O2 -Wall -Wextra -Wno-unused-parameter -pipe -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -I ./ -o
 COMMON  := src/vstegfs.c src/dir.c common/common.c
 
 all: a
@@ -21,6 +21,11 @@ mkfs:
 	 @gcc $(OPTIONS) mkvstegfs $(COMMON) src/mkfs.c
 	-@echo "compiled \`src/mkfs.c $(COMMON)' --> \`mkvstegfs'"
 
+test:
+# build the testfs utility
+	 @gcc -lncurses $(OPTIONS) testvstegfs $(COMMON) src/testfs.c
+	-@echo "compiled \`src/testfs.c $(COMMON)' --> \`testvstegfs'"
+
 a: vstegfs mkfs $(PO_MAKE)
 
 install: $(PO_INSTALL)
@@ -35,11 +40,11 @@ install: $(PO_INSTALL)
 	-@echo "installed \`doc/vstegfs.1.gz' --> \`$(PREFIX)/usr/man/man1/vstegfs.1.gz'"
 
 clean: $(PO_CLEAN)
-	-@rm -fv vstegfs mkvstegfs
+	-@/bin/rm -fv vstegfs mkvstegfs testvstegfs
 
 distclean: clean
 
 uninstall: $(PO_UNINSTALL)
-	 @rm -fv $(PREFIX)/usr/man/man1/vstegfs.1.gz
-	 @rm -fv $(PREFIX)/usr/bin/mkvstegfs
-	 @rm -fv $(PREFIX)/usr/bin/vstegfs
+	 @/bin/rm -fv $(PREFIX)/usr/man/man1/vstegfs.1.gz
+	 @/bin/rm -fv $(PREFIX)/usr/bin/mkvstegfs
+	 @/bin/rm -fv $(PREFIX)/usr/bin/vstegfs

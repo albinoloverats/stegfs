@@ -62,8 +62,13 @@
 #define ONE_MILLION 1000000
 #define SS_48B 3
 
+#define MAX_BLOCK_LOOKUP (int16_t)1024 /* 32767 */
+
 #define ARGS_MINIMUM 2
 #define ARGS_DEFAULT 4
+
+#define VSTEGFS_LOCK(M)     pthread_mutex_lock(&M)
+#define VSTEGFS_UNLOCK(M)   pthread_mutex_unlock(&M)
 
 typedef struct vstat_t
 {
@@ -93,6 +98,15 @@ typedef struct vlist_t
 }
 vlist_t;
 
+typedef struct vinfo_t
+{
+
+}
+vinfo_t;
+
+/*
+ * NB: none of these functions are thread safe!
+ */
 extern   void   vstegfs_init(int64_t, const char *, bool);
 extern  int64_t vstegfs_save(vstat_t *);
 extern  int64_t vstegfs_load(vstat_t *);

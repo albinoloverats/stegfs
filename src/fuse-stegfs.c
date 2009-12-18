@@ -30,6 +30,7 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #include "common/common.h"
 
@@ -58,8 +59,11 @@ static uint64_t buffer_s = BUFFER_DEFAULT;
 static int64_t filesystem;
 static uint64_t fs_size;
 
+static pthread_mutex_t vstegfs_mutex_fuse;
+
 static int vstegfs_getattr(const char *path, struct stat *stbuf)
 {
+    VSTEGFS_LOCK(vstegfs_mutex_fuse);
     char *this = dir_get_file(path);
 
     /*
@@ -86,7 +90,10 @@ static int vstegfs_getattr(const char *path, struct stat *stbuf)
         free(this);
         char *p = NULL;
         if (asprintf(&p, "%s%s", ROOT_PATH, path) < 0)
+        {
+            VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
             return -ENOMEM;
+        }
 
         vstat_t vs;
         vs.fs   = filesystem;
@@ -116,6 +123,7 @@ static int vstegfs_getattr(const char *path, struct stat *stbuf)
 
     stbuf->st_blocks = (int)(stbuf->st_size / stbuf->st_blksize);
 
+    VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
     return EXIT_SUCCESS;
 }
 
@@ -123,17 +131,25 @@ static int vstegfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, 
 {
     char *p = NULL;
     if (!strcmp(path, "/"))
-        p = strdup(ROOT_PATH);
+    {
+        if (!(p = strdup(ROOT_PATH)))
+            return -ENOMEM;
+    }
     else
+    {
         if (asprintf(&p, "%s%s", ROOT_PATH, path) < 0)
             return -ENOMEM;
+    }
     /*
      * always set . and ..
      */
     filler(buf,  ".", NULL, 0);
     filler(buf, "..", NULL, 0);
 
+    VSTEGFS_LOCK(vstegfs_mutex_fuse);
     char **list = vstegfs_known_list(p);
+    VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
+
     free(p);
     if (!list)
         return EXIT_SUCCESS;
@@ -155,6 +171,8 @@ static int vstegfs_unlink(const char *path)
     if (asprintf(&p, "%s%s", ROOT_PATH, path) < 0)
         return -ENOMEM;
 
+    VSTEGFS_LOCK(vstegfs_mutex_fuse);
+
     vstat_t vk;
     vk.fs   = filesystem;
     vk.size = NULL;
@@ -169,6 +187,8 @@ static int vstegfs_unlink(const char *path)
     free(vk.name);
     free(vk.path);
     free(vk.pass);
+
+    VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
     return s;
 }
 
@@ -176,13 +196,15 @@ static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, 
 {
     if (!offset)
     {
-        cache[fi->fh]->stat = EXIT_SUCCESS;
-        cache[fi->fh]->done = false;
-        cache[fi->fh]->rwop = READ;
-
         char *p = NULL;
         if (asprintf(&p, "%s%s", ROOT_PATH, path) < 0)
             return -ENOMEM;
+
+        VSTEGFS_LOCK(vstegfs_mutex_fuse);
+
+        cache[fi->fh]->stat = EXIT_SUCCESS;
+        cache[fi->fh]->done = false;
+        cache[fi->fh]->rwop = READ;
 
         errno = EXIT_SUCCESS;
 
@@ -197,8 +219,11 @@ static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, 
         free(p);
 
         vstegfs_find(vs);
-        if (*vs.size > fs_size)
+
+        uint64_t sz = fs_size;
+        if (*vs.size > sz)
             errno = -EFBIG;
+
         if (!(cache[fi->fh]->data = malloc(cache[fi->fh]->size)))
             errno = -ENOMEM;
 
@@ -212,16 +237,20 @@ static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, 
         free(vs.path);
         free(vs.pass);
 
+        VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
         if (errno != EXIT_SUCCESS)
             return errno;
     }
 
+    VSTEGFS_LOCK(vstegfs_mutex_fuse);
     if (cache[fi->fh]->done)
     {
         free(cache[fi->fh]->data);
         cache[fi->fh]->data = NULL;
         cache[fi->fh]->used = false;
-        return -cache[fi->fh]->stat;
+        int64_t r = -cache[fi->fh]->stat;
+        VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
+        return r;
     }
 
     if ((cache[fi->fh]->part < cache[fi->fh]->size) && (offset + size > cache[fi->fh]->part))
@@ -234,71 +263,98 @@ static int vstegfs_read(const char *path, char *buf, size_t size, off_t offset, 
         memcpy(buf, cache[fi->fh]->data + offset, size);
     }
 
+    VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
     return size;
 }
 
 static int vstegfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
+    VSTEGFS_LOCK(vstegfs_mutex_fuse);
+
     cache[fi->fh]->stat = EXIT_SUCCESS;
     cache[fi->fh]->size += size;
     cache[fi->fh]->rwop = WRITE;
     void *x = NULL;
     if (!(x = realloc(cache[fi->fh]->data, cache[fi->fh]->size + 1)))
     {
-        msg(_("out of memory @ %s:%i"), __FILE__, __LINE__);
+        VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
         return -ENOMEM;
     }
 
     cache[fi->fh]->data = x;
     memcpy(cache[fi->fh]->data + offset, buf, size);
 
+    VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
     return size;
 }
 
 static int vstegfs_open(const char *path, struct fuse_file_info *fi)
 {
-    for (uint64_t i = MIN_FH; i < buffer_s; i++)
+    VSTEGFS_LOCK(vstegfs_mutex_fuse);
+    uint64_t bf = buffer_s;
+    for (uint64_t i = MIN_FH; i < bf; i++)
         if (!cache[i]->used)
         {
             cache[i]->used = true;
             fi->fh = i;
+            VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
             return EXIT_SUCCESS;
         }
 
-    uint64_t z = buffer_s + BUFFER_DEFAULT;
-    if (z < buffer_s)
+    uint64_t z = bf + BUFFER_DEFAULT;
+    if (z < bf)
+    {
+        VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
         return -ENFILE;
+    }
 
     void *x = NULL;
     if (!(x = realloc(cache, z * sizeof( cache_t * ))))
+    {
+        VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
         return -ENOMEM;
+    }
 
     cache = x;
-    for (uint64_t i = buffer_s; i < z; i++)
+    for (uint64_t i = bf; i < z; i++)
         if (!(cache[i] = calloc(1, sizeof( cache_t ))))
+        {
+            VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
             return -ENOMEM;
+        }
     buffer_s = z;
 
     /*
      * return ourself, we should easily then find the 1st newly created entry
      */
+    VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
     return vstegfs_open(path, fi);
 }
 
 static int vstegfs_release(const char *path, struct fuse_file_info *fi)
 {
+    VSTEGFS_LOCK(vstegfs_mutex_fuse);
     if (cache[fi->fh]->rwop != WRITE)
+    {
+        VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
         return EXIT_SUCCESS;
-
+    }
     if (cache[fi->fh]->size > fs_size)
-        return EFBIG;
+    {
+        VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
+        return -EFBIG;
+    }
 
     char *p = NULL;
     if (asprintf(&p, "%s%s", ROOT_PATH, path) < 0)
+    {
+        VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
         return -ENOMEM;
+    }
 
     vstat_t vs;
     vs.fs   = filesystem;
+
     vs.data =  cache[fi->fh]->data;
     vs.size = &cache[fi->fh]->size;
     time_t now = time(NULL);
@@ -319,6 +375,7 @@ static int vstegfs_release(const char *path, struct fuse_file_info *fi)
     cache[fi->fh]->data = NULL;
     cache[fi->fh]->used = false;
 
+    VSTEGFS_UNLOCK(vstegfs_mutex_fuse);
     return EXIT_SUCCESS;
 }
 

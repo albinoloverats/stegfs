@@ -18,12 +18,13 @@
  *
  */
 
-#include <time.h>
+#include <inttypes.h>
+#include <stdbool.h>
 #include <errno.h>
+#include <time.h>
 #include <mhash.h>
 #include <mcrypt.h>
-#include <stdbool.h>
-#include <inttypes.h>
+#include <pthread.h>
 #include <sys/time.h>
 
 #include "common/common.h"
@@ -323,7 +324,10 @@ extern char **vstegfs_known_list(const char *path)
         if (!strcmp(path, known_files[j]->path))
         {
             list[i] = strdup(known_files[j]->name);
-            list = realloc(list, (++i + 1) * sizeof( char * ));
+            void *x = NULL;
+            if (!(x = realloc(list, (++i + 1) * sizeof( char *))))
+                return list;
+            list = x;
             list[i] = NULL;
         }
         j++;
@@ -636,7 +640,7 @@ static uint64_t calc_next_block(uint64_t fs, char *path)
 {
     uint64_t fsb = lseek(fs, 0, SEEK_END) / SB_BLOCK;
     uint64_t block = 0x0;
-    int16_t att = 0; /* give us up to 32767 attempts to find a block */
+    int16_t att = 0;
     bool found = false;
     /*
      * TODO wite a comment :p
@@ -644,6 +648,9 @@ static uint64_t calc_next_block(uint64_t fs, char *path)
     uint16_t depth = dir_get_deep(path);
     do
     {
+        if (++att >= MAX_BLOCK_LOOKUP)
+            break;
+
         rng_seed();
         block = (((uint64_t)mrand48() << 0x20) | mrand48()) % fsb;
 
@@ -669,7 +676,7 @@ static uint64_t calc_next_block(uint64_t fs, char *path)
         {
             char *p = dir_get_part(path, i);
             if (asprintf(&cwd, "%s/%s%s", cwd ? cwd : "", cwd ? "" : "\b", p) < 0)
-                return ENOMEM;
+                return 0;
 
             uint64_t hash[SL_PATH] = { 0x0 };
             {
@@ -687,17 +694,13 @@ static uint64_t calc_next_block(uint64_t fs, char *path)
         }
         if (!used)
             found = true;
-        else
-            if (++att < 0)
-                break;
         free(cwd);
     }
     while (!found);
-
     return found ? block : 0;
 }
 
-void rng_seed(void)
+static void rng_seed(void)
 {
     struct timeval now;
     gettimeofday(&now, NULL);

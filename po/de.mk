@@ -14,7 +14,7 @@ install-de:
 	-@echo "installed \`de.mo' --> \`$(PREFIX)/usr/share/locale/de/LC_MESSAGES/vstegfs.mo'"
 
 clean-de:
-	-@rm -fv de.mo
+	-@/bin/rm -fv de.mo
 
 uninstall-de:
-	-@rm -fv $(PREFIX)/usr/share/locale/de/LC_MESSAGES/vstegfs.mo
+	-@/bin/rm -fv $(PREFIX)/usr/share/locale/de/LC_MESSAGES/vstegfs.mo
