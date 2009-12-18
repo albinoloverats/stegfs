@@ -1,5 +1,7 @@
 /*
- * common linked list code
+ * Common code for implementing a linked list
+ * Copyright (c) 2009-2010, albinoloverats ~ Software Development
+ * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,13 +21,20 @@
 #ifndef _LIST_H_
 #define _LIST_H_
 
+/*!
+ * \file
+ * \author  albinoloverats ~ Software Development
+ * \date    2009-2010
+ * \brief   Common code for implementing a linked list
+ */
+
 #ifdef __cplusplus
 extern "C"
 {
 #endif /* __cplusplus */
 
     /*!
-     * \brief               a single list item object
+     * \brief               A single list item object
      */
     typedef struct list_t
     {
@@ -35,6 +44,11 @@ extern "C"
     }
     list_t;
 
+    /*!
+     * \brief               Provided the objects in the list have an ->id,
+     *                      they can be compared using it; this structure
+     *                      allows us to fake it :p
+     */
     typedef struct compare_id_t
     {
         uintptr_t id;
@@ -44,66 +58,66 @@ extern "C"
     typedef list_t * LIST;
 
     /*!
-     * \brief               create a new list_t
-     * \return              newly created list_t structure
+     * \brief               Create a new list_t
+     * \return              Newly created list_t structure
      */
     extern list_t *list_create(void);
 
     /*!
-     * \brief               delete a list_t
-     * \param[in]   l       the list_t to delete and free
+     * \brief               Delete a list_t
+     * \param[in]   l       The list_t to delete and free
      */
     extern void list_delete(list_t **l);
 
     /*!
-     * \brief               add an object to the list
-     * \param[in]   l       list to add object to
-     * \param[in]   o       the object to add
+     * \brief               Add an object to the list
+     * \param[in]   l       List to add object to
+     * \param[in]   o       The object to add
      */
     extern void list_append(list_t **l, void *o);
 
     /*!
-     * \brief               remove i'th object from a list
-     * \param[in]   l       remove element from the list
-     * \param[in]   i       the index of the object
+     * \brief               Remove i'th object from a list
+     * \param[in]   l       Remove element from the list
+     * \param[in]   i       The index of the object
      */
     extern void list_remove(list_t **l, uint64_t i);
 
     /*!
-     * \brief               get the i'th object from the list
-     * \param[in]   l       the list to search through
-     * \param[in]   i       the index of the object
-     * \return              the object
+     * \brief               Get the i'th object from the list
+     * \param[in]   l       The list to search through
+     * \param[in]   i       The index of the object
+     * \return              The object
      */
     extern list_t *list_get(list_t *l, uint64_t i);
 
     /*!
-     * \brief               return the number of elements in the list
-     * \param[in]   l       the list
-     * \return              the number of elements
+     * \brief               Return the number of elements in the list
+     * \param[in]   l       The list
+     * \return              The number of elements
      */
     extern uint64_t list_size(list_t *l);
 
     /*!
-     * \brief               join two lists toghether; both lists will then point to each other
-     * \param[in]   l       the 1st list
-     * \param[in]   m       the 2nd list
+     * \brief               Join two lists toghether; both lists will then point to each other
+     * \param[in]   l       The 1st list
+     * \param[in]   m       The 2nd list
      */
     extern void list_join(list_t *l, list_t *m);
 
     /*!
-     * \brief               split the list into 2 lists each with 1/2 the elements in each
-     * \param[in]   l       the list to split
+     * \brief               Split the list into 2 lists each with 1/2 the elements in each
+     * \param[in]   l       The list to split
      * \param[out]  l       1st 1/2
      * \param[out]  m       2nd 1/2
      */
     extern list_t *list_split(list_t *l);
 
     /*!
-     * \brief               sort the list
-     * \param[in]   l       the list to sort
-     * \param[out]  l       the sorted list
-     * \return              the sorted list
+     * \brief               Sort the list
+     * \param[in]   l       The list to sort
+     * \param[out]  l       The sorted list
+     * \return              The sorted list
      */
     extern list_t *list_sort(list_t **l);
 
@@ -115,24 +129,24 @@ extern "C"
 
 #ifdef _IN_LIST_
     /*!
-     * \brief               perform the merge part of mergesort
+     * \brief               Perform the merge part of mergesort
      * \param[in]   l       1/2 the list to merge
      * \param[in]   r       1/2 the list to merge
-     * \return              the merged result
+     * \return              The merged result
      */
     static list_t *list_msort(list_t *l, list_t *r);
 
     /*!
-     * \brief               find the 1st element in the list
-     * \param[in]   l       the list
-     * \return              the 1st element
+     * \brief               Find the 1st element in the list
+     * \param[in]   l       The list
+     * \return              The 1st element
      */
     static list_t *list_find_first(list_t *l);
 
     /*!
-     * \brief               find the last element in the list
-     * \param[in]   l       the list
-     * \return              the last element
+     * \brief               Find the last element in the list
+     * \param[in]   l       The list
+     * \return              The last element
      */
     static list_t *list_find_last(list_t *l);
 

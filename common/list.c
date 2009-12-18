@@ -1,5 +1,7 @@
 /*
- * list code example
+ * Common code for implementing a linked list
+ * Copyright (c) 2009-2010, albinoloverats ~ Software Development
+ * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,6 +25,9 @@
 
 int compare_object(void *a, void *b)
 {
+    /*
+     * provided the objects in the list have an ->id, they can be compared using it
+     */
     return ((compare_id_t *)a)->id - ((compare_id_t *)b)->id;
 }
 

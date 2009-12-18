@@ -1,6 +1,6 @@
 /*
- * stegfs ~ a virtual steganographic file system for linux
- * Copyright (c) 2007-2009, albinoloverats ~ Software Development
+ * stegfs ~ a steganographic file system for linux
+ * Copyright (c) 2007-2010, albinoloverats ~ Software Development
  * email: stegfs@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify

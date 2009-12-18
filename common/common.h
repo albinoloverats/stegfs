@@ -1,6 +1,6 @@
 /*
  * Common code shared between projects
- * Copyright (c) 2009, albinoloverats ~ Software Development
+ * Copyright (c) 2009-2010, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -24,7 +24,7 @@
 /*!
  * \file
  * \author  albinoloverats ~ Software Development
- * \date    2009
+ * \date    2009-2010
  * \brief   Common code shared between projects
  */
 

@@ -1,11 +1,11 @@
 This package was debianized by Ashley Anderson <amanderson@albinoloverats.net> on
-Fri, 27 Mar 2009 13:50:00 +0000
+10
 
 It was downloaded from https://albinoloverats.net/stegfs
 
 Upstream Author: albinoloverats ~ Software Development <stegfs@albinoloverats.net>
 
-Copyright: Copyright (c) 2004-2009, albinoloverats ~ Software Development
+Copyright: Copyright (c) 2007-2010, albinoloverats ~ Software Development
 
 License:
     This program is free software: you can redistribute it and/or modify
@@ -24,7 +24,7 @@ License:
 On Debian systems, the complete text of the GNU General
 Public License can be found in `/usr/share/common-licenses/GPL'.
 
-The Debian packaging is (C) 2009, Ashley Anderson <amanderson@albinoloverats.net> and
+The Debian packaging is (C) 2009-2010, Ashley Anderson <amanderson@albinoloverats.net> and
 is licensed under the GPL, see above.
 
 
