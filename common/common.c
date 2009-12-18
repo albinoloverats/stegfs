@@ -18,13 +18,14 @@
  *
  */
 
-#include "common/common.h"
+#include "common.h"
 
 static bool  c_sig = false;
 static char *c_app = NULL;
 static char *c_ver = NULL;
+static FILE *LOG_FILE = NULL;
 
-extern void init(const char * const restrict a, const char * const restrict v)
+extern void init(const char * const restrict a, const char * const restrict v, const char * const restrict f)
 {
     errno = 0;
     if (c_app)
@@ -41,6 +42,14 @@ extern void init(const char * const restrict a, const char * const restrict v)
     bindtextdomain(c_app, "/usr/share/locale");
     textdomain(c_app);
 #endif
+    /*
+     * log to a file if we can, else revert to stderr
+     */
+    if (f)
+        LOG_FILE = fopen(f, "w");
+    if (!LOG_FILE)
+        LOG_FILE = stderr;
+    return;
 }
 
 extern conf_t **config(const char * const restrict f)
@@ -131,13 +140,25 @@ extern void hex(void *v, uint64_t l)
 extern void msg(const char *s, ...)
 {
     if (!s)
+    {
+        if (errno)
+        {
+            char *e = strdup(strerror(errno));
+            for (uint32_t i = 0; i < strlen(e); i++)
+                e[i] = tolower(e[i]);
+            msg("%s", e);
+            free(e);
+        }
         return;
+    }
     va_list ap;
     va_start(ap, s);
-    fprintf(stderr, "\r%s: ", c_app);
-    vfprintf(stderr, s, ap);
-    fprintf(stderr, "\n");
-    fflush(stderr);
+    flockfile(LOG_FILE);
+    fprintf(LOG_FILE, "\r%s: ", c_app);
+    vfprintf(LOG_FILE, s, ap);
+    fprintf(LOG_FILE, "\n");
+    fflush(LOG_FILE);
+    funlockfile(LOG_FILE);
     va_end(ap);
 }
 
@@ -192,6 +213,23 @@ extern void wait(uint32_t s)
     nanosleep(&t, &r);
 }
 
+extern void random_seed(void)
+{
+    struct timeval now;
+    gettimeofday(&now, NULL);
+    uint64_t t = now.tv_sec * ONE_MILLION + now.tv_usec;
+    uint16_t s[RANDOM_SEED_SIZE] = { 0x0 };
+
+    MHASH h = mhash_init(MHASH_TIGER);
+    mhash(h, &t, sizeof( uint64_t ));
+    uint8_t *ph = mhash_end(h);
+    memmove(s, ph, RANDOM_SEED_SIZE * sizeof( uint16_t ));
+    free(ph);
+
+    seed48(s);
+    return;
+}
+
 extern ssize_t getline(char **lineptr, size_t *n, FILE *stream)
 {
     ssize_t r = 0;
@@ -215,6 +253,7 @@ extern ssize_t getline(char **lineptr, size_t *n, FILE *stream)
     if (*lineptr)
         free(*lineptr);
     *lineptr = buffer;
+    *n = r;
 
     return r;
 }
