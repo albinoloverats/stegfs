@@ -21,12 +21,17 @@ mkfs:
 	 @gcc $(OPTIONS) mkstegfs $(COMMON) src/mkfs.c
 	-@echo "compiled \`src/mkfs.c $(COMMON)' --> \`mkstegfs'"
 
+man:
+# compress the man page
+	 @gzip -c doc/stegfs.1 > doc/stegfs.1.gz
+	-@echo "compressed \`doc/stegfs.1' --> \`doc/stegfs.1.gz'"
+
 testfs:
 # build the testfs utility
 	 @gcc -lncurses $(OPTIONS) teststegfs $(COMMON) src/testfs.c
 	-@echo "compiled \`src/testfs.c $(COMMON)' --> \`teststegfs'"
 
-a: stegfs mkfs $(PO_MAKE)
+a: stegfs mkfs man $(PO_MAKE)
 
 all: a testfs
 
@@ -42,7 +47,7 @@ install: $(PO_INSTALL)
 	-@echo "installed \`doc/stegfs.1.gz' --> \`$(PREFIX)/usr/man/man1/stegfs.1.gz'"
 
 clean: $(PO_CLEAN)
-	-@/bin/rm -fv stegfs mkstegfs
+	-@/bin/rm -fv stegfs mkstegfs doc/stegfs.1.gz
 
 distclean: clean
 	-@/bin/rm -fv teststegfs

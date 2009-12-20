@@ -1,0 +1,55 @@
+.TH stegfs "1" "Janurary 2010" "stegfs 201001" "stegfs"
+.SH NAME
+stegfs \- a (Fuse based) steganographic file system for Unix-like operating systems
+.SH SYNOPSIS
+.B stegfs
+\fIOPTION ARGUMENT\fR ...
+.SH DESCRIPTION
+.PP
+\fBstegfs\fR is a Fuse based file system which provides absolute security. Using encryption to secure files, and the art of steganography to hide them, stegfs is able to ensure that the existence of such files isn't guaranteed. The libraries mhash and mcrypt are used to provide the Tiger cryptographic hash function and the Serpent symmetric key block cipher.
+.SH OPTIONS (stegfs)
+.TP
+\fB\-f\fR, \fB\-\-filesystemm FILE SYSTEM\fR
+The file system image to use
+.TP
+\fB\-m\fR, \fB\-\-mount MOUNT POINT\fR
+The directory to use as the mount point for the file system
+.TP
+\fB\-n\fR, \fB\-\-nocache\fR
+Do not cache directory entries and used blocks
+.SH OPTIONS (mkstegfs)
+.TP
+\fB\-f\fR, \fB\-\-filesystemm FILE SYSTEM\fR
+The file or device to create the file system in/on
+.TP
+\fB\-s\fR, \fB\-\-size SIZE\fR
+The size of the file system when initially creating it (only needed when using a file instead of a block device)
+.TP
+\fB\-x\fR, \fB\-\-force\fR
+Used to force overwriting of an existing file for a new file system
+.TP
+\fB\-r\fR, \fB\-\-restore\fR
+Restore the default stegfs superblock
+.SH OPTIONS (Common)
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+This help list
+.TP
+\fB\-l\fR, \fB\-\-licence\fR
+An overview of the GNU GPL
+.TP
+\fB\-v\fR, \fB\-\-version\fR
+Show the version number and quit
+.PP
+More information ...
+.SH AUTHOR
+Written by Ashley Anderson
+.SH BUGS
+Many, probably too many to count, but most of them can probably be passed off as features which enhance security ;)
+.SH COPYRIGHT
+Copyright (c) 2004\-2010 albinoloverats ~ Software Development
+.SH LICENCE
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along with this program. If not, see <http://www.gnu.org/licenses/>.
+Note on spelling: As albinoloverats.net is a British company and "licence" is the correct spelling in its native language. However, the name of the licences, written in most cases in America, feature the American spelling of the word, license. As part of the title of the official licensing document it was thought inappropriate to alter the spelling.  In British English, license is the verb, licence is the noun and licensee is the person who is granted a Licence.
