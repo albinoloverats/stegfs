@@ -213,23 +213,6 @@ extern void wait(uint32_t s)
     nanosleep(&t, &r);
 }
 
-extern void random_seed(void)
-{
-    struct timeval now;
-    gettimeofday(&now, NULL);
-    uint64_t t = now.tv_sec * ONE_MILLION + now.tv_usec;
-    uint16_t s[RANDOM_SEED_SIZE] = { 0x0 };
-
-    MHASH h = mhash_init(MHASH_TIGER);
-    mhash(h, &t, sizeof( uint64_t ));
-    uint8_t *ph = mhash_end(h);
-    memmove(s, ph, RANDOM_SEED_SIZE * sizeof( uint16_t ));
-    free(ph);
-
-    seed48(s);
-    return;
-}
-
 extern ssize_t getline(char **lineptr, size_t *n, FILE *stream)
 {
     ssize_t r = 0;

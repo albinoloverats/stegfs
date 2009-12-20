@@ -50,7 +50,6 @@ extern "C"
     #include <ctype.h>
     #include <errno.h>
     #include <libintl.h>
-    #include <mhash.h>
     #include <sys/time.h>
 
     #ifdef HAVE_CONFIG_H
@@ -205,11 +204,6 @@ extern "C"
      * \param[in]  s     Number of milliseconds
      */
     extern void wait(uint32_t s);
-
-    /*!
-     * \brief            Seed the random number generator
-     */
-    extern void random_seed(void);
 
 	/*!
 	 * \brief            Wrapper function for systems without getline
