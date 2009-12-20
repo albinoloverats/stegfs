@@ -32,7 +32,7 @@
  */
 extern char *dir_get_file(const char *path)
 {
-    char *p = strdupa(path);
+    char *p = strdup(path);
     if (!p)
         return NULL;
     char *f = strrchr(p, ':');
@@ -43,6 +43,7 @@ extern char *dir_get_file(const char *path)
         r = strndup(path, f - p);
     else
         r = strndup(strrchr(p, '/') + 1, f - strrchr(p, '/'));
+    free(p);
     return r;
 }
 
@@ -56,7 +57,7 @@ extern uint16_t dir_get_deep(const char *path)
     uint16_t c = 0;
     if (path[0] != '/')
         c++;
-    char *p = strdupa(path);
+    char *p = strdup(path);
     if (!p)
         return 0;
     char *e = strchr(p, ':') ? : p + strlen(p);
@@ -66,6 +67,7 @@ extern uint16_t dir_get_deep(const char *path)
             break;
         else
             c++;
+    free(p);
     return ++c;
 }
 
@@ -76,12 +78,13 @@ extern char *dir_get_part(const char *path, uint16_t part)
 {
     if (part > dir_get_deep(path))
         return NULL;
-    char *p = strdupa(path);
+    char *p = strdup(path);
     if (!p)
         return NULL;
     char *s = NULL;
     for (uint16_t i = 0; i <= part; i++)
         s = strsep(&p, "/");
+    free(p);
     return s;
 }
 
