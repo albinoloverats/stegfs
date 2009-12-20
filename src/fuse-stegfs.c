@@ -21,6 +21,7 @@
 #define FUSE_USE_VERSION 27
 
 #include <fuse.h>
+#include <limits.h>
 #include <fcntl.h>
 #include <getopt.h>
 #include <pthread.h>
