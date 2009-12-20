@@ -123,8 +123,17 @@
     extern list_t *lib_stegfs_cache_get(void);
     extern uint8_t *lib_stegfs_cache_map(void);
 
-    extern int64_t lib_stegfs_stat(stegfs_file_t *, stegfs_block_t *);
+    /*
+     * stat'ing a file is different - failure is indictated with a return value of 0
+     * becayse all positive values are allowable inode values; 0 is the only invalid
+     * inode
+     */
+    extern uint64_t lib_stegfs_stat(stegfs_file_t *, stegfs_block_t *);
     extern int64_t lib_stegfs_kill(stegfs_file_t *);
+    /*
+     * load/save return values < 0 for an error; this value can then directly be used
+     * as the return value from the fuse functions
+     */
     extern int64_t lib_stegfs_load(stegfs_file_t *);
     extern int64_t lib_stegfs_save(stegfs_file_t *);
 
@@ -145,5 +154,8 @@
     static uint64_t lib_stegfs_block_find(char *);
     static bool lib_stegfs_block_ours(uint64_t, uint64_t *);
 
+    static void lib_stegfs_random_seed(void);
+
     static stegfs_fs_info_t *file_system;
+//    static pthread_mutex_t stegfs_lock;
 #endif /* _IN_LIB_STEGFS_ */

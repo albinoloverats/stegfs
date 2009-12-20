@@ -103,7 +103,7 @@ static void lib_stegfs_cache_del(stegfs_file_t *file)
             free(x->path);
             free(x);
             list_remove(&file_system->files, i);
-            return; /* found a file in the same directory with the same name; we're done */
+            break; /* found a file in the same directory with the same name; we're done */
         }
     }
     return;
@@ -158,10 +158,9 @@ static MCRYPT lib_stegfs_init_crypt(stegfs_file_t *file, uint8_t ivi)
     /*
      * create the initial key for the encryption algorithm
      */
+    char *fk = NULL;
+    if (asprintf(&fk, "%s:%s", file->name, strlen(file->pass) ? file->pass : PATH_ROOT))
     {
-        char *fk = NULL;
-        if (asprintf(&fk, "%s:%s", file->name, strlen(file->pass) ? file->pass : PATH_ROOT) < 0)
-            return NULL;
         MHASH h = mhash_init(MHASH_TIGER);
         mhash(h, fk, strlen(fk));
         uint8_t *ph = mhash_end(h);
@@ -173,10 +172,9 @@ static MCRYPT lib_stegfs_init_crypt(stegfs_file_t *file, uint8_t ivi)
     /*
      * create the initial iv for the encryption algorithm
      */
+    char *iv_s = NULL;
+    if (asprintf(&iv_s, "%s+%i", file->name, ivi))
     {
-        char *iv_s = NULL;
-        if (asprintf(&iv_s, "%s+%i", file->name, ivi) < 0)
-            return NULL;
         MHASH h = mhash_init(MHASH_TIGER);
         mhash(h, iv_s, strlen(iv_s));
         uint8_t *ph = mhash_end(h);
@@ -188,50 +186,54 @@ static MCRYPT lib_stegfs_init_crypt(stegfs_file_t *file, uint8_t ivi)
     return c;
 }
 
-extern int64_t lib_stegfs_stat(stegfs_file_t *file, stegfs_block_t *block)
+extern uint64_t lib_stegfs_stat(stegfs_file_t *file, stegfs_block_t *block)
 {
     uint16_t header[MAX_COPIES] = INIT_HEADER;
     uint64_t path[SL_PATH] = INIT_PATH;
+    bool found = false;
+    uint64_t inode = 0x0;
     lib_stegfs_init_hash(file, &header, &path);
     if (!block)
         block = alloca(sizeof( stegfs_block_t ));
-    if (!block)
-        return 0;//-ENOMEM;
-    /*
-     * try to find a header
-     */
-    bool found = false;
-    uint64_t inode = 0x0;
-    for (uint8_t i = 0; i < MAX_COPIES; i++)
+    if (block)
     {
-        for (int8_t j = (sizeof( uint64_t ) / sizeof( uint16_t )); j >= 0; --j)
-            inode = (inode << 0x10) | header[i + j];
-        inode %= file_system->blocks;
-        if (lib_stegfs_block_ours(inode, path))
+        /*
+         * try to find a header
+         */
+        for (uint8_t i = 0; i < MAX_COPIES; i++)
         {
-            /*
-             * found a header block which might be ours, if we can read
-             * its contents we're in business
-             */
-            MCRYPT c = lib_stegfs_init_crypt(file, i);
-            if (!c)
-                return 0;//-ENOMEM;
-            if (!lib_stegfs_block_load(inode, c, block))
+            for (int8_t j = (sizeof( uint64_t ) / sizeof( uint16_t )); j >= 0; --j)
+                inode = (inode << 0x10) | header[i + j];
+            inode %= file_system->blocks;
+            if (lib_stegfs_block_ours(inode, path))
             {
                 /*
-                 * if we're here we were able to successfully open the header
+                 * found a header block which might be ours, if we can read
+                 * its contents we're in business
                  */
-                memmove(&file->size, block->next, SB_NEXT);
-                uint64_t data[SL_DATA] = { 0x0 };
-                memmove(data, block->data, SB_DATA);
-                memmove(&file->time, &data[SL_DATA - 1], sizeof( time_t ));
-                found = true;
+                MCRYPT c = lib_stegfs_init_crypt(file, i);
+                if (c)
+                {
+                    if (!lib_stegfs_block_load(inode, c, block))
+                    {
+                        /*
+                        * if we're here we were able to successfully open the header
+                        */
+                        memmove(&file->size, block->next, SB_NEXT);
+                        uint64_t data[SL_DATA] = { 0x0 };
+                        memmove(data, block->data, SB_DATA);
+                        memmove(&file->time, &data[SL_DATA - 1], sizeof( time_t ));
+                        found = true;
+                    }
+                    mcrypt_generic_deinit(c);
+                    mcrypt_module_close(c);
+                }
+                else
+                    break;
             }
-            mcrypt_generic_deinit(c);
-            mcrypt_module_close(c);
+            if (file->size)
+                break;
         }
-        if (file->size)
-            break;
     }
     return found ? inode : 0;
 }
@@ -245,7 +247,7 @@ extern int64_t lib_stegfs_kill(stegfs_file_t *file)
     /*
      * TODO find a way to unmark blocks in the bitmap
      */
-    return EXIT_SUCCESS;
+    return -EXIT_SUCCESS;
 }
 
 extern int64_t lib_stegfs_save(stegfs_file_t *file)
@@ -354,6 +356,7 @@ static int64_t lib_stegfs_block_save(uint64_t offset, MCRYPT crypto, stegfs_bloc
     /*
      * calculate the hash of the data
      */
+    errno = EXIT_SUCCESS;
     uint8_t hdata[SB_DATA] = { 0x00 };
     memmove(hdata, (uint8_t *)block->data, SB_DATA);
     MHASH h = mhash_init(MHASH_TIGER);
@@ -373,9 +376,7 @@ static int64_t lib_stegfs_block_save(uint64_t offset, MCRYPT crypto, stegfs_bloc
     /*
      * write the encrypted block to this block location
      */
-    if (pwrite(file_system->id, block, sizeof( stegfs_block_t ), offset * SB_BLOCK) != sizeof( stegfs_block_t ))
-        return errno;
-    return EXIT_SUCCESS;
+    return pwrite(file_system->id, block, sizeof( stegfs_block_t ), offset * SB_BLOCK) != sizeof( stegfs_block_t ) ? errno : EXIT_SUCCESS;
 }
 
 extern int64_t lib_stegfs_load(stegfs_file_t *file)
@@ -462,28 +463,29 @@ extern int64_t lib_stegfs_load(stegfs_file_t *file)
 static int64_t lib_stegfs_block_load(uint64_t offset, MCRYPT crypto, stegfs_block_t *block)
 {
     errno = EXIT_SUCCESS;
-    if (pread(file_system->id, block, sizeof( stegfs_block_t ), offset * SB_BLOCK) != sizeof( stegfs_block_t ))
-        return errno;
-#ifndef DEBUGGING
-    uint8_t data[SB_SERPENT * 7] = { 0x00 };
-    memmove(data, ((uint8_t *)block) + SB_SERPENT, SB_BLOCK - SB_PATH);
-    mdecrypt_generic(crypto, data, sizeof( data ));
-    memmove(((uint8_t *)block) + SB_SERPENT, data, SB_BLOCK - SB_PATH);
-#endif /* ! DEBUGGING */
-    /*
-     * check the hash of the decrypted data
-     */
-    uint8_t hash[SB_HASH] = { 0x00 };
+    if (!pread(file_system->id, block, sizeof( stegfs_block_t ), offset * SB_BLOCK) != sizeof( stegfs_block_t ))
     {
-        MHASH h = mhash_init(MHASH_TIGER);
-        mhash(h, block->data, SB_DATA);
-        uint8_t *ph = mhash_end(h);
-        memmove(hash, ph, SB_HASH);
-        free(ph);
+#ifndef DEBUGGING
+        uint8_t data[SB_SERPENT * 7] = { 0x00 };
+        memmove(data, ((uint8_t *)block) + SB_SERPENT, SB_BLOCK - SB_PATH);
+        mdecrypt_generic(crypto, data, sizeof( data ));
+        memmove(((uint8_t *)block) + SB_SERPENT, data, SB_BLOCK - SB_PATH);
+#endif /* ! DEBUGGING */
+        /*
+         * check the hash of the decrypted data
+         */
+        uint8_t hash[SB_HASH] = { 0x00 };
+        {
+            MHASH h = mhash_init(MHASH_TIGER);
+            mhash(h, block->data, SB_DATA);
+            uint8_t *ph = mhash_end(h);
+            memmove(hash, ph, SB_HASH);
+            free(ph);
+        }
+        if (memcmp(hash, block->hash, SB_HASH))
+            errno = EXIT_FAILURE;
     }
-    if (memcmp(hash, block->hash, SB_HASH))
-        return EXIT_FAILURE;
-    return EXIT_SUCCESS;
+    return errno;
 }
 
 static uint64_t lib_stegfs_block_find(char *path)
@@ -496,7 +498,7 @@ static uint64_t lib_stegfs_block_find(char *path)
     {
         if (++att >= MAX_BLOCK_LOOKUP)
             break;
-        random_seed();
+        lib_stegfs_random_seed();
         block = (((uint64_t)mrand48() << 0x20) | mrand48()) % file_system->blocks;
         /*
          * check the bitmap for this block
@@ -551,4 +553,21 @@ static bool lib_stegfs_block_ours(uint64_t offset, uint64_t *hash)
     if (memcmp(data, hash, SB_PATH))
         return false; /* they're different, not along our path */
     return true;
+}
+
+static void lib_stegfs_random_seed(void)
+{
+    struct timeval now;
+    gettimeofday(&now, NULL);
+    uint64_t t = now.tv_sec * ONE_MILLION + now.tv_usec;
+    uint16_t s[RANDOM_SEED_SIZE] = { 0x0 };
+
+    MHASH h = mhash_init(MHASH_TIGER);
+    mhash(h, &t, sizeof( uint64_t ));
+    uint8_t *ph = mhash_end(h);
+    memmove(s, ph, RANDOM_SEED_SIZE * sizeof( uint16_t ));
+    free(ph);
+
+    seed48(s);
+    return;
 }
