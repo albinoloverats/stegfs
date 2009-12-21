@@ -570,6 +570,6 @@ int64_t show_help(void)
     fprintf(stderr, "  -h, --help                     Show this help list\n");
     fprintf(stderr, "  -l, --licence                  Show overview of GNU GPL\n");
     fprintf(stderr, "  -v, --version                  Show version information\n\n");
-    fprintf(stderr, "  Fuse executable to mount vstegfs file systems\n");
+    fprintf(stderr, "  Fuse executable to mount stegfs file systems\n");
     return EXIT_SUCCESS;
 }
