@@ -1,4 +1,4 @@
-.PHONY: stegfs mkfs all install clean distclean uninstall
+.PHONY: stegfs mkfs testfs most all install clean distclean uninstall
 
 PO_MAKE      = 
 PO_INSTALL   = 
@@ -20,13 +20,17 @@ mkfs:
 # build the mkfs utility
 	 @cc $(OPTIONS) mkstegfs $(COMMON) src/mkfs.c
 	-@echo "compiled \`src/mkfs.c $(COMMON)' --> \`mkstegfs'"
+man:
+# compress the man page
+	 @gzip -c doc/stegfs.1 > doc/stegfs.1.gz
+	-@echo "compressed \`doc/stegfs.1' --> \`doc/stegfs.1.gz'"
 
 testfs:
 # build the testfs utility
 	 @cc -lncurses $(OPTIONS) teststegfs $(COMMON) src/testfs.c
 	-@echo "compiled \`src/testfs.c $(COMMON)' --> \`teststegfs'"
 
-a: stegfs mkfs $(PO_MAKE)
+a: stegfs mkfs man $(PO_MAKE)
 
 all: a testfs
 
@@ -42,12 +46,14 @@ install: $(PO_INSTALL)
 	-@echo "installed \`doc/stegfs.1.gz' --> \`$(PREFIX)/usr/man/man1/stegfs.1.gz'"
 
 clean: $(PO_CLEAN)
-	-@rm -f stegfs mkstegfs
+	-@rm -f stegfs mkstegfs doc/stegfs.1.gz
 	-@echo "removed \`stegfs'"
 	-@echo "removed \`mkstegfs'"
+	-@echo "removed \`doc/stegfs.1.gz'"
 
 distclean: clean
-	-@/bin/rm -fv teststegfs
+	-@/bin/rm -f teststegfs
+	-@echo "removed \`teststegfs'"
 
 uninstall: $(PO_UNINSTALL)
 	-@rm -f $(PREFIX)/usr/man/man1/stegfs.1.gz
