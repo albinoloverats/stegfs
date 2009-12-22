@@ -81,10 +81,11 @@ extern char *dir_get_part(const char *path, uint16_t part)
     char *p = strdup(path);
     if (!p)
         return NULL;
+    char *x = p;
     char *s = NULL;
     for (uint16_t i = 0; i <= part; i++)
         s = strsep(&p, "/");
-    free(p);
+    free(x);
     return s;
 }
 
