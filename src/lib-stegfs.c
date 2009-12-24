@@ -45,7 +45,7 @@ extern void lib_stegfs_init(const char *filesystem, bool cache)
     stegfs_block_t super;
     lseek(file_system->id, 0, SEEK_SET);
     if (read(file_system->id, &super, sizeof( stegfs_block_t )) != sizeof( stegfs_block_t ))
-        msg(strerror(errno));
+        msg("%s", strerror(errno));
     if ((super.hash[0] != MAGIC_0) || (super.hash[1] != MAGIC_1) || (super.hash[2] != MAGIC_2))
     {
         msg(_("magic number failure in superblock for %s"), filesystem);
@@ -463,7 +463,7 @@ extern int64_t lib_stegfs_load(stegfs_file_t *file)
 static int64_t lib_stegfs_block_load(uint64_t offset, MCRYPT crypto, stegfs_block_t *block)
 {
     errno = EXIT_SUCCESS;
-    if (!pread(file_system->id, block, sizeof( stegfs_block_t ), offset * SB_BLOCK) != sizeof( stegfs_block_t ))
+    if (pread(file_system->id, block, sizeof( stegfs_block_t ), offset * SB_BLOCK) == sizeof( stegfs_block_t ))
     {
 #ifndef DEBUGGING
         uint8_t data[SB_SERPENT * 7] = { 0x00 };
