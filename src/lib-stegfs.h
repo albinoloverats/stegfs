@@ -89,7 +89,7 @@
 
     typedef struct stegfs_file_t
     {
-        uintptr_t     id;
+        uint64_t      id;
         uint64_t      size;
         time_t        time;
         stegfs_mode_e mode;
