@@ -164,7 +164,7 @@ static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t fill
                     if (map[i] & (0x01 << j))
                     {
                         char *m = NULL;
-                        if (asprintf(&m, "%lu", i * CHAR_BIT + j))
+                        if (asprintf(&m, "%ju", i * CHAR_BIT + j))
                         {
                             filler(buf, m, NULL, 0);
                             free(m);
@@ -263,14 +263,14 @@ static int fuse_stegfs_read(const char *path, char *buf, size_t size, off_t offs
         {
             if ((this->mode == STEGFS_READ) && (this->size))
             {
-                if (offset + size > this->size)
+                if ((unsigned)(offset + size) > this->size)
                     size = this->size - offset;
                 memcpy(buf, this->data + offset, size);
                 e = size;
             }
             else
             {
-                msg(_("file %#016lx not opened for reading"), this->id);
+                msg(_("file %#016jx not opened for reading"), this->id);
                 e = -EBADF;
             }
             found = true;
@@ -302,7 +302,7 @@ static int fuse_stegfs_write(const char *path, const char *buf, size_t size, off
                  * only increae the buffer if we need to
                  */
                 void *x = NULL;
-                if (offset + size > this->size)
+                if ((unsigned)(offset + size) > this->size)
                 {
                     this->size = offset + size;
                     x = realloc(this->data, this->size + 1);
@@ -323,7 +323,7 @@ static int fuse_stegfs_write(const char *path, const char *buf, size_t size, off
             }
             else
             {
-                msg(_("file %#016lx not opened for writing"), this->id);
+                msg(_("file %#016jx not opened for writing"), this->id);
                 e = -EBADF;
             }
             found = true;
