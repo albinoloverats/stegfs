@@ -129,12 +129,12 @@ extern void hex(void *v, uint64_t l)
         if (c > HEX_LINE_WRAP)
         {
             c = 1;
-            msg(b);
+            msg("%s", b);
             memset(b, 0x00, sizeof( b ));
         }
         sprintf(b, "%s%02X%s", b, s[i], (c % sizeof( uint32_t )) ? "" : " ");
     }
-    msg(b);
+    msg("%s", b);
 }
 
 extern void msg(const char *s, ...)
@@ -165,7 +165,7 @@ extern void msg(const char *s, ...)
 extern void die(const char *s, ...)
 {
     if (s)
-        msg(s);
+        msg("%s", s);
     if (errno)
     {
         char *e = strdup(strerror(errno));
@@ -215,7 +215,7 @@ extern void wait(uint32_t s)
 
 extern ssize_t getline(char **lineptr, size_t *n, FILE *stream)
 {
-    ssize_t r = 0;
+    size_t r = 0;
     uint32_t step = 0xFF;
     char *buffer = malloc(step);
     
