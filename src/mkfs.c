@@ -146,7 +146,7 @@ int main(int argc, char **argv)
          */
         msg(_("location      : %s"), fs_name);
         fs_blocks = fs_size * SB_1MB / SB_BLOCK;
-        msg(_("total blocks  : %8lu"), fs_blocks);
+        msg(_("total blocks  : %8ju"), fs_blocks);
         {
             char *units = strdup("MB");
             float volume = fs_size;
