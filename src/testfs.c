@@ -108,7 +108,8 @@ static void *tmain(void *arg)
     memset(blk, tid, sizeof( blk ));
 
     char *fname = NULL;
-    asprintf(&fname, "file_%02i", tid);
+    if (!asprintf(&fname, "file_%02i", tid))
+        die(_("out of memory @ %s:%i"), __FILE__, __LINE__);
     FILE *file = fopen(fname, "w");
 
     bool failed = false;
