@@ -13,11 +13,11 @@ msgstr "mit blick auf artikel %i"
 msgid "no complete copy of file found; recovered %lu bytes"
 msgstr "keine vollständige kopie der datei gefunden, wieder %lu bytes"
 
-msgid "file %#016lx not opened for reading"
-msgstr "%#016lx datei nicht zum lesen geöffnet"
+msgid "file %#016jx not opened for reading"
+msgstr "%#016jx datei nicht zum lesen geöffnet"
 
-msgid "file %#016lx not opened for writing"
-msgstr "%#016lx datei nicht zum schreiben geöffnet"
+msgid "file %#016jx not opened for writing"
+msgstr "%#016jx datei nicht zum schreiben geöffnet"
 
 msgid "could not find space in cache for file \"%s\""
 msgstr "konnte sie nicht finden platz im cache für die datei \"%s\""
@@ -43,7 +43,7 @@ msgstr "kann nicht sein, eine dateisystem mit größe < 1MB"
 msgid "location      : %s"
 msgstr "standort      : %s"
 
-msgid "total blocks  : %8lu"
+msgid "total blocks  : %8ju"
 msgstr "blöcke        : %8lu"
 
 msgid "volume        : %8.2f %s"
