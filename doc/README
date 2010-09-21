@@ -5,10 +5,10 @@ Changes:
     Complete rewrite of the Fuse interface, and a major  overhaul  of
     the stegfs backend.
 
-    Mutex’s  have  been added to limit access to a single thread at a
+    Mutex's  have  been added to limit access to a single thread at a
     time.
 
-    Files are written when flush(); therefore  you  shouldb’t  really
+    Files are written when flush(); therefore  you  shouldb't  really
     call flush() multiple times on an open file or you might serious‐
     ly screw things up :p
 
@@ -47,7 +47,7 @@ About:
     or contains any valid data).
 
     Files can be stored with or without a  password.  The  convention
-    adopted  for  stegfs  is ‘/dir/tree/file:passwd’; that is, every‐
+    adopted  for  stegfs  is '/dir/tree/file:passwd'; that is, every‐
     thing after a colon is used at the password  for  encrypting  and
     decrypting  the  file. In addition to this, as with the directory
     hierarchy and the file name, the password is also used to  locate
