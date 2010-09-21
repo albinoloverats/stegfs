@@ -31,19 +31,19 @@ About:
     to retrieve data eclipses this.)
 
     stegfs uses a file hierarchy similar to that of conventional file
-    systems. However, all directories must start with a + symbol; al‐
-    lowing stegfs to easily distinguish between  files  and  directo‐
+    systems. However, all directories must start with a + symbol; al-
+    lowing stegfs to easily distinguish between  files  and  directo-
     ries.  For each sub directory, a check is made to ensure that the
-    current block isn’t already being used by another file down  that
-    path.  Files at a deeper level ’know’ about the files above them,
+    current block isn't already being used by another file down  that
+    path.  Files at a deeper level 'know' about the files above them,
     but files in the root directory know only of  those  other  files
     also  in  the  root.  Therefore, files at a deeper level are less
     likely to overwrite another file, but are more susceptible to be‐
     ing overwritten themselves.
 
     NB  ‐  Files  and directories do not need to be created, they al‐
-    ready exist ‐ just try stat’ing a file to see what this means ;‐)
-    (that  said, just because a file might exist doesn’t mean it does
+    ready exist ‐ just try stat'ing a file to see what this means ;‐)
+    (that  said, just because a file might exist doesn't mean it does
     or contains any valid data).
 
     Files can be stored with or without a  password.  The  convention
