@@ -19,21 +19,67 @@
  */
 
 #ifndef _DIR_H_
-#define _DIR_H_
+    #define _DIR_H_
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
+    /*!
+     * \file    dir.h
+     * \author  albinoloverats ~ Software Development
+     * \date    2009-2010
+     * \brief   Directory parsing functions
+     * \note    These functions all return newly allocated strings
+     *
+     * Collection of functions to parse directory hierarchies and extract the
+     * names of each leaf along the tree, from the root all the way to the file
+     * name and password
+     */
 
-extern char    *dir_get_file(const char *);
-extern uint16_t dir_get_deep(const char *);
-extern char    *dir_get_part(const char *, uint16_t);
-extern char    *dir_get_pass(const char *);
-extern char    *dir_get_path(const char *);
+    #include <inttypes.h>
 
-#ifdef __cplusplus
-}
-#endif
+    /*!
+     * \brief         Extract the file part of the /path/file:password
+     * \param[in]  p  Path: /path/file:password
+     * \return        Newly allocated string: file name
+     *
+     * Working backwards, cut off the password and leading directories
+     */
+    extern char *dir_get_file(const char * const restrict p) __attribute__((nonnull(1)));
+
+    /*!
+     * \brief         Determine how deep down the hierarchy path goes
+     * \param[in]  p  Path: /path/file:password
+     * \return        Number of subdirectories passed through
+     *
+     * Count the number of parent directories the given path includes
+     */
+    extern uint16_t dir_get_deep(const char * const restrict p) __attribute__((nonnull(1)));
+
+    /*!
+     * \brief         Extract the numbered part of the /path/file:password
+     * \param[in]  p  Path: /path/file:password
+     * \param[in]  x  Element from path to extract
+     * \return        Newly allocated string: directory name
+     *
+     * Work down the given path and return a copy of the directory name at the
+     * given index in the hierarchy
+     */
+    extern char *dir_get_part(const char * const restrict p, const uint16_t x) __attribute__((nonnull(1)));
+
+    /*!
+     * \brief         Extract the password part of the /path/file:password
+     * \param[in]  p  Path: /path/file:password
+     * \return        Newly allocated string: password
+     *
+     * Find and return a copy of the password part of the path
+     */
+    extern char *dir_get_pass(const char * const restrict p) __attribute__((nonnull(1)));
+
+    /*!
+     * \brief         Extract only the path part of the /path/file:password
+     * \param[in]  p  Path: /path/file:password
+     * \return        Newly allocated string: path
+     *
+     * Take the given path, copy it, and cut off the file name and password
+     */
+    extern char *dir_get_path(const char * const restrict p) __attribute__((nonnull(1)));
 
 #endif /* _DIR_H_ */

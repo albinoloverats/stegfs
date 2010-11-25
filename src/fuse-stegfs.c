@@ -21,10 +21,17 @@
 #define FUSE_USE_VERSION 27
 
 #include <fuse.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <inttypes.h>
+#include <stdbool.h>
 #include <limits.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
 #include <pthread.h>
+#include <libintl.h>
 
 #include "common/common.h"
 #include "common/list.h"
@@ -32,6 +39,7 @@
 #define _IN_FUSE_STEGFS_
 #include "src/fuse-stegfs.h"
 #undef _IN_FUSE_STEGFS_
+
 #include "src/dir.h"
 
 
@@ -53,7 +61,7 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
     stbuf->st_ctime   = time(NULL);
     stbuf->st_mtime   = time(NULL);
     stbuf->st_size    = 0x0;
-    stbuf->st_blksize = SB_BLOCK;
+    stbuf->st_blksize = SIZE_BYTE_BLOCK;
     if (!strcmp(path, FILE_ROOT))
     {
         /*

@@ -18,91 +18,70 @@
  *
  */
 
-#include "common/common.h"
-
 #include "src/dir.h"
 
-/*
- * these functions all return newly allocated strings (which the user is
- * required to free once finished with them)
- */
+#include <stdlib.h>
+#include <string.h>
 
-/*
- * return the file part of the path (everything after the final /)
- */
-extern char *dir_get_file(const char *path)
+extern char *dir_get_file(const char * const restrict p)
 {
-    char *p = strdup(path);
-    if (!p)
+    char * const restrict z = strdup(p);
+    if (!z)
         return NULL;
-    char *f = strrchr(p, ':');
-    char *e = strchr(p, ':') ? : p + strlen(p);
+    const char * const restrict f = strrchr(z, ':');
+    char * const restrict e = strchr(z, ':') ? : z + strlen(z);
     char *r = NULL;
     *e = 0x00;
-    if (!strrchr(path, '/'))
-        r = strndup(path, f - p);
+    if (!strrchr(p, '/'))
+        r = strndup(p, f - z);
     else
-        r = strndup(strrchr(p, '/') + 1, f - strrchr(p, '/'));
-    free(p);
+        r = strndup(strrchr(z, '/') + 1, f - strrchr(z, '/'));
+    free(z);
     return r;
 }
 
-/*
- * calculate how deep in the hierarchy we are (count number of '/')
- */
-extern uint16_t dir_get_deep(const char *path)
+extern uint16_t dir_get_deep(const char * const restrict p)
 {
-    if (!strlen(path))
+    if (!strlen(p))
         return 0;
     uint16_t c = 0;
-    if (path[0] != '/')
+    if (p[0] != '/')
         c++;
-    char *p = strdup(path);
-    if (!p)
+    char * restrict z = strdup(p);
+    if (!z)
         return 0;
-    char *e = strchr(p, ':') ? : p + strlen(p);
+    char * const restrict e = strchr(z, ':') ? : z + strlen(z);
     *e = 0x00;
-    while ((p = strchr(p, '/')))
-        if (++p >= e) /* if we run past the end of the string break */
+    while ((z = strchr(z, '/')))
+        if (++z >= e) /* if we run past the end of the string break */
             break;
         else
             c++;
-    free(p);
+    free(z);
     return ++c;
 }
 
-/*
- * return a particular directory name from with the hierarchy
- */
-extern char *dir_get_part(const char *path, uint16_t part)
+extern char *dir_get_part(const char * const restrict p, const uint16_t x)
 {
-    if (part > dir_get_deep(path))
+    if (x > dir_get_deep(p))
         return NULL;
-    char *p = strdup(path);
-    if (!p)
+    char *z = strdup(p);
+    if (!z)
         return NULL;
-    char *x = p;
     char *s = NULL;
-    for (uint16_t i = 0; i <= part; i++)
-        s = strsep(&p, "/");
-    free(x);
+    for (uint16_t i = 0; i <= x; i++)
+        s = strsep(&z, "/");
     return s;
 }
 
-/*
- * return the password associated with the file
- */
-extern char *dir_get_pass(const char *path)
+extern char *dir_get_pass(const char * const restrict p)
 {
-    if (!strrchr(path, ':'))
+    if (!strrchr(p, ':'))
         return strdup("");
-    return strdup(strrchr(path, ':') + 1);
+    return strdup(strrchr(p, ':') + 1);
 }
 
-/*
- * return the directory part of the path (everything up to the final /)
- */
-extern char *dir_get_path(const char *path)
+extern char *dir_get_path(const char * const restrict p)
 {
-    return strndup(path, strrchr(path, '/') - path);
+    return strndup(p, strrchr(p, '/') - p);
 }

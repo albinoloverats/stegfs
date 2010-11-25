@@ -24,14 +24,12 @@
     #include "src/lib-stegfs.h"
 
     #define APP "stegfs"
-    #define VER "201001"
+    #define VER "201001+"
     #ifdef DEBUGGING
         #define LOG "LOG"
     #else /*    DEBUGGING */
         #define LOG NULL
     #endif /* ! DEBUGGING */
-
-    #define DEFAULT_SIZE_PAGE   4096    /* the number of bytes given us by the kernel/fuse module */
 
     #define FILE_ROOT "/"
     #define FILE_PROC FILE_ROOT "+proc"

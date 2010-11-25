@@ -18,13 +18,20 @@
  *
  */
 
-#include <time.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <ctype.h>
+#include <string.h>
+#include <inttypes.h>
+#include <stdbool.h>
+#include <time.h>
 #include <fcntl.h>
 #include <getopt.h>
-#include <mcrypt.h>
+#include <errno.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <mcrypt.h>
+#include <libintl.h>
 
 #include "common/common.h"
 
@@ -100,7 +107,7 @@ int main(int argc, char **argv)
              */
             if ((fs = open(fs_name, O_WRONLY | F_WRLCK, S_IRUSR | S_IWUSR)) < 0)
                 die(_("could not open the block device"));
-            fs_size = lseek(fs, 0, SEEK_END) / SB_1MB;
+            fs_size = lseek(fs, 0, SEEK_END) / RATIO_BYTE_MB;
             break;
         case S_IFDIR:
         case S_IFCHR:
@@ -131,7 +138,7 @@ int main(int argc, char **argv)
     if (restore)
     {
         msg(_("restoring superblock on %s"), fs_name);
-        fs_blocks = lseek(fs, 0, SEEK_END) / SB_BLOCK;
+        fs_blocks = lseek(fs, 0, SEEK_END) / SIZE_BYTE_BLOCK;
     }
     else
     {
@@ -145,19 +152,19 @@ int main(int argc, char **argv)
          * user
          */
         msg(_("location      : %s"), fs_name);
-        fs_blocks = fs_size * SB_1MB / SB_BLOCK;
+        fs_blocks = fs_size * RATIO_BYTE_MB / SIZE_BYTE_BLOCK;
         msg(_("total blocks  : %8ju"), fs_blocks);
         {
             char *units = strdup("MB");
             float volume = fs_size;
-            if (volume >= SM_1TB)
+            if (volume >= RATIO_MB_TB)
             {
-                volume /= SM_1TB;
+                volume /= RATIO_MB_TB;
                 units = strdup("TB");
             }
-            else if (volume >= SM_1GB)
+            else if (volume >= RATIO_MB_GB)
             {
-                volume /= SM_1GB;
+                volume /= RATIO_MB_GB;
                 units = strdup("GB");
             }
             msg(_("volume        : %8.2f %s"), volume, units);
@@ -165,16 +172,16 @@ int main(int argc, char **argv)
         }
         {
             char *units = strdup("MB");
-            float fs_data = fs_size * SB_DATA;
-            fs_data /= SB_BLOCK;
-            if (fs_data >= SM_1TB)
+            float fs_data = fs_size * SIZE_BYTE_DATA;
+            fs_data /= SIZE_BYTE_BLOCK;
+            if (fs_data >= RATIO_MB_TB)
             {
-                fs_data /= SM_1TB;
+                fs_data /= RATIO_MB_TB;
                 units = strdup("TB");
             }
-            else if (fs_data >= SM_1GB)
+            else if (fs_data >= RATIO_MB_GB)
             {
-                fs_data /= SM_1GB;
+                fs_data /= RATIO_MB_GB;
                 units = strdup("GB");
             }
             msg(_("data capacity : %8.2f %s"), fs_data, units);
@@ -182,17 +189,17 @@ int main(int argc, char **argv)
         }
         {
             char *units = strdup("MB");
-            float fs_avail = fs_size * SB_DATA;
-            fs_avail /= SB_BLOCK;
+            float fs_avail = fs_size * SIZE_BYTE_DATA;
+            fs_avail /= SIZE_BYTE_BLOCK;
             fs_avail /= MAX_COPIES;
-            if (fs_avail >= SM_1TB)
+            if (fs_avail >= RATIO_MB_TB)
             {
-                fs_avail /= SM_1TB;
+                fs_avail /= RATIO_MB_TB;
                 units = strdup("TB");
             }
-            else if (fs_avail >= SM_1GB)
+            else if (fs_avail >= RATIO_MB_GB)
             {
-                fs_avail /= SM_1GB;
+                fs_avail /= RATIO_MB_GB;
                 units = strdup("GB");
             }
             msg(_("usable space  : %8.2f %s"), fs_avail, units);
@@ -204,11 +211,11 @@ int main(int argc, char **argv)
         lseek(fs, 0, SEEK_SET);
         for (uint64_t i = 0; i < fs_size; i++)
         {
-            stegfs_block_t buffer[BLOCK_PER_MB];
+            stegfs_block_t buffer[BLOCKS_PER_MB];
 
-            for (uint16_t j = 0; j < BLOCK_PER_MB; j++)
+            for (uint16_t j = 0; j < BLOCKS_PER_MB; j++)
             {
-                uint8_t path[SB_PATH] =
+                uint8_t path[SIZE_BYTE_PATH] =
                 {
                     0x1B, 0x9D, 0xCC, 0x02,
                     0xA6, 0xAF, 0x57, 0xA1,
@@ -218,23 +225,23 @@ int main(int argc, char **argv)
                 /*
                  * using 8bit bytes makes using rand48() easier
                  */
-                uint8_t data[SB_DATA];
-                uint8_t hash[SB_HASH];
-                uint8_t next[SB_NEXT];
+                uint8_t data[SIZE_BYTE_DATA];
+                uint8_t hash[SIZE_BYTE_HASH];
+                uint8_t next[SIZE_BYTE_NEXT];
 
-                for (uint8_t k = 0; k < SB_DATA; k++)
+                for (uint8_t k = 0; k < SIZE_BYTE_DATA; k++)
                     data[k] = mrand48();
-                for (uint8_t k = 0; k < SB_HASH; k++)
+                for (uint8_t k = 0; k < SIZE_BYTE_HASH; k++)
                     hash[k] = mrand48();
-                for (uint8_t k = 0; k < SB_NEXT; k++)
+                for (uint8_t k = 0; k < SIZE_BYTE_NEXT; k++)
                     next[k] = mrand48();
 
-                memcpy(buffer[j].path, path, SB_PATH);
-                memcpy(buffer[j].data, data, SB_DATA);
-                memcpy(buffer[j].hash, hash, SB_HASH);
-                memcpy(buffer[j].next, next, SB_NEXT);
+                memcpy(buffer[j].path, path, SIZE_BYTE_PATH);
+                memcpy(buffer[j].data, data, SIZE_BYTE_DATA);
+                memcpy(buffer[j].hash, hash, SIZE_BYTE_HASH);
+                memcpy(buffer[j].next, next, SIZE_BYTE_NEXT);
             }
-            if (write(fs, buffer, SB_1MB) != SB_1MB)
+            if (write(fs, buffer, RATIO_BYTE_MB) != RATIO_BYTE_MB)
                 msg(_("could not create the file system"));
         }
     }
@@ -244,19 +251,19 @@ int main(int argc, char **argv)
     {
         stegfs_block_t sb;
 
-        char sid[SB_PATH] = { 0x00 };
+        char sid[SIZE_BYTE_PATH] = { 0x00 };
         strncpy(sid + 1, SUPER_ID, sizeof( sid ) - 2);
         sid[0x00] = 0x02;
         sid[0x0F] = 0x03;
-        memcpy(sb.path, sid, SB_PATH);
+        memcpy(sb.path, sid, SIZE_BYTE_PATH);
 
-        memset(sb.data, 0xFF, SB_DATA);
+        memset(sb.data, 0xFF, SIZE_BYTE_DATA);
 
         sb.hash[0] = MAGIC_0;
         sb.hash[1] = MAGIC_1;
         sb.hash[2] = MAGIC_2;
 
-        memcpy(sb.next, &fs_blocks, SB_NEXT);
+        memcpy(sb.next, &fs_blocks, SIZE_BYTE_NEXT);
 
         lseek(fs, 0, SEEK_SET);
         if ( write(fs, &sb, sizeof( stegfs_block_t )) != sizeof( stegfs_block_t ))
@@ -279,10 +286,10 @@ uint64_t size_in_mb(char *s)
     switch (toupper(f[0]))
     {
         case 'T':
-            v *= SM_1TB;
+            v *= RATIO_MB_TB;
             break;
         case 'G':
-            v *= SM_1GB;
+            v *= RATIO_MB_GB;
             break;
         case 'M':
         case '\0':
