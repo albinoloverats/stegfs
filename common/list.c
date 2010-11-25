@@ -18,18 +18,15 @@
  *
  */
 
-#include "common/common.h"
 #define _IN_LIST_
-#include "common/list.h"
-#undef _IN_LIST
+#include "list.h"
+#include "common.h"
 
-int compare_object(void *a, void *b)
-{
-    /*
-     * provided the objects in the list have an ->id, they can be compared using it
-     */
-    return ((compare_id_t *)a)->id - ((compare_id_t *)b)->id;
-}
+
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
+#include <unistd.h>
 
 extern list_t *list_create(void)
 {
@@ -72,9 +69,9 @@ extern void list_append(list_t **l, void *o)
     return;
 }
 
-extern void list_remove(list_t **l, uint64_t i)
+extern void list_remove(list_t **l, const uint64_t i)
 {
-    uint64_t s = list_size(*l);
+    const uint64_t s = list_size(*l);
     if (i >= s)
         return;
     list_t *x = list_get(*l, i);
@@ -93,7 +90,7 @@ extern void list_remove(list_t **l, uint64_t i)
     return;
 }
 
-extern list_t *list_get(list_t *l, uint64_t i)
+extern list_t *list_get(list_t *l, const uint64_t i)
 {
     if (i >= list_size(l))
         return NULL;
@@ -138,13 +135,13 @@ extern list_t *list_split(list_t *l)
 
 extern list_t *list_sort(list_t **l)
 {
-    uint64_t s = list_size(*l);
+    const uint64_t s = list_size(*l);
     if (s <= 1)
         return *l;
     list_t *r = list_split(*l);
     *l = list_sort(l);
     r = list_sort(&r);
-    if (compare_object(list_find_last(*l)->object, list_find_first(r)->object) > 0)
+    if (list_generic_compare(list_find_last(*l)->object, list_find_first(r)->object) > 0)
         *l = list_msort(*l, r);
     else
         list_join(*l, r);
@@ -160,7 +157,7 @@ static list_t *list_msort(list_t *l, list_t *r)
     {
         l = list_find_first(l);
         r = list_find_first(r);
-        if (compare_object(l->object, r->object) <= 0)
+        if (list_generic_compare(l->object, r->object) <= 0)
         {
             list_append(&a, l->object);
             list_remove(&l, 0);
@@ -181,7 +178,7 @@ static list_t *list_msort(list_t *l, list_t *r)
 }
 
 
-static list_t *list_find_first(list_t *l)
+static list_t *list_find_first(list_t *const restrict l)
 {
     list_t *x = l;
     while (true)
@@ -192,7 +189,7 @@ static list_t *list_find_first(list_t *l)
     return x;
 }
 
-static list_t *list_find_last(list_t *l)
+static list_t *list_find_last(list_t * const restrict l)
 {
     list_t *x = l;
     while (true)
@@ -201,4 +198,9 @@ static list_t *list_find_last(list_t *l)
         else
             x = x->next;
     return x;
+}
+
+static inline int list_generic_compare(void *a, void *b)
+{
+    return ((compare_id_t *)a)->id - ((compare_id_t *)b)->id;
 }

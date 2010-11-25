@@ -1,3 +1,21 @@
+# Common code translations - German language file
+# Copyright (c) 2010, albinoloverats ~ Software Development
+# This file is distributed under the same license as the application.
+# Ashley Anderson <amanderson@albinoloverats.net>, 2010.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: albinoloverats.net Common code\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2010-05-21 10:34+0100\n"
+"PO-Revision-Date: 2010-05-21 11:06+0100\n"
+"Last-Translator: Ashley Anderson <amanderson@albinoloverats.net>\n"
+"Language-Team: albinoloverats ~ Software Development <webmaster@albinoloverats.net>\n"
+"Language: de\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=iso-8859-1\n"
+"Content-Transfer-Encoding: 8bit\n"
+
 msgid "unknown option %c"
 msgstr "unbekannte option %c"
 

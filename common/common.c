@@ -20,10 +20,18 @@
 
 #include "common.h"
 
-static bool  c_sig = false;
-static char *c_app = NULL;
-static char *c_ver = NULL;
-static FILE *LOG_FILE = NULL;
+#include <stdarg.h>
+#include <string.h>
+#include <stdbool.h>
+#include <signal.h>
+#include <ctype.h>
+#include <errno.h>
+#include <time.h>
+
+static bool c_sig = false;
+/*@null@*/static char *c_app = NULL;
+/*@null@*/static char *c_ver = NULL;
+/*@null@*/static FILE *LOG_FILE = NULL;
 
 extern void init(const char * const restrict a, const char * const restrict v, const char * const restrict f)
 {
@@ -34,9 +42,6 @@ extern void init(const char * const restrict a, const char * const restrict v, c
     c_ver = strdup(v);
     if ((signal(SIGTERM, sigint) == SIG_ERR) || (signal(SIGINT, sigint) == SIG_ERR) || (signal(SIGQUIT, sigint) == SIG_ERR))
         die(_("could not set signal handler"));
-    /*
-     * set locale
-     */
 #if 0
     setlocale(LC_ALL, "");
     bindtextdomain(c_app, "/usr/share/locale");
@@ -52,51 +57,45 @@ extern void init(const char * const restrict a, const char * const restrict v, c
     return;
 }
 
-extern conf_t **config(const char * const restrict f)
+/*@null@*/extern conf_t **config(const char * const restrict f)
 {
-    FILE *file = fopen(f, "r");
+    FILE * const restrict file = fopen(f, "r");
     if (!file)
     {
         msg(_("could not open configuration file %s"), f);
         return NULL;
     }
-    conf_t **x  = malloc(sizeof(conf_t *));
+    conf_t ** restrict x = malloc(sizeof( conf_t * ));
     x[0] = NULL;
     size_t i = 0;
-
-    char  *line = NULL;
+    char *line = NULL;
     size_t size = 0;
     while (getline(&line, &size, file) != -1)
     {
         if (line[0] != '#' && line[0] != '\n')
         {
-            char *l = strdup(line);
-            char *o = strtok(l, " \t\n\r#");
-            char *v = strtok(NULL, "\t\n\r#"); /* don't delimit by space this time */
-
+            char * const restrict l = strdup(line);
+            const char * const restrict o = strtok(l, " \t\n\r#");
+            const char * const restrict v = strtok(NULL, "\t\n\r#"); /* don't delimit by space this time */
             if (o && v && strlen(o) && strlen(v))
             {
                 if (!(x = realloc(x, (i + 2) * sizeof( conf_t * ))))
                     die(_("out of memory @ %s:%i"), __FILE__, __LINE__ - 1);
                 if (!(x[i] = malloc(sizeof( conf_t ))))
                     die(_("out of memory @ %s:%i"), __FILE__, __LINE__ - 1);
-
                 if (!(x[i]->option = strdup(o)))
                     die(_("out of memory @ %s:%i"), __FILE__, __LINE__ - 1);
                 if (!(x[i]->value  = strdup(v)))
                     die(_("out of memory @ %s:%i"), __FILE__, __LINE__ - 1);
-
                 x[++i] = NULL;
             }
             free(l);
         }
-
         free(line);
         line = NULL;
         size = 0;
     }
     fclose(file);
-
     return x;
 }
 
@@ -121,7 +120,7 @@ extern int64_t show_version(void)
 
 extern void hex(void *v, uint64_t l)
 {
-    uint8_t *s = v;
+    const uint8_t * const s = v;
     char b[HEX_LINE_WIDTH] = { 0x00 };
     uint8_t c = 1;
     for (uint64_t i = 0; i < l; i++, c++)
@@ -137,13 +136,13 @@ extern void hex(void *v, uint64_t l)
     msg("%s", b);
 }
 
-extern void msg(const char *s, ...)
+extern void msg(const char * const restrict s, ...)
 {
     if (!s)
     {
         if (errno)
         {
-            char *e = strdup(strerror(errno));
+            char * const restrict e = strdup(strerror(errno));
             for (uint32_t i = 0; i < strlen(e); i++)
                 e[i] = tolower(e[i]);
             msg("%s", e);
@@ -162,13 +161,13 @@ extern void msg(const char *s, ...)
     va_end(ap);
 }
 
-extern void die(const char *s, ...)
+extern void die(const char * const restrict s, ...)
 {
     if (s)
         msg("%s", s);
     if (errno)
     {
-        char *e = strdup(strerror(errno));
+        char * const restrict e = strdup(strerror(errno));
         for (uint32_t i = 0; i < strlen(e); i++)
             e[i] = tolower(e[i]);
         msg("%s", e);
@@ -184,7 +183,7 @@ extern void sigint(int s)
         errno = ECANCELED;
         die(NULL);
     }
-    char *ss = NULL;
+    char * restrict ss = NULL;
     switch (s)
     {
         case SIGTERM:
@@ -218,7 +217,6 @@ extern ssize_t getline(char **lineptr, size_t *n, FILE *stream)
     size_t r = 0;
     uint32_t step = 0xFF;
     char *buffer = malloc(step);
-    
     for (r = 0; ; r++)
     {
         int c = fgetc(stream);
@@ -237,6 +235,5 @@ extern ssize_t getline(char **lineptr, size_t *n, FILE *stream)
         free(*lineptr);
     *lineptr = buffer;
     *n = r;
-
     return r;
 }
