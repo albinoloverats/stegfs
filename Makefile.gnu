@@ -23,8 +23,8 @@ mkfs:
 
 man:
 # compress the man page
-	 @gzip -c doc/stegfs.1 > doc/stegfs.1.gz
-	-@echo "compressed \`doc/stegfs.1' --> \`doc/stegfs.1.gz'"
+	 @gzip -c doc/stegfs.1 > stegfs.1.gz
+	-@echo "compressed \`doc/stegfs.1' --> \`stegfs.1.gz'"
 
 testfs:
 # build the testfs utility
@@ -43,11 +43,11 @@ install: $(PO_INSTALL)
 	 @install -c -m 755 -s -D -T mkstegfs $(PREFIX)/usr/bin/mkstegfs
 	-@echo "installed \`mkstegfs' --> \`$(PREFIX)/usr/bin/stegfs'"
 # finally the man page
-	 @install -c -m 644 -D -T doc/stegfs.1.gz $(PREFIX)/usr/man/man1/stegfs.1.gz
-	-@echo "installed \`doc/stegfs.1.gz' --> \`$(PREFIX)/usr/man/man1/stegfs.1.gz'"
+	 @install -c -m 644 -D -T stegfs.1.gz $(PREFIX)/usr/man/man1/stegfs.1.gz
+	-@echo "installed \`stegfs.1.gz' --> \`$(PREFIX)/usr/man/man1/stegfs.1.gz'"
 
 clean: $(PO_CLEAN)
-	-@/bin/rm -fv stegfs mkstegfs doc/stegfs.1.gz
+	-@/bin/rm -fv stegfs mkstegfs stegfs.1.gz
 
 distclean: clean
 	-@/bin/rm -fv teststegfs
