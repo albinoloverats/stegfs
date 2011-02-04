@@ -22,15 +22,19 @@
 #include "list.h"
 #include "common.h"
 
-
+#include <time.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 #include <unistd.h>
 
-extern list_t *list_create(void)
+extern list_t *list_create(int64_t (*fn)(const void * const restrict, const void * const restrict))
 {
-    return (void *)-1;
+    if (fn == NULL)
+        list_compare_function = list_generic_compare;
+    else
+        list_compare_function = fn;
+    return NEW_LIST;
 }
 
 extern void list_delete(list_t **l)
@@ -65,7 +69,6 @@ extern void list_append(list_t **l, void *o)
     n->prev = x;
     n->object = o;
     x->next = n;
-    list_sort(l);
     return;
 }
 
@@ -74,7 +77,7 @@ extern void list_remove(list_t **l, const uint64_t i)
     const uint64_t s = list_size(*l);
     if (i >= s)
         return;
-    list_t *x = list_get(*l, i);
+    list_t *x = list_move_to(*l, i);
     if (x->prev)
         x->prev->next = x->next;
     else
@@ -86,11 +89,10 @@ extern void list_remove(list_t **l, const uint64_t i)
     x->next = NULL;
     free(x);
     x = NULL;
-    list_sort(l);
     return;
 }
 
-extern list_t *list_get(list_t *l, const uint64_t i)
+extern list_t *list_move_to(list_t *l, const uint64_t i)
 {
     if (i >= list_size(l))
         return NULL;
@@ -98,6 +100,11 @@ extern list_t *list_get(list_t *l, const uint64_t i)
     for (uint64_t j = 0; j < i; j++)
         x = x->next;
     return x;
+}
+
+extern void *list_get(list_t *l, const uint64_t i)
+{
+    return list_move_to(l, i)->object;
 }
 
 extern uint64_t list_size(list_t *l)
@@ -127,7 +134,7 @@ extern void list_join(list_t *l, list_t *m)
 
 extern list_t *list_split(list_t *l)
 {
-    list_t *m = list_get(l, list_size(l) / 2);
+    list_t *m = list_move_to(l, list_size(l) / 2);
     m->prev->next = NULL;
     m->prev = NULL;
     return m;
@@ -139,12 +146,22 @@ extern list_t *list_sort(list_t **l)
     if (s <= 1)
         return *l;
     list_t *r = list_split(*l);
-    *l = list_sort(l);
-    r = list_sort(&r);
-    if (list_generic_compare(list_find_last(*l)->object, list_find_first(r)->object) > 0)
-        *l = list_msort(*l, r);
-    else
-        list_join(*l, r);
+    return list_msort(list_sort(l), list_sort(&r));
+}
+
+extern list_t *list_shuffle(list_t **l)
+{
+    const uint64_t s = list_size(*l);
+    if (s <= 1)
+        return *l;
+    srand48(time(0));
+    for (uint64_t i = 0; i < SHUFFLE_FACTOR * s; i++)
+    {
+        uint64_t r = (lrand48() << 32 | lrand48()) % s;
+        void *x = list_get(*l, r);
+        list_remove(l, r);
+        list_append(l, x);
+    }
     return *l;
 }
 
@@ -152,12 +169,12 @@ static list_t *list_msort(list_t *l, list_t *r)
 {
     int64_t x = list_size(l);
     int64_t y = list_size(r);
-    list_t *a = list_create();
+    list_t *a = list_create(list_compare_function);
     while (x && y)
     {
         l = list_find_first(l);
         r = list_find_first(r);
-        if (list_generic_compare(l->object, r->object) <= 0)
+        if (list_compare_function(l->object, r->object) <= 0)
         {
             list_append(&a, l->object);
             list_remove(&l, 0);
@@ -177,8 +194,7 @@ static list_t *list_msort(list_t *l, list_t *r)
     return a;
 }
 
-
-static list_t *list_find_first(list_t *const restrict l)
+static list_t *list_find_first(list_t * const restrict l)
 {
     list_t *x = l;
     while (true)
@@ -200,7 +216,23 @@ static list_t *list_find_last(list_t * const restrict l)
     return x;
 }
 
-static inline int list_generic_compare(void *a, void *b)
+static int64_t list_generic_compare(const void * const restrict a, const void * const restrict b)
 {
+    msg("using generic comparison function");
     return ((compare_id_t *)a)->id - ((compare_id_t *)b)->id;
+}
+
+extern void list_debug(list_t *l)
+{
+    list_t *x = list_find_first(l);
+    uint64_t i = 0;
+    while (true)
+    {
+        msg("object %02lu: %16p << %16p >> %16p = %p [%lu]", i, x->prev, x, x->next, x->object, x->object ? ((compare_id_t *)x->object)->id : (uint64_t)-1);
+        x = x->next;
+        if (!x)
+            break;
+        i++;
+    }
+    return;
 }

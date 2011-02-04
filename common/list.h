@@ -31,10 +31,6 @@
      * through the list, split lists and merge them back together
      */
 
-    /*
-     * TODO provide a way to compare any object type - accept pointer to function at init
-     */
-
     #include <inttypes.h>
 
     #include "common.h"
@@ -67,22 +63,42 @@
     }
     compare_id_t;
 
-    //typedef list_t * LIST;
+    /*!
+     * \brief  Constant for new and empty list object
+     *
+     * This constant is used to indicate a newly created list
+     */
+    #define NEW_LIST (void *)-1
 
     /*!
-     * \brief   Create a new list_t
-     * \return  Newly created list_t structure
+     * \brief  Number of iterations through the list when shuffling
+     *
+     * The shuffle function will work through the list this number of times
+     * in an attempt to ensure that the list is shuffled sufficiently
+     */
+    #define SHUFFLE_FACTOR 4
+
+    //typedef list_t * LIST;
+
+    /*
+     * TODO find a way to make the function pointer optional; overload
+     * the function with either 0 or 1 parameters
+     */
+    /*!
+     * \brief          Create a new list_t
+     * \param[in]  fn  Function pointer used to compare objects in the list
+     * \return         Newly created list_t structure
      *
      * Create a new list which is ready to have objects inserted into it
      */
-    extern list_t *list_create(void);
+    extern list_t *list_create(int64_t (*fn)(const void * const restrict, const void * const restrict));
 
     /*!
      * \brief         Delete a list_t
      * \param[in]  l  The list_t to delete and free
      *
      * Delete a list, removing any remaining elements and freeing associated
-     * memory
+     * memory NB does not free objects within the list, only list elements
      */
     extern void list_delete(list_t **l) __attribute__((nonnull(1)));
 
@@ -91,7 +107,7 @@
      * \param[in]  l  List to add object to
      * \param[in]  o  The object to add
      *
-     * Insert a new object into the list, ensuring the list is then sorted
+     * Append a new object onto the tail end of the list
      */
     extern void list_append(list_t **l, void *o) __attribute__((nonnull(1, 2)));
 
@@ -105,14 +121,24 @@
     extern void list_remove(list_t **l, const uint64_t i) __attribute__((nonnull(1)));
 
     /*!
-     * \brief         Get the i'th object from the list
+     * \brief         Move to the i'th object from the list
      * \param[in]  l  The list to search through
      * \param[in]  i  The index of the object
-     * \return        The object
+     * \return        The list object at i
      *
      * Move along the list to the container around the object at the given index
      */
-    extern list_t *list_get(list_t *l, const uint64_t i) __attribute__((nonnull(1)));
+    extern list_t *list_move_to(list_t *l, const uint64_t i) __attribute__((nonnull(1)));
+
+    /*!
+     * \brief         Get the i'th object from the list
+     * \param[in]  l  The list to search through
+     * \param[in]  i  The index of the object
+     * \return        A pointer to the object at i
+     *
+     * Get the object at the given position within the list
+     */
+    extern void *list_get(list_t *l, const uint64_t i) __attribute__((nonnull(1)));
 
     /*!
      * \brief         Return the number of elements in the list
@@ -147,11 +173,29 @@
      * \param[in,out]  l  The list to sort. The sorted list
      * \return            The sorted list
      *
-     * Sort the list. This shouldn't be all that necessary as objects are
-     * inserted and sorted straight away keeping the list, mostly, sorted
+     * Sort the list using the comparison function provided when the list was created
      */
     extern list_t *list_sort(list_t **l) __attribute__((nonnull(1)));
 
+    /*!
+     * \brief             Randomly shuffle this list
+     * \param[in,out]  l  The list of shuffle. The shuffled list
+     * \return            The shuffled list
+     *
+     * Randomly shuffle the items in the list
+     */
+    extern list_t *list_shuffle(list_t **l) __attribute__((nonnull(1)));
+
+    #ifdef _DEBUG_ON_
+        /*!
+         * \brief         Print out the list structure
+         * \param[in]  l  The list to print the structure of
+         *
+         * Print out the structure of the list: all the elements and their values as well as the
+         * pointers to the previous/next elements
+         */
+        extern void list_debug(list_t *l);
+    #endif
 #endif
 
 #ifdef _IN_LIST_
@@ -191,7 +235,18 @@
      *
      * A generic compare function which checks the objects for an ->id (as in compare_id_t)
      */
-    static inline int list_generic_compare(void *a, void *b) __attribute__((nonnull(1, 2)));
+    static int64_t list_generic_compare(const void * const restrict a, const void * const restrict b) __attribute__((nonnull(1,2)));
+
+    /*!
+     * \brief         Function pointer for list comparison function
+     * \param[in]  a  A pointer to an object
+     * \param[in]  b  A pointer to an object
+     * \return        Whether objects differ (see: strcmp)
+     *
+     * Internal function pointer which points to the function to be used for comparing
+     * objects in the list
+     */
+    static int64_t (*list_compare_function)(const void * const restrict a, const void * const restrict b);
 
     #undef _IN_LIST_
 #endif
