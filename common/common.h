@@ -1,6 +1,6 @@
 /*
  * Common code shared between projects
- * Copyright (c) 2009-2010, albinoloverats ~ Software Development
+ * Copyright (c) 2009-2011, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -24,7 +24,7 @@
     /*!
      * \file    common.h
      * \author  albinoloverats ~ Software Development
-     * \date    2009-2010
+     * \date    2009-2011
      * \brief   Common code shared between projects
      *
      * Common code, mostly used for application initialisation. Such as
@@ -41,20 +41,33 @@
 
     #ifndef _WIN32
         #ifndef O_BINARY
-            #define O_BINARY NOTSET  /*!< Value is only relevant on MS systems (and is required), pretend it exists elsewhere */
+            #define O_BINARY NOTSET /*!< Value is only relevant on MS systems (and is required), pretend it exists elsewhere */
         #endif
     #else
-        #define srand48 srand    /*!< Quietly alias srand48 to be srand on Windows */
-        #define lrand48 rand     /*!< Quietly alias lrand48 to be rand on Windows */
-        #define F_RDLCK NOTSET   /*!< If value doesn't exist on Windows, ignore it */
-        #define F_WRLCK NOTSET   /*!< If value doesn't exist on Windows, ignore it */
-        #define O_FSYNC NOTSET   /*!< If value doesn't exist on Windows, ignore it */
+        #define srand48 srand  /*!< Quietly alias srand48 to be srand on Windows */
+        #define lrand48 rand   /*!< Quietly alias lrand48 to be rand on Windows */
+        #define F_RDLCK NOTSET /*!< If value doesn't exist on Windows, ignore it */
+        #define F_WRLCK NOTSET /*!< If value doesn't exist on Windows, ignore it */
+        #define O_FSYNC NOTSET /*!< If value doesn't exist on Windows, ignore it */
         #ifndef SIGQUIT
             #define SIGQUIT SIGBREAK /*!< If value doesn't exist on Windows, use next closest match */
         #endif
     #endif
 
     #define _(s) gettext(s) /*!< Allow use of _() to refer to gettext() */
+
+    #define COMMON_CONCAT(A, B) COMMON_CONCAT2(A, B) /*!< Function overloading argument concatination (part 1) */
+    #define COMMON_CONCAT2(A, B) A ## B              /*!< Function overloading argument concatination (part 2) */
+
+    /*@ignore@*/
+    #define COMMON_ARGS_COUNT(...) COMMON_ARGS_COUNT2(__VA_ARGS__, 3, 2, 1) /*!< Function overloading argument count (part 1) */
+    #define COMMON_ARGS_COUNT2(_1, _2, _3, _, ...) _                        /*!< Function overloading argument count (part 2) */
+
+    #define init0() init3("", "N/A", NULL)                                             /*!< Silently call init3() as init2() with NULL as the final parameter */
+    #define init1(A) init3(A, "N/A", NULL)                                             /*!< Silently call init3() as init2() with NULL as the final parameter */
+    #define init2(A, B) init3(A, B, NULL)                                              /*!< Silently call init3() as init2() with NULL as the final parameter */
+    #define init(...) COMMON_CONCAT(init, COMMON_ARGS_COUNT(__VA_ARGS__))(__VA_ARGS__) /*!< Allow init() to be called with either 2 or 3 parameters */
+    /*@end@*/
 
     /*! Brief overview of the GNU General Public License */
     #define TEXT_LICENCE \
@@ -90,30 +103,28 @@
     conf_t;
 
     /*!
-     * \brief            Main application entry point
-     * \note             This function is declared here, but defined in the application source
-     * \param[in]  argc  Number of command line options
-     * \param[in]  argv  Array of command line options
+     * \brief         Initialisation of signal handler and locale settings
+     * \param[in]  a  The application name to use when displaying messages
+     * \param[in]  v  The version of the application
+     * \param[in]  f  (Optional) A file name to log messages to; defaults to stderr
      *
-     * Main function; application entry point. Define MAIN_VOID to use main
-     * function which takes no arguments
+     * Application initialisation, such as log/error output, signal handling
+     * and user displayed version details
+     *
+     * \fn extern void init(const char * const restrict a, const char * const restrict v, const char * const restrict f) __attribute__((nonnull(1, 2)));
      */
-    #ifndef MAIN_VOID
-        int main(int argc, char **argv);
-    #else
-        int main(void);
-    #endif
 
     /*!
      * \brief         Initialisation of signal handler and locale settings
      * \param[in]  a  The application name to use when displaying messages
      * \param[in]  v  The version of the application
-     * \param[in]  f  A file name to log messages to; if NULL, stderr is used
+     * \param[in]  f  (Optional) A file name to log messages to; defaults to stderr
      *
-     * Application initialisation, such as log/error output, signal handling
-     * and user displayed version details
+     * Hidden initialisation function - called by init() after optional parameter is added
+     * if needed - a crud form of overloading in C; NB: don't call this function, use init()
+     * instead
      */
-    extern void init(const char * const restrict a, const char * const restrict v, const char * const restrict f) __attribute__((nonnull(1, 2)));
+    extern void init3(const char * const restrict a, const char * const restrict v, const char * const restrict f) __attribute__((nonnull(1, 2)));
 
     /*!
      * \brief         Parse configuration file for options
@@ -200,12 +211,12 @@
     extern void sigint(int s);
 
     /*!
-     * \brief         Wait for the specified number of milliseconds
+     * \brief         Wait (or chill out) for the specified number of milliseconds
      * \param[in]  s  Number of milliseconds
      *
      * Pause application execution for the given number of milliseconds
      */
-    extern void wait(uint32_t s);
+    extern void chill(uint32_t s);
 
 	/*!
 	 * \brief  Wrapper function for systems without getline (ie BSD)

@@ -1,6 +1,6 @@
 /*
  * Common code shared between projects
- * Copyright (c) 2009-2010, albinoloverats ~ Software Development
+ * Copyright (c) 2009-2011, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -33,15 +33,15 @@ static bool c_sig = false;
 /*@null@*/static char *c_ver = NULL;
 /*@null@*/static FILE *LOG_FILE = NULL;
 
-extern void init(const char * const restrict a, const char * const restrict v, const char * const restrict f)
+extern void init3(const char * const restrict a, const char * const restrict v, const char * const restrict f)
 {
     errno = 0;
     if (c_app)
         return;
-    c_app = strdup(a);
-    c_ver = strdup(v);
+    /*@i1@*/c_app = strdup(a);
+    /*@i1@*/c_ver = strdup(v);
     if ((signal(SIGTERM, sigint) == SIG_ERR) || (signal(SIGINT, sigint) == SIG_ERR) || (signal(SIGQUIT, sigint) == SIG_ERR))
-        die(_("could not set signal handler"));
+        /*@i1@*/die(_("could not set signal handler"));
 #if 0
     setlocale(LC_ALL, "");
     bindtextdomain(c_app, "/usr/share/locale");
@@ -62,7 +62,7 @@ extern void init(const char * const restrict a, const char * const restrict v, c
     FILE * const restrict file = fopen(f, "r");
     if (!file)
     {
-        msg(_("could not open configuration file %s"), f);
+        /*@i1@*/msg(_("could not open configuration file %s"), f);
         return NULL;
     }
     conf_t ** restrict x = malloc(sizeof( conf_t * ));
@@ -204,7 +204,7 @@ extern void sigint(int s)
     c_sig = true;
 }
 
-extern void wait(uint32_t s)
+extern void chill(uint32_t s)
 {
     div_t a = div(s, 1000);
     struct timespec t = { a.quot, a.rem * 10 };
