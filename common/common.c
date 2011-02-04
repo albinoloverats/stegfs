@@ -51,52 +51,49 @@ extern void init3(const char * const restrict a, const char * const restrict v, 
      * log to a file if we can, else revert to stderr
      */
     if (f)
-        LOG_FILE = fopen(f, "w");
+        redirect_log(f);
     if (!LOG_FILE)
         LOG_FILE = stderr;
     return;
 }
 
-/*@null@*/extern conf_t **config(const char * const restrict f)
+extern void redirect_log(const char * const restrict f)
 {
-    FILE * const restrict file = fopen(f, "r");
+    /*
+     * log to a file if we can, else revert to stderr
+     */
+    if (f)
+        LOG_FILE = fopen(f, "a");
+    if (!LOG_FILE)
+        LOG_FILE = stderr;
+}
+
+/*@null@*/extern list_t *config(const char * const restrict f)
+{
+    FILE *file = fopen(f, "r");
     if (!file)
     {
-        /*@i1@*/msg(_("could not open configuration file %s"), f);
+        msg(_("could not open configuration file %s"), f);
         return NULL;
     }
-    conf_t ** restrict x = malloc(sizeof( conf_t * ));
-    x[0] = NULL;
-    size_t i = 0;
-    char *line = NULL;
+ 
+    list_t *list = list_create(NULL);
+    char  *line = NULL;
     size_t size = 0;
-    while (getline(&line, &size, file) != -1)
+    while (getline(&line, &size, file) >= 0)
     {
         if (line[0] != '#' && line[0] != '\n')
         {
-            char * const restrict l = strdup(line);
-            const char * const restrict o = strtok(l, " \t\n\r#");
-            const char * const restrict v = strtok(NULL, "\t\n\r#"); /* don't delimit by space this time */
-            if (o && v && strlen(o) && strlen(v))
-            {
-                if (!(x = realloc(x, (i + 2) * sizeof( conf_t * ))))
-                    die(_("out of memory @ %s:%i"), __FILE__, __LINE__ - 1);
-                if (!(x[i] = malloc(sizeof( conf_t ))))
-                    die(_("out of memory @ %s:%i"), __FILE__, __LINE__ - 1);
-                if (!(x[i]->option = strdup(o)))
-                    die(_("out of memory @ %s:%i"), __FILE__, __LINE__ - 1);
-                if (!(x[i]->value  = strdup(v)))
-                    die(_("out of memory @ %s:%i"), __FILE__, __LINE__ - 1);
-                x[++i] = NULL;
-            }
-            free(l);
+            conf_t *c = calloc(1, sizeof( conf_t * ));
+            char *l = strdup(line);
+            c->option = strdup(strsep(&l, " \t\n\r#"));
+            c->value = strdup(strsep(&l, "\n\r#")); /* don't delimit by space this time, only end of line or start of comment */
+            list_append(&list, c);
         }
-        free(line);
-        line = NULL;
-        size = 0;
     }
+    free(line);
     fclose(file);
-    return x;
+    return list;
 }
 
 extern int64_t show_licence(void)

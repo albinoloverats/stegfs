@@ -1,6 +1,6 @@
 /*
  * Common code for implementing a linked list
- * Copyright (c) 2009-2010, albinoloverats ~ Software Development
+ * Copyright (c) 2009-2011, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify

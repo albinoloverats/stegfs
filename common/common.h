@@ -37,6 +37,8 @@
     #include <inttypes.h>
     #include <libintl.h>
 
+    #include "list.h"
+
     #define NOTSET 0 /*!< Value to use when nothing else is available */
 
     #ifndef _WIN32
@@ -127,15 +129,24 @@
     extern void init3(const char * const restrict a, const char * const restrict v, const char * const restrict f) __attribute__((nonnull(1, 2)));
 
     /*!
+     * \brief         Redirect STDERR
+     * \param[in]  f  A file name to log messages to; if NULL, stderr is used
+     *
+     * Useful for redirecting error messages to a log file after the application
+     * has started if running as a daemon
+     */
+    extern void redirect_log(const char * const restrict f) __attribute__((nonnull(1)));
+
+    /*!
      * \brief         Parse configuration file for options
      * \param[in]  f  Configuration file to parse
-     * \return        Pointer to array of parameters
+     * \return        Pointer to a list_t of parameters
      *
      * Configuration file parser. Will read through a config file and build a
      * array of option/value pairs which can then be easily dealt with by the
      * application
      */
-    /*@null@*/extern conf_t **config(const char const * restrict f) __attribute__((nonnull(1)));
+    /*@null@*/extern list_t *config(const char const * restrict f) __attribute__((nonnull(1)));
 
     /*!
      * \brief   Show list of command line options

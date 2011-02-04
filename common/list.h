@@ -1,6 +1,6 @@
 /*
  * Common code for implementing a linked list
- * Copyright (c) 2009-2010, albinoloverats ~ Software Development
+ * Copyright (c) 2009-2011, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -32,8 +32,6 @@
      */
 
     #include <inttypes.h>
-
-    #include "common.h"
 
     /*!
      * \brief  A single list item object
@@ -199,54 +197,58 @@
 #endif
 
 #ifdef _IN_LIST_
-    /*!
-     * \brief         Perform the merge part of mergesort
-     * \param[in]  l  1/2 the list to merge
-     * \param[in]  r  1/2 the list to merge
-     * \return        The merged result
-     *
-     * Internal function to perform the merge in the merge sort algorithm
-     */
-    static list_t *list_msort(list_t *l, list_t *r) __attribute__((nonnull(1, 2)));
+    #ifndef _BEEN_IN_LIST_
+        #define _BEEN_IN_LIST_
 
-    /*!
-     * \brief         Find the 1st element in the list
-     * \param[in]  l  The list
-     * \return        The 1st element
-     *
-     * Internal function to move to the first item in the list
-     */
-    static list_t *list_find_first(list_t * const restrict l) __attribute__((nonnull(1)));
+        /*!
+         * \brief         Perform the merge part of mergesort
+         * \param[in]  l  1/2 the list to merge
+         * \param[in]  r  1/2 the list to merge
+         * \return        The merged result
+         *
+         * Internal function to perform the merge in the merge sort algorithm
+         */
+        static list_t *list_msort(list_t *l, list_t *r) __attribute__((nonnull(1, 2)));
 
-    /*!
-     * \brief         Find the last element in the list
-     * \param[in]  l  The list
-     * \return        The last element
-     *
-     * Internal function to move to the last item in the list
-     */
-    static list_t *list_find_last(list_t * const restrict l) __attribute__((nonnull(1)));
+        /*!
+         * \brief         Find the 1st element in the list
+         * \param[in]  l  The list
+         * \return        The 1st element
+         *
+         * Internal function to move to the first item in the list
+         */
+        static list_t *list_find_first(list_t * const restrict l) __attribute__((nonnull(1)));
 
-    /*!
-     * \brief         A generic compare by ID
-     * \param[in]  a  A pointer to an object
-     * \param[in]  b  A pointer to an object
-     * \return        Whether objects differ (see: strcmp)
-     *
-     * A generic compare function which checks the objects for an ->id (as in compare_id_t)
-     */
-    static int64_t list_generic_compare(const void * const restrict a, const void * const restrict b) __attribute__((nonnull(1,2)));
+        /*!
+         * \brief         Find the last element in the list
+         * \param[in]  l  The list
+         * \return        The last element
+         *
+         * Internal function to move to the last item in the list
+         */
+        static list_t *list_find_last(list_t * const restrict l) __attribute__((nonnull(1)));
 
-    /*!
-     * \brief         Function pointer for list comparison function
-     * \param[in]  a  A pointer to an object
-     * \param[in]  b  A pointer to an object
-     * \return        Whether objects differ (see: strcmp)
-     *
-     * Internal function pointer which points to the function to be used for comparing
-     * objects in the list
-     */
-    static int64_t (*list_compare_function)(const void * const restrict a, const void * const restrict b);
+        /*!
+         * \brief         A generic compare by ID
+         * \param[in]  a  A pointer to an object
+         * \param[in]  b  A pointer to an object
+         * \return        Whether objects differ (see: strcmp)
+         *
+         * A generic compare function which checks the objects for an ->id (as in compare_id_t)
+         */
+        static int64_t list_generic_compare(const void * const restrict a, const void * const restrict b) __attribute__((nonnull(1,2)));
 
+        /*!
+         * \brief         Function pointer for list comparison function
+         * \param[in]  a  A pointer to an object
+         * \param[in]  b  A pointer to an object
+         * \return        Whether objects differ (see: strcmp)
+         *
+         * Internal function pointer which points to the function to be used for comparing
+         * objects in the list
+         */
+        static int64_t (*list_compare_function)(const void * const restrict a, const void * const restrict b);
+
+    #endif /* _BEEN_IN_LIST_ */
     #undef _IN_LIST_
 #endif
