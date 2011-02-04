@@ -1,6 +1,6 @@
 /*
  * stegfs ~ a steganographic file system for unix-like systems
- * Copyright (c) 2007-2010, albinoloverats ~ Software Development
+ * Copyright (c) 2007-2011, albinoloverats ~ Software Development
  * email: stegfs@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -195,7 +195,7 @@ static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t fill
                 uint64_t max = list_size(files);
                 for (uint64_t i = 0; i < max; i++)
                 {
-                    stegfs_cache_t *x = (stegfs_cache_t *)(list_get(files, i)->object);
+                    stegfs_cache_t *x = (stegfs_cache_t *)(list_move_to(files, i)->object);
                     if (!strcmp(p, PATH_PROC) && strlen(x->name))
                     {
                         char *f = NULL;
@@ -266,7 +266,7 @@ static int fuse_stegfs_read(const char *path, char *buf, size_t size, off_t offs
     uint64_t max = list_size(fuse_cache);
     for (uint64_t i = 0; i < max; i++)
     {
-        stegfs_file_t *this = (stegfs_file_t *)(list_get(fuse_cache, i)->object);
+        stegfs_file_t *this = (stegfs_file_t *)(list_move_to(fuse_cache, i)->object);
         if (this->id == info->fh)
         {
             if ((this->mode == STEGFS_READ) && (this->size))
@@ -301,7 +301,7 @@ static int fuse_stegfs_write(const char *path, const char *buf, size_t size, off
     uint64_t max = list_size(fuse_cache);
     for (uint64_t i = 0; i < max; i++)
     {
-        stegfs_file_t *this = (stegfs_file_t *)(list_get(fuse_cache, i)->object);
+        stegfs_file_t *this = (stegfs_file_t *)(list_move_to(fuse_cache, i)->object);
         if (this->id == info->fh)
         {
             if (this->mode == STEGFS_WRITE)
@@ -362,7 +362,7 @@ static int fuse_stegfs_open(const char *path, struct fuse_file_info *info)
         uint64_t max = list_size(fuse_cache);
         for (uint64_t i = 0; i < max; i++)
         {
-            stegfs_file_t *x = (stegfs_file_t *)(list_get(fuse_cache, i)->object);
+            stegfs_file_t *x = (stegfs_file_t *)(list_move_to(fuse_cache, i)->object);
             if (x->id > i)
             {
                 this->id = i;
@@ -409,7 +409,7 @@ static int fuse_stegfs_release(const char *path, struct fuse_file_info *info)
     uint64_t max = list_size(fuse_cache);
     for (uint64_t i = 0; i < max; i++)
     {
-        stegfs_file_t *this = (stegfs_file_t *)(list_get(fuse_cache, i)->object);
+        stegfs_file_t *this = (stegfs_file_t *)(list_move_to(fuse_cache, i)->object);
         if (this->id == info->fh)
         {
             found = true;
@@ -438,7 +438,7 @@ static int fuse_stegfs_flush(const char *path, struct fuse_file_info *info)
     uint64_t max = list_size(fuse_cache);
     for (uint64_t i = 0; i < max; i++)
     {
-        stegfs_file_t *this = (stegfs_file_t *)(list_get(fuse_cache, i)->object);
+        stegfs_file_t *this = (stegfs_file_t *)(list_move_to(fuse_cache, i)->object);
         if (this->id == info->fh)
         {
             found = true;
@@ -487,7 +487,7 @@ static int fuse_stegfs_chown(const char *path, uid_t uid, gid_t gid)
 
 int main(int argc, char **argv)
 {
-    init(APP, VER, LOG);
+    init(APP, VER);
 
     if (argc < ARGS_MINIMUM)
         return show_usage();
@@ -543,7 +543,7 @@ int main(int argc, char **argv)
 
     lib_stegfs_init(fs, do_cache);
 
-    fuse_cache = list_create();
+    fuse_cache = list_create(NULL);
     stegfs_file_t *x = calloc(1, sizeof( stegfs_file_t ));
     list_append(&fuse_cache, x);
 

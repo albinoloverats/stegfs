@@ -1,6 +1,6 @@
 /*
  * stegfs ~ a steganographic file system for unix-like systems
- * Copyright (c) 2007-2010, albinoloverats ~ Software Development
+ * Copyright (c) 2007-2011, albinoloverats ~ Software Development
  * email: stegfs@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -58,7 +58,7 @@ extern void lib_stegfs_init(const char * const restrict fs, const bool c)
          * allocate memory to store bitmap, and list of file names
          */
         file_system->bitmap = calloc(file_system->blocks / CHAR_BIT, sizeof( uint8_t ));
-        file_system->files = list_create();
+        file_system->files = list_create(NULL);
         stegfs_cache_t *x = calloc(1, sizeof( stegfs_cache_t ));
         x->id = 0;
         x->name = strdup("");
@@ -81,7 +81,7 @@ static void lib_stegfs_cache_add(const stegfs_file_t * const restrict file)
     const uint64_t max = list_size(file_system->files);
     for (uint64_t i = 0; i < max; i++)
     {
-        const stegfs_cache_t * const restrict x = (stegfs_cache_t *)(list_get(file_system->files, i)->object);
+        const stegfs_cache_t * const restrict x = (stegfs_cache_t *)list_move_to(file_system->files, i);
         if (!strcmp(file->path, x->path) && !strcmp(file->name, x->name))
             return; /* found a file in the same directory with the same name; we're done */
     }
@@ -97,7 +97,7 @@ static void lib_stegfs_cache_del(const stegfs_file_t * const restrict file)
     const uint64_t max = list_size(file_system->files);
     for (uint64_t i = 0; i < max; i++)
     {
-        stegfs_cache_t * const restrict x = (stegfs_cache_t *)(list_get(file_system->files, i)->object);
+        stegfs_cache_t * const restrict x = (stegfs_cache_t *)list_move_to(file_system->files, i);
         if (!strcmp(file->path, x->path) && !strcmp(file->name, x->name))
         {
             free(x->name);
