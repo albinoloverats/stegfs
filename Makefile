@@ -35,6 +35,9 @@ $(mkfsob): $(object) mkfs.o
 $(common):
 	@$(MAKE) -C common
 
+documentation:
+	@doxygen
+
 language:
 	@$(MAKE) -C po
 
@@ -43,6 +46,7 @@ clean:
 	@$(MAKE) -C common clean
 
 distclean: clean
-	@rm -f $(app) $(fuseob) $(mkfsob) $(common)
+	@rm -f $(app) $(mkfs) $(fuseob) $(mkfsob) $(common)
 	@$(MAKE) -C common distclean
 	@$(MAKE) -C po distclean
+	@rm -frv doc/{html,latex}
