@@ -1,5 +1,7 @@
 .PHONY: clean distclean
 
+DOXYGEN  = doxygen
+
 object   = common.o list.o
 module   = clib.a
 
@@ -17,6 +19,10 @@ $(module): $(object)
 	@$(CC) $(CPPFLAGS) $(CFLAGS) $@ $<
 	@echo "compiled \`$<' --> \`$@'"
 
+documentation:
+	@$(DOXYGEN)
+	@$(MAKE) -C doc/latex
+
 language:
 	@$(MAKE) -C po
 
@@ -26,3 +32,4 @@ clean:
 distclean: clean
 	@rm -fv $(module)
 	@$(MAKE) -C po distclean
+	@rm -frv doc/{html,latex}
