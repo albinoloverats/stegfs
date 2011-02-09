@@ -105,7 +105,7 @@ extern int64_t show_licence(void)
 extern int64_t show_usage(void)
 {
     fprintf(stderr, _("Usage:\n"));
-    fprintf(stderr, _("  %s [OPTION] [ARGUMENT] ...\n"), c_app);
+    fprintf(stderr, _("  %s [OPTION]...\n"), c_app);
     return EXIT_SUCCESS;
 }
 
@@ -150,7 +150,8 @@ extern void msg(const char * const restrict s, ...)
     va_list ap;
     va_start(ap, s);
     flockfile(LOG_FILE);
-    fprintf(LOG_FILE, "\r%s: ", c_app);
+    if (LOG_FILE == stderr)
+        fprintf(LOG_FILE, "\r%s: ", c_app);
     vfprintf(LOG_FILE, s, ap);
     fprintf(LOG_FILE, "\n");
     fflush(LOG_FILE);
@@ -161,7 +162,7 @@ extern void msg(const char * const restrict s, ...)
 extern void die(const char * const restrict s, ...)
 {
     if (s)
-        msg("%s", s);
+        msg(s);
     if (errno)
     {
         char * const restrict e = strdup(strerror(errno));
