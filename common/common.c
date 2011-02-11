@@ -22,7 +22,6 @@
 
 #include <stdarg.h>
 #include <string.h>
-#include <stdbool.h>
 #include <signal.h>
 #include <ctype.h>
 #include <errno.h>
@@ -66,6 +65,44 @@ extern void redirect_log(const char * const restrict f)
         LOG_FILE = fopen(f, "a");
     if (!LOG_FILE)
         LOG_FILE = stderr;
+}
+
+extern list_t *parse_args(char **v, list_t *a)
+{
+    list_t *x = list_create(NULL);
+    uint16_t expected = list_size(a);
+    for (uint16_t i = 1; ; i++) 
+    {
+        if (!v[i])
+            break;
+        bool found = false;
+        for (uint16_t j = 0; j < expected && !found; j++)
+        {
+            args_t *arg = list_get(a, j);
+            if (strlen(v[i]) == 2)
+            {
+                if (*(v[i] + 1) == arg->short_option)
+                    found = true;
+            }
+            else
+            {
+                if (!strcmp(v[i] + 2, arg->long_option))
+                    found = true;
+            }
+            if (found)
+            {
+                if (arg->has_option)
+                {
+                    i++;
+                    arg->option = strdup(v[i]);
+                }
+                arg->found = true;
+            }
+        }
+        if (!found)
+            list_append(&x, v[i]);
+    }
+    return x;
 }
 
 /*@null@*/extern list_t *config(const char * const restrict f)

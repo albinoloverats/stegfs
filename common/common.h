@@ -35,6 +35,7 @@
     #include <stdlib.h>
     #include <unistd.h>
     #include <inttypes.h>
+    #include <stdbool.h>
     #include <libintl.h>
 
     #include "list.h"
@@ -105,6 +106,24 @@
     conf_t;
 
     /*!
+     * \brief  Structure for parsing program arguments and returned values
+     *
+     * Each copy of this structure will define the short and long program
+     * arguments and whether an option is expected; the fields found and
+     * option will return whether th option was found and any the string
+     * value for the option
+     */
+    typedef struct args_t
+    {
+        char short_option; /*!< Expected short argument */
+        char *long_option; /*!< Expected long argument */
+        bool found;        /*!< Whether the argument was found in argv */
+        bool has_option;   /*!< Whether to expect an option */
+        char *option;      /*!< String value of the option */
+    }
+    args_t;
+
+    /*!
      * \brief         Initialisation of signal handler and locale settings
      * \param[in]  a  The application name to use when displaying messages
      * \param[in]  v  The version of the application
@@ -136,6 +155,17 @@
      * has started if running as a daemon
      */
     extern void redirect_log(const char * const restrict f) __attribute__((nonnull(1)));
+
+    /*!
+     * \brief             Parse command line arguments
+     * \param[in]      v  Command line arguments; typically argv from main()
+     * \param[in,out]  a  List of args_t which define arguments to look for
+     * \return            A list of strings which are extra arguments found but not looked for
+     *
+     * A way of parsing command line arguments, looking for any values and returning
+     * a list of arguments which were seen but not explicitly looked for
+     */
+    extern list_t *parse_args(char **v, list_t *a) __attribute__((nonnull(1, 2)));
 
     /*!
      * \brief         Parse configuration file for options
