@@ -81,7 +81,7 @@ static void lib_stegfs_cache_add(const stegfs_file_t * const restrict file)
     const uint64_t max = list_size(file_system->files);
     for (uint64_t i = 0; i < max; i++)
     {
-        const stegfs_cache_t * const restrict x = (stegfs_cache_t *)list_move_to(file_system->files, i);
+        const stegfs_cache_t * const restrict x = list_get(file_system->files, i);
         if (!strcmp(file->path, x->path) && !strcmp(file->name, x->name))
             return; /* found a file in the same directory with the same name; we're done */
     }
@@ -97,7 +97,7 @@ static void lib_stegfs_cache_del(const stegfs_file_t * const restrict file)
     const uint64_t max = list_size(file_system->files);
     for (uint64_t i = 0; i < max; i++)
     {
-        stegfs_cache_t * const restrict x = (stegfs_cache_t *)list_move_to(file_system->files, i);
+        stegfs_cache_t * const restrict x = list_get(file_system->files, i);
         if (!strcmp(file->path, x->path) && !strcmp(file->name, x->name))
         {
             free(x->name);

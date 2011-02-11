@@ -38,66 +38,83 @@
 #include "src/fuse-stegfs.h"
 #include "src/lib-stegfs.h"
 
-static uint64_t size_in_mb(char *);
+static int64_t usage(void);
+static uint64_t size_in_mb(const char *);
 
 int main(int argc, char **argv)
 {
-    init("mk" APP, VER);
+    init(argv[0], VER);
 
     uint64_t  fs_size = 0x0;
     char     *fs_name = NULL;
 
-    bool force   = false;
-    bool restore = false;
+    bool frc  = false;
+    bool rstr = false;
 
     if (argc < ARGS_MINIMUM)
-        return show_usage();
-    while (true)
+        return usage();
+
+    args_t licence    = {'l', "licence",    false, false, NULL};
+    args_t version    = {'v', "version",    false, false, NULL};
+    args_t help       = {'h', "help",       false, false, NULL};
+    args_t filesystem = {'f', "filesystem", false, true,  NULL};
+    args_t size       = {'s', "size",       false, true,  NULL};
+    args_t force      = {'x', "force",      false, false, NULL};
+    args_t restore    = {'r', "restore",    false, false, NULL};
+
+    list_t *opts = list_create(NULL);
+    list_append(&opts, &licence);
+    list_append(&opts, &version);
+    list_append(&opts, &help);
+    list_append(&opts, &filesystem);
+    list_append(&opts, &size);
+    list_append(&opts, &force);
+    list_append(&opts, &restore);
+
+    list_t *unknown = parse_args(argv, opts);
+
+    if (licence.found)
+        return show_licence();
+    if (version.found)
+        return show_version();
+    if (help.found)
+        return show_help();
+    if (filesystem.found)
+        fs_name = strdup(filesystem.option);
+    if (size.found)
+        fs_size = size_in_mb(size.option);
+    frc = force.found;
+    rstr = restore.found;
+
+    if (!fs_name || !fs_size)
     {
-        static struct option long_options[] =
+        uint16_t lz = list_size(unknown);
+        for (uint16_t i = 0; i < lz; i++)
         {
-            {"filesystem", required_argument, 0, 'f'},
-            {"size"      , required_argument, 0, 's'},
-            {"force"     , no_argument      , 0, 'x'},
-            {"restore"   , no_argument      , 0, 'r'},
-            {"help"      , no_argument      , 0, 'h'},
-            {"licence"   , no_argument      , 0, 'l'},
-            {"version"   , no_argument      , 0, 'v'},
-            {0, 0, 0, 0}
-        };
-        int32_t optex = 0;
-        int32_t opt = getopt_long(argc, argv, "f:s:xrhlv", long_options, &optex);
-        if (opt < 0)
-            break;
-        switch (opt)
-        {
-            case 'f':
-                fs_name = strdup(optarg);
-                break;
-            case 's':
-                fs_size = size_in_mb(optarg);
-                break;
-            case 'r':
-                restore = true;
-            case 'x':
-                force = true;
-                break;
-            case 'h':
-                return show_help();
-            case 'l':
-                return show_licence();
-            case 'v':
-                return show_version();
-            case '?':
-            default:
-                die(_("unknown option %c"), opt);
+            char *arg = list_get(unknown, i);
+            bool alpha = false;
+            for (uint16_t j = 0; j < strlen(arg) - 1; j++)
+            {
+                if (!isdigit(arg[j]))
+                {
+                    alpha = true;
+                    break;
+                }
+            }
+            if (alpha && !fs_name)
+                fs_name = strdup(arg);
+            else if (!alpha && !fs_size)
+                fs_size = size_in_mb(arg);
         }
     }
+    if (!fs_name)
+        return usage();
     /*
      * is this a device or a file?
      */
     int64_t fs = 0x0;
     struct stat fs_stat;
+    memset(&fs_stat, 0x00, sizeof( fs_stat ));
     stat(fs_name, &fs_stat);
     switch (fs_stat.st_mode & S_IFMT)
     {
@@ -114,28 +131,28 @@ int main(int argc, char **argv)
         case S_IFLNK:
         case S_IFSOCK:
         case S_IFIFO:
-            die(_("unable to create file system on specified device"));
+            die(_("unable to create file system on specified device \"%s\""), fs_name);
         case S_IFREG:
-            if (!force)
+            if (!frc)
                 die(_("file by that name already exists - use -x to force"));
+            /*
+             * file does exist; use its current size as the desired capacity
+             * (unless the user has specified a new size)
+             */
+            if ((fs = open(fs_name, O_WRONLY | F_WRLCK, S_IRUSR | S_IWUSR)) < 0)
+                msg(gettext("could not open file system %s"), fs_name);
+            fs_size = fs_size ? fs_size : (uint64_t)lseek(fs, 0, SEEK_END) / RATIO_BYTE_MB;
+            break;
         default:
             /*
              * file doesn't exist - good, lets create it...
              */
-        {
-            int64_t flags = O_WRONLY | O_CREAT | O_TRUNC;
-#ifdef _GNU_SOURCE
-            flags |= F_WRLCK;
-#endif
-            if (restore)
-                flags ^= O_TRUNC; /* don't truncate the file if we're restoring the sb */
-            if ((fs = open(fs_name, flags, S_IRUSR | S_IWUSR)) < 0)
-                die(_("could not open the file system"));
-        }
+            if ((fs = open(fs_name, O_WRONLY | F_WRLCK | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR)) < 0)
+                die(_("could not open file system %s"), fs_name);
         break;
     }
     uint64_t fs_blocks = 0x0;
-    if (restore)
+    if (rstr)
     {
         msg(_("restoring superblock on %s"), fs_name);
         fs_blocks = lseek(fs, 0, SEEK_END) / SIZE_BYTE_BLOCK;
@@ -274,7 +291,7 @@ int main(int argc, char **argv)
     return errno;
 }
 
-uint64_t size_in_mb(char *s)
+static uint64_t size_in_mb(const char *s)
 {
     /*
      * parse the value for our file system size (if using a file on an
@@ -300,13 +317,20 @@ uint64_t size_in_mb(char *s)
     return v;
 }
 
+static int64_t usage(void)
+{
+    fprintf(stderr, _("Usage:\n"));
+    fprintf(stderr, _("  mk%s [OPTION]... FILESYSTEM\n"), APP);
+    return EXIT_SUCCESS;
+}
+
 int64_t show_help(void)
 {
     /*
      * TODO translate
      */
     show_version();
-    show_usage();
+    usage();
     fprintf(stderr, "\nOptions:\n\n");
     fprintf(stderr, "  -f, --filesystem  FILE SYSTEM  Where to write the file system to\n");
     fprintf(stderr, "  -s, --size        SIZE         Size of the file system in MB\n");

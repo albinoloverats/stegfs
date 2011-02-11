@@ -195,7 +195,7 @@ static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t fill
                 uint64_t max = list_size(files);
                 for (uint64_t i = 0; i < max; i++)
                 {
-                    stegfs_cache_t *x = (stegfs_cache_t *)(list_move_to(files, i)->object);
+                    stegfs_cache_t *x = list_get(files, i);
                     if (!strcmp(p, PATH_PROC) && strlen(x->name))
                     {
                         char *f = NULL;
@@ -266,7 +266,7 @@ static int fuse_stegfs_read(const char *path, char *buf, size_t size, off_t offs
     uint64_t max = list_size(fuse_cache);
     for (uint64_t i = 0; i < max; i++)
     {
-        stegfs_file_t *this = (stegfs_file_t *)(list_move_to(fuse_cache, i)->object);
+        stegfs_file_t *this = list_get(fuse_cache, i);
         if (this->id == info->fh)
         {
             if ((this->mode == STEGFS_READ) && (this->size))
@@ -301,7 +301,7 @@ static int fuse_stegfs_write(const char *path, const char *buf, size_t size, off
     uint64_t max = list_size(fuse_cache);
     for (uint64_t i = 0; i < max; i++)
     {
-        stegfs_file_t *this = (stegfs_file_t *)(list_move_to(fuse_cache, i)->object);
+        stegfs_file_t *this = list_get(fuse_cache, i);
         if (this->id == info->fh)
         {
             if (this->mode == STEGFS_WRITE)
@@ -362,7 +362,7 @@ static int fuse_stegfs_open(const char *path, struct fuse_file_info *info)
         uint64_t max = list_size(fuse_cache);
         for (uint64_t i = 0; i < max; i++)
         {
-            stegfs_file_t *x = (stegfs_file_t *)(list_move_to(fuse_cache, i)->object);
+            stegfs_file_t *x = list_get(fuse_cache, i);
             if (x->id > i)
             {
                 this->id = i;
@@ -409,7 +409,7 @@ static int fuse_stegfs_release(const char *path, struct fuse_file_info *info)
     uint64_t max = list_size(fuse_cache);
     for (uint64_t i = 0; i < max; i++)
     {
-        stegfs_file_t *this = (stegfs_file_t *)(list_move_to(fuse_cache, i)->object);
+        stegfs_file_t *this = list_get(fuse_cache, i);
         if (this->id == info->fh)
         {
             found = true;
@@ -438,7 +438,7 @@ static int fuse_stegfs_flush(const char *path, struct fuse_file_info *info)
     uint64_t max = list_size(fuse_cache);
     for (uint64_t i = 0; i < max; i++)
     {
-        stegfs_file_t *this = (stegfs_file_t *)(list_move_to(fuse_cache, i)->object);
+        stegfs_file_t *this = list_get(fuse_cache, i);
         if (this->id == info->fh)
         {
             found = true;
@@ -489,56 +489,71 @@ int main(int argc, char **argv)
 {
     init(APP, VER);
 
+    char *fs = NULL, *mnt = NULL;
+    bool dbg = false, do_cache = true;
+
     if (argc < ARGS_MINIMUM)
-        return show_usage();
+        return usage();
 
-    char *fs = NULL, *mount = NULL;
-    bool debug = false, do_cache = true;
+    args_t licence    = {'l', "licence",    false, false, NULL};
+    args_t version    = {'v', "version",    false, false, NULL};
+    args_t help       = {'h', "help",       false, false, NULL};
+    args_t debug      = {'d', "debug",      false, false, NULL};
+    args_t filesystem = {'f', "filesystem", false, true,  NULL};
+    args_t mount      = {'m', "mount",      false, true,  NULL};
+    args_t nocache    = {'n', "nocache",    false, false, NULL};
 
-    while (true)
+    list_t *opts = list_create(NULL);
+    list_append(&opts, &licence);
+    list_append(&opts, &version);
+    list_append(&opts, &help);
+    list_append(&opts, &debug);
+    list_append(&opts, &filesystem);
+    list_append(&opts, &mount);
+    list_append(&opts, &nocache);
+
+    list_t *unknown = parse_args(argv, opts);
+
+    if (licence.found)
+        return show_licence();
+    if (version.found)
+        return show_version();
+    if (help.found)
+        return show_help();
+    dbg = debug.found;
+    do_cache = !nocache.found;
+    if (filesystem.found)
+        fs = strdup(filesystem.option);
+    if (mount.found)
+        mnt = strdup(mount.option);
+
+    if (!mnt || !fs)
     {
-        static struct option long_options[] =
+        uint16_t lz = list_size(unknown);
+        for (uint16_t i = 0; i < lz; i++)
         {
-            {"debug"     , no_argument      , 0, 'd'},
-            {"filesystem", required_argument, 0, 'f'},
-            {"mount"     , required_argument, 0, 'm'},
-            {"nocache"   , no_argument      , 0, 'n'},
-            {"help"      , no_argument      , 0, 'h'},
-            {"licence"   , no_argument      , 0, 'l'},
-            {"version"   , no_argument      , 0, 'v'},
-            {0, 0, 0, 0}
-        };
-        int optex = 0;
-        int opt = getopt_long(argc, argv, "df:m:nhlv", long_options, &optex);
-        if (opt < 0)
-            break;
-        switch (opt)
-        {
-            case 'd':
-                debug = true;
-                break;
-            case 'f':
-                fs = strdup(optarg);
-                break;
-            case 'm':
-                mount = strdup(optarg);
-                break;
-            case 'n':
-                do_cache = false;
-                break;
-            case 'h':
-                return show_help();
-            case 'l':
-                return show_licence();
-            case 'v':
-                return show_version();
-            case '?':
-            default:
-                die(_("unknown option %c"), opt);
+            struct stat fs_stat;
+            memset(&fs_stat, 0x00, sizeof( fs_stat ));
+            char *arg = list_get(unknown, i);
+            stat(arg, &fs_stat);
+            switch (fs_stat.st_mode & S_IFMT)
+            {
+                case S_IFDIR:
+                    if (!mnt)
+                        mnt = strdup(arg);
+                    break;
+                case S_IFBLK:
+                case S_IFLNK:
+                case S_IFREG:
+                    if (!fs)
+                        fs = strdup(arg);
+                    break;
+                default:
+                    die(_("could not open file system %s"), arg);
+            }
         }
     }
-
-    if (!mount || !fs)
+    if (!mnt || !fs)
         return show_usage();
 
     lib_stegfs_init(fs, do_cache);
@@ -548,7 +563,7 @@ int main(int argc, char **argv)
     list_append(&fuse_cache, x);
 
     char **args = NULL;
-    if (!(args = calloc(debug ? ARGS_DEFAULT + 1 : ARGS_DEFAULT, sizeof( char * ))))
+    if (!(args = calloc(dbg ? ARGS_DEFAULT + 1 : ARGS_DEFAULT, sizeof( char * ))))
         die(_("out of memory @ %s:%i"), __FILE__, __LINE__);
 
     {
@@ -556,12 +571,19 @@ int main(int argc, char **argv)
         args[i++] = strdup(argv[0]);
         args[i++] = strdup("-o");
         args[i++] = strdup("use_ino");
-        if (debug)
+        if (dbg)
             args[i++] = strdup("-d");
-        args[i++] = strdup(mount);
+        args[i++] = strdup(mnt);
     }
 
-    return fuse_main(debug ? ARGS_DEFAULT + 1 : ARGS_DEFAULT, args, &fuse_stegfs_functions, NULL);
+    return fuse_main(dbg ? ARGS_DEFAULT + 1 : ARGS_DEFAULT, args, &fuse_stegfs_functions, NULL);
+}
+
+static int64_t usage(void)
+{
+    fprintf(stderr, _("Usage:\n"));
+    fprintf(stderr, _("  %s [OPTION]... FILESYSTEM  MOUNT POINT\n"), APP);
+    return EXIT_SUCCESS;
 }
 
 int64_t show_help(void)
@@ -570,7 +592,7 @@ int64_t show_help(void)
      * TODO translate
      */
     show_version();
-    show_usage();
+    usage();
     fprintf(stderr, "\nOptions:\n\n");
     fprintf(stderr, "  -f, --filesystem  FILE SYSTEM  Location of the file system to mount\n");
     fprintf(stderr, "  -m, --mount       MOUNT POINT  Where to mount the file system\n");

@@ -43,6 +43,7 @@
 
     #define ARGS_MINIMUM 2
     #define ARGS_DEFAULT 4
+    #define ARGS_SIMPLE  3
 
 #endif /* _FUSE_STEGFS_H_ */
 
@@ -91,4 +92,5 @@
     static pthread_mutex_t fuse_lock;
     static list_t *fuse_cache;
 
+    static int64_t usage(void);
 #endif /* _IN_FUSE_STEGFS_ */
