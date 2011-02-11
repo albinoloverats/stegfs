@@ -1,58 +1,52 @@
-.PHONY: stegfs mkfs testfs most all install clean distclean uninstall
+.PHONY: clean distclean
 
-PO_MAKE      = 
-PO_INSTALL   = 
-PO_CLEAN     = 
-PO_UNINSTALL = 
+vpath %.c src
 
-OPTIONS := `pkg-config fuse --cflags --libs` -lmhash -lmcrypt -lpthread -std=gnu99 -O2 -Wall -Wextra -Wno-unused-parameter -pipe -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -I ./ -o
-COMMON  := src/lib-stegfs.c src/dir.c common/common.c common/list.c
+object   = lib-stegfs.o dir.o
+common	 = common/clib.a
+fuseob   = fuse-stegfs.a
+mkfsob   = mkstegfs.a
+app      = stegfs
+mkfs     = mkstegfs
 
-most: a
--include po/*.mk
+CFLAGS   = -Wall -Wextra -Wno-unused-parameter -O2 -std=gnu99 -c -o # -ggdb
+CPPFLAGS = -I. -Isrc -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 `pkg-config fuse --cflags`
+LDFLAGS  = -r -s -o
+LIBS     = `pkg-config fuse --libs-only-l` -lmhash -lmcrypt -lpthread
 
-stegfs:
-# build the main fuse executable
-	 @gcc $(OPTIONS) stegfs $(COMMON) src/fuse-stegfs.c
-	-@echo "compiled \`src/fuse-stegfs.c $(COMMON)' --> \`stegfs'"
+all: $(fuseob) $(mkfsob) $(common) language
+	@$(CC) $(LIBS) -o $(app) $(fuseob) $(common)
+	@echo "built \`$(fuseob) $(common)' --> \`$(app)'"
+	@$(CC) $(LIBS) -o $(mkfs) $(mkfsob) $(common)
+	@echo "built \`$(mkfsob) $(common)' --> \`$(mkfs)'"
 
-mkfs:
-# build the mkfs utility
-	 @gcc $(OPTIONS) mkstegfs $(COMMON) src/mkfs.c
-	-@echo "compiled \`src/mkfs.c $(COMMON)' --> \`mkstegfs'"
+$(fuseob): $(object) fuse-stegfs.o
+	@$(LD) $(LDFLAGS) $(fuseob) $^
+	@echo "linked \`$^' --> \`$(fuseob)'"
 
-man:
-# compress the man page
-	 @gzip -c doc/stegfs.1 > stegfs.1.gz
-	-@echo "compressed \`doc/stegfs.1' --> \`stegfs.1.gz'"
+$(mkfsob): $(object) mkfs.o
+	@$(LD) $(LDFLAGS) $(mkfsob) $^
+	@echo "linked \`$^' --> \`$(mkfsob)'"
 
-testfs:
-# build the testfs utility
-	 @gcc -lncurses $(OPTIONS) teststegfs $(COMMON) src/testfs.c
-	-@echo "compiled \`src/testfs.c $(COMMON)' --> \`teststegfs'"
+%.o: %.c
+	@$(CC) $(CPPFLAGS) $(CFLAGS) $@ $<
+	@echo "compiled \`$<' --> \`$@'"
 
-a: stegfs mkfs man $(PO_MAKE)
+$(common):
+	@$(MAKE) -C common
 
-all: a testfs
+documentation:
+	@doxygen
 
-install: $(PO_INSTALL)
-# install stegfs
-	 @install -c -m 755 -s -D -T stegfs $(PREFIX)/usr/bin/stegfs
-	-@echo "installed \`stegfs' --> \`$(PREFIX)/usr/bin/stegfs'"
-# install the mkfs
-	 @install -c -m 755 -s -D -T mkstegfs $(PREFIX)/usr/bin/mkstegfs
-	-@echo "installed \`mkstegfs' --> \`$(PREFIX)/usr/bin/stegfs'"
-# finally the man page
-	 @install -c -m 644 -D -T stegfs.1.gz $(PREFIX)/usr/man/man1/stegfs.1.gz
-	-@echo "installed \`stegfs.1.gz' --> \`$(PREFIX)/usr/man/man1/stegfs.1.gz'"
+language:
+	@$(MAKE) -C po
 
-clean: $(PO_CLEAN)
-	-@/bin/rm -fv stegfs mkstegfs stegfs.1.gz
+clean:
+	@rm -fv $(object) fuse-stegfs.o mkfs.o
+	@$(MAKE) -C common clean
 
 distclean: clean
-	-@/bin/rm -fv teststegfs
-
-uninstall: $(PO_UNINSTALL)
-	 @/bin/rm -fv $(PREFIX)/usr/man/man1/stegfs.1.gz
-	 @/bin/rm -fv $(PREFIX)/usr/bin/mkstegfs
-	 @/bin/rm -fv $(PREFIX)/usr/bin/stegfs
+	@rm -f $(app) $(mkfs) $(fuseob) $(mkfsob) $(common)
+	@$(MAKE) -C common distclean
+	@$(MAKE) -C po distclean
+	@rm -frv doc/{html,latex}

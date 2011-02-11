@@ -7,7 +7,7 @@ module   = clib.a
 
 CFLAGS   = -Wall -Wextra -O2 -std=gnu99 -pipe -c -o # -ggdb
 CPPFLAGS = -I. -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64
-LDFLAGS  = -r -o # -s
+LDFLAGS  = -r -s -o
 
 all: $(module) language
 
