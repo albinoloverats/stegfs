@@ -25,8 +25,8 @@ msgstr "konnte sie nicht finden platz im cache für die datei \"%s\""
 msgid "could not open the block device"
 msgstr "konnte nicht geöffnet werden dir block device"
 
-msgid "unable to create file system on specified device"
-msgstr "nicht in der lage, das dateisystem angegebene gerät"
+msgid "unable to create file system on specified device \"%s\""
+msgstr "nicht in der lage, das dateisystem angegebene gerät \"%s\""
 
 msgid "file by that name already exists - use -x to force"
 msgstr "datei mit diesem namen existiert bereits - benutzen, um -x"
