@@ -81,12 +81,12 @@ extern list_t *parse_args(char **v, list_t *a)
             args_t *arg = list_get(a, j);
             if (strlen(v[i]) == 2)
             {
-                if (*(v[i] + 1) == arg->short_option)
+                if (*(v[i]) == '-' && *(v[i] + 1) == arg->short_option)
                     found = true;
             }
             else
             {
-                if (!strcmp(v[i] + 2, arg->long_option))
+                if (!strncmp(v[i], "--", 2) && !strcmp(v[i] + 2, arg->long_option))
                     found = true;
             }
             if (found)
