@@ -34,6 +34,8 @@
 #include <libintl.h>
 
 #include "common/common.h"
+#include "common/list.h"
+#include "common/tlv.h"
 
 #include "src/fuse-stegfs.h"
 #include "src/lib-stegfs.h"
@@ -267,14 +269,30 @@ int main(int argc, char **argv)
      */
     {
         stegfs_block_t sb;
-
-        char sid[SIZE_BYTE_PATH] = { 0x00 };
-        strncpy(sid + 1, SUPER_ID, sizeof( sid ) - 2);
-        sid[0x00] = 0x02;
-        sid[0x0F] = 0x03;
-        memcpy(sb.path, sid, SIZE_BYTE_PATH);
-
-        memset(sb.data, 0xFF, SIZE_BYTE_DATA);
+        memset(sb.path, 0xFF, SIZE_BYTE_PATH);
+        memset(sb.data, 0x00, SIZE_BYTE_DATA);
+        /*
+         * use TLV format for storing data in SB
+         */
+        list_t *header = list_create(NULL);
+        list_append(&header, tlv_combine(STEGFS_FS_NAME, strlen(PATH_ROOT), PATH_ROOT));
+        list_append(&header, tlv_combine(STEGFS_VERSION, strlen(VER), VER));
+        {
+            MCRYPT mc = mcrypt_module_open(MCRYPT_SERPENT, NULL, MCRYPT_CBC, NULL);
+            char *mca = mcrypt_enc_get_algorithms_name(mc);
+            list_append(&header, tlv_combine(STEGFS_CRYPTO, strlen(mca), mca));
+            mcrypt_generic_deinit(mc);
+            mcrypt_module_close(mc);
+            free(mca);
+        }
+        {
+            char *mha = (char *)mhash_get_hash_name(MHASH_TIGER);
+            list_append(&header, tlv_combine(STEGFS_HASH, strlen(mha), mha));
+            free(mha);
+        }
+        uint8_t *tlv_data = NULL;
+        uint64_t tlv_size = tlv_build(&tlv_data, header);
+        memcpy(sb.data, tlv_data, tlv_size);
 
         sb.hash[0] = MAGIC_0;
         sb.hash[1] = MAGIC_1;

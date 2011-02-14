@@ -58,7 +58,7 @@
     #define RATIO_MB_GB     0x00000400      /* size in MB of 1 GB */
     #define RATIO_MB_TB     RATIO_BYTE_MB   /* size in MB of 1 TB (1:1 as B:MB) */
 
-    #define PATH_ROOT "stegfs"
+    #define PATH_ROOT "stegfs" /* also app/fs name */
 
     #define MAX_COPIES 9
 
@@ -78,6 +78,15 @@
 
     #define STEGFS_LOCK(M)     pthread_mutex_lock(&M)
     #define STEGFS_UNLOCK(M)   pthread_mutex_unlock(&M)
+
+    typedef enum stegfs_header_data_e
+    {
+        STEGFS_FS_NAME,
+        STEGFS_VERSION,
+        STEGFS_CRYPTO,
+        STEGFS_HASH
+    }
+    stegfs_header_data_e;
 
     /*!
      * \brief  Structure to hold file system information

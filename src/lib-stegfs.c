@@ -37,7 +37,10 @@ extern void lib_stegfs_init(const char * const restrict fs, const bool c)
     if ((file_system->id = open(fs, O_RDWR, S_IRUSR | S_IWUSR)) < 3)
         die(_("could not open file system %s"), fs);
     /*
-     * check the first block to see if everything looks okay
+     * check the first block to see if everything looks okay - actually
+     * just check the magic numbers of the end of the block; in the 
+     * future we could check version and algorithm info from the TLV
+     * data block
      */
 #ifndef DEBUGGING
     stegfs_block_t super;
