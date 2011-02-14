@@ -2,7 +2,7 @@
 
 DOXYGEN  = doxygen
 
-object   = common.o list.o
+object   = common.o list.o tlv.o
 module   = clib.a
 
 CFLAGS   = -Wall -Wextra -O2 -std=gnu99 -pipe -c -o # -ggdb
