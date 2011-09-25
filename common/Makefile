@@ -2,12 +2,12 @@
 
 DOXYGEN  = doxygen
 
-object   = common.o list.o tlv.o
+object   = common.o logging.o list.o tlv.o
 module   = clib.a
 
-CFLAGS   = -Wall -Wextra -O2 -std=gnu99 -pipe -c -o # -ggdb
+CFLAGS   = -Wall -Wextra -O0 -std=gnu99 -pipe -c -o
 CPPFLAGS = -I. -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64
-LDFLAGS  = -r -s -o
+LDFLAGS  = -r -o
 
 all: $(module) language
 

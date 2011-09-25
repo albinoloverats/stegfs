@@ -18,9 +18,10 @@
  *
  */
 
-#define _IN_LIST_
+#define __LIST__H__
 #include "list.h"
 #include "common.h"
+#include "logging.h"
 
 #include <time.h>
 #include <stdlib.h>
@@ -28,8 +29,9 @@
 #include <stdbool.h>
 #include <unistd.h>
 
-extern list_t *list_create(int64_t (*fn)(const void * const restrict, const void * const restrict))
+extern list_t *list_create(int (*fn)(const void *, const void *))
 {
+    log_message(LOG_EVERYTHING, "%s:%d:%s(%p)", __FILE__, __LINE__, __func__, fn);
     if (fn == NULL)
         list_compare_function = list_generic_compare;
     else
@@ -39,6 +41,9 @@ extern list_t *list_create(int64_t (*fn)(const void * const restrict, const void
 
 extern void list_delete(list_t **l)
 {
+    log_message(LOG_EVERYTHING, "%s:%d:%s(%p)", __FILE__, __LINE__, __func__, l);
+    if (!l || *l == NEW_LIST)
+        return;
     list_t *x = list_find_first(*l);
     while (true)
     {
@@ -51,32 +56,38 @@ extern void list_delete(list_t **l)
             break;
         x = y;
     }
-    free(*l);
-    l = NULL;
+    *l = NULL;
     return;
 }
 
-extern void list_append(list_t **l, void *o)
+extern void list_append(list_t **l, const void * const restrict o)
 {
-    if (*l == (void *)-1)
+    log_message(LOG_EVERYTHING, "%s:%d:%s(%p, %p)", __FILE__, __LINE__, __func__, l, o);
+    if (!l || *l == NEW_LIST)
     {
-        *l = calloc(1, sizeof( list_t ));
+        if (!(*l = calloc(1, sizeof( list_t ))))
+            die("out of memory @ %s:%d:%s [%zu]", __FILE__, __LINE__, __func__, sizeof( list_t ));
         (*l)->object = o;
         return;
     }
     list_t *x = list_find_last(*l);
     list_t *n = calloc(1, sizeof( list_t ));
+    if (!n)
+        die("out of memory @ %s:%d:%s [%zu]", __FILE__, __LINE__, __func__, sizeof( list_t ));
     n->prev = x;
     n->object = o;
     x->next = n;
     return;
 }
 
-extern void list_remove(list_t **l, const uint64_t i)
+extern void *list_remove(list_t **l, const uint64_t i)
 {
+    log_message(LOG_EVERYTHING, "%s:%d:%s(%p, %ju)", __FILE__, __LINE__, __func__, l, i);
+    if (!l || *l == NEW_LIST)
+        return NULL;
     const uint64_t s = list_size(*l);
     if (i >= s)
-        return;
+        return NULL;
     list_t *x = list_move_to(*l, i);
     if (x->prev)
         x->prev->next = x->next;
@@ -84,16 +95,19 @@ extern void list_remove(list_t **l, const uint64_t i)
         *l = (*l)->next;
     if (x->next)
         x->next->prev = x->prev;
-    x->object = NULL;
+    const void *r = x->object;
     x->prev = NULL;
     x->next = NULL;
     free(x);
     x = NULL;
-    return;
+    return (void *)r;
 }
 
 extern list_t *list_move_to(list_t *l, const uint64_t i)
 {
+    log_message(LOG_EVERYTHING, "%s:%d:%s(%p, %ju)", __FILE__, __LINE__, __func__, l, i);
+    if (!l || l == NEW_LIST)
+        return NULL;
     if (i >= list_size(l))
         return NULL;
     list_t *x = list_find_first(l);
@@ -104,12 +118,16 @@ extern list_t *list_move_to(list_t *l, const uint64_t i)
 
 extern void *list_get(list_t *l, const uint64_t i)
 {
-    return list_move_to(l, i)->object;
+    log_message(LOG_EVERYTHING, "%s:%d:%s(%p, %ju)", __FILE__, __LINE__, __func__, l, i);
+    if (!l || l == NEW_LIST)
+        return NULL;
+    return (void *)list_move_to(l, i)->object;
 }
 
 extern uint64_t list_size(list_t *l)
 {
-    if (!l || (l == (void *)-1))
+    log_message(LOG_EVERYTHING, "%s:%d:%s(%p)", __FILE__, __LINE__, __func__, l);
+    if (!l || l == NEW_LIST)
         return 0;
     list_t *x = list_find_first(l);
     uint64_t s = 1;
@@ -125,6 +143,9 @@ extern uint64_t list_size(list_t *l)
 
 extern void list_join(list_t *l, list_t *m)
 {
+    log_message(LOG_EVERYTHING, "%s:%d:%s(%p, %p)", __FILE__, __LINE__, __func__, l, m);
+    if (!l || l == NEW_LIST || !m || m == NEW_LIST)
+        return;
     list_t *x = list_find_last(l);
     list_t *y = list_find_first(m);
     x->next = y;
@@ -134,6 +155,9 @@ extern void list_join(list_t *l, list_t *m)
 
 extern list_t *list_split(list_t *l)
 {
+    log_message(LOG_EVERYTHING, "%s:%d:%s(%p)", __FILE__, __LINE__, __func__, l);
+    if (!l || l == NEW_LIST)
+        return NULL;
     list_t *m = list_move_to(l, list_size(l) / 2);
     m->prev->next = NULL;
     m->prev = NULL;
@@ -142,6 +166,9 @@ extern list_t *list_split(list_t *l)
 
 extern list_t *list_sort(list_t **l)
 {
+    log_message(LOG_EVERYTHING, "%s:%d:%s(%p)", __FILE__, __LINE__, __func__, l);
+    if (!l || *l == NEW_LIST)
+        return NULL;
     const uint64_t s = list_size(*l);
     if (s <= 1)
         return *l;
@@ -151,13 +178,16 @@ extern list_t *list_sort(list_t **l)
 
 extern list_t *list_shuffle(list_t **l)
 {
+    log_message(LOG_EVERYTHING, "%s:%d:%s(%p)", __FILE__, __LINE__, __func__, l);
+    if (!l || *l == NEW_LIST)
+        return NULL;
     const uint64_t s = list_size(*l);
     if (s <= 1)
         return *l;
     srand48(time(0));
     for (uint64_t i = 0; i < SHUFFLE_FACTOR * s; i++)
     {
-        uint64_t r = (lrand48() << 32 | lrand48()) % s;
+        uint64_t r = ((uint64_t)lrand48() << 32 | (uint64_t)lrand48()) % s;
         void *x = list_get(*l, r);
         list_remove(l, r);
         list_append(l, x);
@@ -167,6 +197,7 @@ extern list_t *list_shuffle(list_t **l)
 
 static list_t *list_msort(list_t *l, list_t *r)
 {
+    log_message(LOG_EVERYTHING, "%s:%d:%s(%p, %p)", __FILE__, __LINE__, __func__, l, r);
     int64_t x = list_size(l);
     int64_t y = list_size(r);
     list_t *a = list_create(list_compare_function);
@@ -196,6 +227,7 @@ static list_t *list_msort(list_t *l, list_t *r)
 
 static list_t *list_find_first(list_t * const restrict l)
 {
+    log_message(LOG_EVERYTHING, "%s:%d:%s(%p)", __FILE__, __LINE__, __func__, l);
     list_t *x = l;
     while (true)
         if (!x->prev)
@@ -207,6 +239,7 @@ static list_t *list_find_first(list_t * const restrict l)
 
 static list_t *list_find_last(list_t * const restrict l)
 {
+    log_message(LOG_EVERYTHING, "%s:%d:%s(%p)", __FILE__, __LINE__, __func__, l);
     list_t *x = l;
     while (true)
         if (!x->next)
@@ -216,19 +249,22 @@ static list_t *list_find_last(list_t * const restrict l)
     return x;
 }
 
-static int64_t list_generic_compare(const void * const restrict a, const void * const restrict b)
+static int list_generic_compare(const void *a, const void *b)
 {
-    msg("using generic comparison function");
+    log_message(LOG_EVERYTHING, "%s:%d:%s(%p, %p)", __FILE__, __LINE__, __func__, a, b);
+    log_message(LOG_DEBUG, "using generic comparison function");
     return ((compare_id_t *)a)->id - ((compare_id_t *)b)->id;
 }
 
+#ifdef DEBUGGING
 extern void list_debug(list_t *l)
 {
+    log_message(LOG_EVERYTHING, "%s:%d:%s(%p)", __FILE__, __LINE__, __func__, l);
     list_t *x = list_find_first(l);
     uint64_t i = 0;
     while (true)
     {
-        msg("object %02lu: %16p << %16p >> %16p = %p [%lu]", i, x->prev, x, x->next, x->object, x->object ? ((compare_id_t *)x->object)->id : (uint64_t)-1);
+        log_message(LOG_DEBUG, "object %02ju: %16p << %16p >> %16p = %p [%ju]", i, x->prev, x, x->next, x->object, x->object ? ((compare_id_t *)x->object)->id : (uint64_t)-1);
         x = x->next;
         if (!x)
             break;
@@ -236,3 +272,4 @@ extern void list_debug(list_t *l)
     }
     return;
 }
+#endif

@@ -44,10 +44,10 @@
         uint8_t tag;
         uint16_t length;
         uint8_t *value;
-    }
+    } __attribute__((packed))
     tlv_t;
 
-    extern tlv_t *tlv_combine(uint8_t t, uint16_t l, void *v) __attribute__((nonnull(3)));
+    extern tlv_t tlv_combine(uint8_t t, uint16_t l, void *v) __attribute__((nonnull(3)));
 
     extern uint64_t tlv_build(uint8_t **b, list_t *l) __attribute__((nonnull(2)));
 

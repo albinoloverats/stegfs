@@ -42,10 +42,10 @@
      */
     typedef struct list_t
     {
-        void *object;        /*!< Pointer to this item in the list */
+        const void *object;  /*!< Pointer to this item in the list */
         struct list_t *prev; /*!< Pointer to previous list item */
         struct list_t *next; /*!< Pointer to next list item */
-    }
+    } __attribute__((aligned))
     list_t;
 
     /*!
@@ -58,7 +58,7 @@
     typedef struct compare_id_t
     {
         uintptr_t id; /*!< ID used for object comparison */
-    }
+    } __attribute__((aligned))
     compare_id_t;
 
     /*!
@@ -76,7 +76,7 @@
      */
     #define SHUFFLE_FACTOR 4
 
-    //typedef list_t * LIST;
+    /*typedef list_t * LIST;*/
 
     /*
      * TODO find a way to make the function pointer optional; overload
@@ -89,7 +89,7 @@
      *
      * Create a new list which is ready to have objects inserted into it
      */
-    extern list_t *list_create(int64_t (*fn)(const void * const restrict, const void * const restrict));
+    extern list_t *list_create(int (*fn)(const void *, const void *));
 
     /*!
      * \brief         Delete a list_t
@@ -107,16 +107,17 @@
      *
      * Append a new object onto the tail end of the list
      */
-    extern void list_append(list_t **l, void *o) __attribute__((nonnull(1, 2)));
+    extern void list_append(list_t **l, const void * const restrict o) __attribute__((nonnull(1, 2)));
 
     /*!
      * \brief         Remove i'th object from a list
      * \param[in]  l  Remove element from the list
      * \param[in]  i  The index of the object
+     * \return        The data that was stored at this point in the list
      *
      * Remove the object (at the given position within the list) from the list
      */
-    extern void list_remove(list_t **l, const uint64_t i) __attribute__((nonnull(1)));
+    extern void *list_remove(list_t **l, const uint64_t i) __attribute__((nonnull(1)));
 
     /*!
      * \brief         Move to the i'th object from the list
@@ -184,7 +185,7 @@
      */
     extern list_t *list_shuffle(list_t **l) __attribute__((nonnull(1)));
 
-    #ifdef _DEBUG_ON_
+    #ifdef DEBUGGING
         /*!
          * \brief         Print out the list structure
          * \param[in]  l  The list to print the structure of
@@ -196,7 +197,7 @@
     #endif
 #endif
 
-#ifdef _IN_LIST_
+#ifdef __LIST__H__
     #ifndef _BEEN_IN_LIST_
         #define _BEEN_IN_LIST_
 
@@ -236,7 +237,7 @@
          *
          * A generic compare function which checks the objects for an ->id (as in compare_id_t)
          */
-        static int64_t list_generic_compare(const void * const restrict a, const void * const restrict b) __attribute__((nonnull(1,2)));
+        static int list_generic_compare(const void *a, const void *b) __attribute__((nonnull(1,2)));
 
         /*!
          * \brief         Function pointer for list comparison function
@@ -247,8 +248,8 @@
          * Internal function pointer which points to the function to be used for comparing
          * objects in the list
          */
-        static int64_t (*list_compare_function)(const void * const restrict a, const void * const restrict b);
+        static int (*list_compare_function)(const void *a, const void *b);
 
     #endif /* _BEEN_IN_LIST_ */
-    #undef _IN_LIST_
+    #undef __LIST__H__
 #endif

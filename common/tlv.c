@@ -18,6 +18,7 @@
  *
  */
 
+#include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
 
@@ -25,13 +26,14 @@
 #include "common.h"
 #include "list.h"
 
-extern tlv_t *tlv_combine(uint8_t t, uint16_t l, void *v)
+extern tlv_t tlv_combine(uint8_t t, uint16_t l, void *v)
 {
-    tlv_t *x = malloc(sizeof( tlv_t * ));
-    x->tag = t;
-    x->length = l;
-    x->value = malloc(l);
-    memcpy(x->value, v, l);
+    tlv_t x = { 0, 0, NULL };
+    x.tag = t;
+    x.length = l;
+    if (!(x.value = malloc(l)))
+        die("out of memory @ %s:%d:%s", __FILE__, __LINE__, __func__);
+    memcpy(x.value, v, l);
     return x;
 }
 
@@ -45,6 +47,8 @@ extern uint64_t tlv_build(uint8_t **b, list_t *l)
         uint64_t c = z;
         z += sizeof( uint8_t ) + sizeof( uint16_t ) + t->length;
         uint8_t *x = realloc(*b, z);
+        if (!x)
+            die("out of memory @ %s:%d:%s [%ju]", __FILE__, __LINE__, __func__, z);
         memcpy(x + c, &(t->tag), sizeof( uint8_t ));
         memcpy(x + c + sizeof( uint8_t ), &(t->length), sizeof( uint16_t ));
         memcpy(x + c + sizeof( uint8_t ) + sizeof( uint16_t ), t->value, t->length);
