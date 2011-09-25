@@ -10,7 +10,7 @@ app      = stegfs
 mkfs     = mkstegfs
 
 CFLAGS   = -Wall -Wextra -Wno-unused-parameter -O2 -std=gnu99 -c -o # -ggdb
-CPPFLAGS = -I. -Isrc -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 `pkg-config fuse --cflags`
+CPPFLAGS = -I. -Isrc -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 `pkg-config fuse --cflags` -DDEBUGGING
 LDFLAGS  = -r -s -o
 LIBS     = `pkg-config fuse --libs-only-l` -lmhash -lmcrypt -lpthread
 
@@ -40,6 +40,17 @@ documentation:
 
 language:
 	@$(MAKE) -C po
+
+install:
+	 @install -c -m 755 -s -D -T stegfs $(PREFIX)/usr/bin/stegfs
+	-@echo "installed \`stegfs' --> \`$(PREFIX)/usr/bin/stegfs'"
+	 @install -c -m 755 -s -D -T mkstegfs $(PREFIX)/usr/bin/mkstegfs
+	-@echo "installed \`mkstegfs' --> \`$(PREFIX)/usr/bin/stegfs'"
+	 @install -c -m 644 -D -T doc/stegfs.1.gz $(PREFIX)/usr/man/man1/stegfs.1.gz
+	-@echo "installed \`doc/stegfs.1.gz' --> \`$(PREFIX)/usr/man/man1/stegfs.1.gz'"
+
+uninstall:
+	-@echo "TODO!!!"
 
 clean:
 	@rm -fv $(object) fuse-stegfs.o mkfs.o

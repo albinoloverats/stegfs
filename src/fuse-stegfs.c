@@ -113,7 +113,7 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
         }
         else
         {
-            msg(_("out of memory @ %s:%i"), __FILE__, __LINE__);
+            log_message(LOG_FATAL, _("out of memory @ %s:%i"), __FILE__, __LINE__);
             e = -ENOMEM;
         }
     }
@@ -138,7 +138,7 @@ static int fuse_stegfs_readlink(const char *path, char *buf, size_t size)
     }
     else
     {
-        msg(NULL);
+        log_message(LOG_ERROR, "Unexpected error!");
         e = -ENOENT;
     }
 
@@ -179,7 +179,7 @@ static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t fill
                         }
                         else
                         {
-                            msg(_("out of memory @ %s:%i"), __FILE__, __LINE__);
+                            log_message(LOG_FATAL, _("out of memory @ %s:%i"), __FILE__, __LINE__);
                             e = -ENOMEM;
                         }
                     }
@@ -209,7 +209,7 @@ static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t fill
                         }
                         else
                         {
-                            msg(_("out of memory @ %s:%i"), __FILE__, __LINE__);
+                            log_message(LOG_FATAL, _("out of memory @ %s:%i"), __FILE__, __LINE__);
                             e = -ENOMEM;
                         }
                     }
@@ -220,7 +220,7 @@ static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t fill
             }
             else
             {
-                msg(_("out of memory @ %s:%i"), __FILE__, __LINE__);
+                log_message(LOG_FATAL, _("out of memory @ %s:%i"), __FILE__, __LINE__);
                 e = -ENOMEM;
             }
         }
@@ -249,7 +249,7 @@ static int fuse_stegfs_unlink(const char *path)
     }
     else
     {
-        msg(_("out of memory @ %s:%i"), __FILE__, __LINE__);
+        log_message(LOG_FATAL, _("out of memory @ %s:%i"), __FILE__, __LINE__);
         e = -ENOMEM;
     }
 
@@ -278,7 +278,7 @@ static int fuse_stegfs_read(const char *path, char *buf, size_t size, off_t offs
             }
             else
             {
-                msg(_("file %#016jx not opened for reading"), this->id);
+                log_message(LOG_ERROR, _("file %#016jx not opened for reading"), this->id);
                 e = -EBADF;
             }
             found = true;
@@ -325,13 +325,13 @@ static int fuse_stegfs_write(const char *path, const char *buf, size_t size, off
                 }
                 else
                 {
-                    msg(_("out of memory @ %s:%i"), __FILE__, __LINE__);
+                    log_message(LOG_FATAL, _("out of memory @ %s:%i"), __FILE__, __LINE__);
                     e = -ENOMEM;
                 }
             }
             else
             {
-                msg(_("file %#016jx not opened for writing"), this->id);
+                log_message(LOG_ERROR, _("file %#016jx not opened for writing"), this->id);
                 e = -EBADF;
             }
             found = true;
@@ -353,7 +353,7 @@ static int fuse_stegfs_open(const char *path, struct fuse_file_info *info)
     char *p = NULL;
     if (asprintf(&p, "%s%s", PATH_ROOT, path) < 0)
     {
-        msg(_("out of memory @ %s:%i"), __FILE__, __LINE__);
+        log_message(LOG_FATAL, _("out of memory @ %s:%i"), __FILE__, __LINE__);
         e = -ENOMEM;
     }
     stegfs_file_t *this = calloc(1, sizeof( stegfs_file_t ));
@@ -392,7 +392,7 @@ static int fuse_stegfs_open(const char *path, struct fuse_file_info *info)
     }
     else
     {
-        msg(_("could not find space in cache for file \"%s\""), path);
+        log_message(LOG_WARNING, _("could not find space in cache for file \"%s\""), path);
         e = -ENOMEM;
     }
 
@@ -487,40 +487,27 @@ static int fuse_stegfs_chown(const char *path, uid_t uid, gid_t gid)
 
 int main(int argc, char **argv)
 {
-    init(APP, VER);
-
     char *fs = NULL, *mnt = NULL;
     bool dbg = false, do_cache = true;
 
     if (argc < ARGS_MINIMUM)
-        return usage();
+    {
+        show_usage(USAGE_STRING);
+        return EXIT_FAILURE;
+    }
 
-    args_t licence    = {'l', "licence",    false, false, NULL};
-    args_t version    = {'v', "version",    false, false, NULL};
-    args_t help       = {'h', "help",       false, false, NULL};
-    args_t debug      = {'d', "debug",      false, false, NULL};
-    args_t filesystem = {'f', "filesystem", false, true,  NULL};
-    args_t mount      = {'m', "mount",      false, true,  NULL};
-    args_t nocache    = {'n', "nocache",    false, false, NULL};
+    args_t filesystem = {'f', "filesystem", false, true,  NULL, ""};
+    args_t mount      = {'m', "mount",      false, true,  NULL, ""};
+    args_t nocache    = {'n', "nocache",    false, false, NULL, ""};
 
     list_t *opts = list_create(NULL);
-    list_append(&opts, &licence);
-    list_append(&opts, &version);
-    list_append(&opts, &help);
-    list_append(&opts, &debug);
     list_append(&opts, &filesystem);
     list_append(&opts, &mount);
     list_append(&opts, &nocache);
 
-    list_t *unknown = parse_args(argv, opts);
+    list_t *unknown = init(SFS_NAME, SFS_VERSION, USAGE_STRING, argv, NULL, opts);
 
-    if (licence.found)
-        return show_licence();
-    if (version.found)
-        return show_version();
-    if (help.found)
-        return show_help();
-    dbg = debug.found;
+    //dbg = debug.found;
     do_cache = !nocache.found;
     if (filesystem.found)
         fs = strdup(filesystem.option);
@@ -554,7 +541,10 @@ int main(int argc, char **argv)
         }
     }
     if (!mnt || !fs)
-        return show_usage();
+    {
+        show_usage(USAGE_STRING);
+        return EXIT_FAILURE;
+    }
 
     lib_stegfs_init(fs, do_cache);
 
@@ -579,27 +569,3 @@ int main(int argc, char **argv)
     return fuse_main(dbg ? ARGS_DEFAULT + 1 : ARGS_DEFAULT, args, &fuse_stegfs_functions, NULL);
 }
 
-static int64_t usage(void)
-{
-    fprintf(stderr, _("Usage:\n"));
-    fprintf(stderr, _("  %s [OPTION]... FILESYSTEM  MOUNT POINT\n"), APP);
-    return EXIT_SUCCESS;
-}
-
-int64_t show_help(void)
-{
-    /*
-     * TODO translate
-     */
-    show_version();
-    usage();
-    fprintf(stderr, "\nOptions:\n\n");
-    fprintf(stderr, "  -f, --filesystem  FILE SYSTEM  Location of the file system to mount\n");
-    fprintf(stderr, "  -m, --mount       MOUNT POINT  Where to mount the file system\n");
-    fprintf(stderr, "  -n, --nocache                  Do not cache directory entries and used blocks\n");
-    fprintf(stderr, "  -h, --help                     Show this help list\n");
-    fprintf(stderr, "  -l, --licence                  Show overview of GNU GPL\n");
-    fprintf(stderr, "  -v, --version                  Show version information\n\n");
-    fprintf(stderr, "  Fuse executable to mount stegfs file systems\n");
-    return EXIT_SUCCESS;
-}

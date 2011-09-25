@@ -46,10 +46,10 @@ extern void lib_stegfs_init(const char * const restrict fs, const bool c)
     stegfs_block_t super;
     lseek(file_system->id, 0, SEEK_SET);
     if (read(file_system->id, &super, sizeof( stegfs_block_t )) != sizeof( stegfs_block_t ))
-        msg("%s", strerror(errno));
+        log_message(LOG_ERROR, "%s", strerror(errno));
     if ((super.hash[0] != MAGIC_0) || (super.hash[1] != MAGIC_1) || (super.hash[2] != MAGIC_2))
     {
-        msg(_("magic number failure in superblock for %s"), fs);
+        log_message(LOG_FATAL, _("magic number failure in superblock for %s"), fs);
         die(_("use mkstegfs to restore superblock"));
     }
 #endif /* ! DEBUGGING */
@@ -279,6 +279,18 @@ extern int64_t lib_stegfs_save(stegfs_file_t *file)
      * work through the file to be hidden (MAX_COPIES) times
      */
     uint64_t start[MAX_COPIES] = { 0x0 };
+    /*
+     * TODO: rewrite save so that it fullfills the following:
+     * 1. If the file is being re-saved, check all existing and still valid
+     *    blocks and write to those first (in the same order as before)
+     * 2. Delete any unnecessary blocks after the end fo the file if the new
+     *    size is small
+     * 3. If the file is being written for the first time, continue as before
+     *
+     * This will require the following new fatures:
+     * 1. Being able to travers a file from beginning to end down any of its
+     *    branches
+     */
     for (uint8_t i = 0; i < MAX_COPIES; i++)
     {
         if (!(start[i] = lib_stegfs_block_find(file->path)))
@@ -290,12 +302,10 @@ extern int64_t lib_stegfs_save(stegfs_file_t *file)
          * process the data: encrypt and store
          */
         uint64_t next = start[i];
-        uint64_t p = 0x0;
         for (uint64_t j = 0; j < file->size; j += SIZE_BYTE_DATA)
         {
             uint8_t data[SIZE_BYTE_DATA] = { 0x00 };
-            memmove(data, file->data + p, SIZE_BYTE_DATA);
-            p += SIZE_BYTE_DATA;
+            memmove(data, file->data + j, j + SIZE_BYTE_DATA > file->size ? file->size % SIZE_BYTE_DATA : SIZE_BYTE_DATA);
             stegfs_block_t block;
             uint64_t cb = next;
             if (!(next = lib_stegfs_block_find(file->path)))

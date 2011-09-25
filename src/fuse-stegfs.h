@@ -23,13 +23,11 @@
 
     #include "src/lib-stegfs.h"
 
-    #define APP "stegfs"
-    #define VER "201101+"
-    #ifdef DEBUGGING
-        #define LOG "LOG"
-    #else /*    DEBUGGING */
-        #define LOG NULL
-    #endif /* ! DEBUGGING */
+    #define SFS_NAME "stegfs"
+    #define SFS_VERSION "201110"
+
+    /* TODO */
+    #define USAGE_STRING "TODO"
 
     #define FILE_ROOT "/"
     #define FILE_PROC FILE_ROOT "+proc"
@@ -92,5 +90,4 @@
     static pthread_mutex_t fuse_lock;
     static list_t *fuse_cache;
 
-    static int64_t usage(void);
 #endif /* _IN_FUSE_STEGFS_ */

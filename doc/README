@@ -92,13 +92,13 @@ Technical Data:
          Chunk Name        Size (in bits)
         +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+
         | Directory/Path Checksum    128 |  |
-        |   [Superblock ID]              |  +‐ Tiger128
+        |  [Nothing - 0xFF]              |  +‐ Tiger128
         |                                |  |
         |                                |  |
         +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+‐‐‐‐‐‐‐‐+
         | Data                       640 |           |
         |  (Starting blocks + timestamp) |           |
-        |  [Nothing ‐ 0xFF]              |           |
+        |  [File system infomration]     |           |
         |                                |           |
         |                                |           |
         |                                |           |
@@ -118,8 +118,8 @@ Technical Data:
         |                                |           |
         +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+ ‐‐‐‐‐‐‐+
         | Checksum                   192 |  |        |
-        | [Hash of "stegfs"]             |  |        |
-        |                                |  |        |
+        |  [Hash of "stegfs" (extended   |  |        |
+        |                         UUID)] |  |        |
         |                                |  +‐ Tiger |
         |                                |  |        |
         |                                |  |        |

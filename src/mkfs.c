@@ -40,13 +40,10 @@
 #include "src/fuse-stegfs.h"
 #include "src/lib-stegfs.h"
 
-static int64_t usage(void);
 static uint64_t size_in_mb(const char *);
 
 int main(int argc, char **argv)
 {
-    init(argv[0], VER);
-
     uint64_t  fs_size = 0x0;
     char     *fs_name = NULL;
 
@@ -54,33 +51,24 @@ int main(int argc, char **argv)
     bool rstr = false;
 
     if (argc < ARGS_MINIMUM)
-        return usage();
+    {
+        show_usage(USAGE_STRING);
+        return EXIT_FAILURE;
+    }
 
-    args_t licence    = {'l', "licence",    false, false, NULL};
-    args_t version    = {'v', "version",    false, false, NULL};
-    args_t help       = {'h', "help",       false, false, NULL};
-    args_t filesystem = {'f', "filesystem", false, true,  NULL};
-    args_t size       = {'s', "size",       false, true,  NULL};
-    args_t force      = {'x', "force",      false, false, NULL};
-    args_t restore    = {'r', "restore",    false, false, NULL};
+    args_t filesystem = {'f', "filesystem", false, true,  NULL, ""};
+    args_t size       = {'s', "size",       false, true,  NULL, ""};
+    args_t force      = {'x', "force",      false, false, NULL, ""};
+    args_t restore    = {'r', "restore",    false, false, NULL, ""};
 
     list_t *opts = list_create(NULL);
-    list_append(&opts, &licence);
-    list_append(&opts, &version);
-    list_append(&opts, &help);
     list_append(&opts, &filesystem);
     list_append(&opts, &size);
     list_append(&opts, &force);
     list_append(&opts, &restore);
 
-    list_t *unknown = parse_args(argv, opts);
+    list_t *unknown = init(argv[0], SFS_VERSION, USAGE_STRING, argv, NULL, opts);
 
-    if (licence.found)
-        return show_licence();
-    if (version.found)
-        return show_version();
-    if (help.found)
-        return show_help();
     if (filesystem.found)
         fs_name = strdup(filesystem.option);
     if (size.found)
@@ -110,7 +98,10 @@ int main(int argc, char **argv)
         }
     }
     if (!fs_name)
-        return usage();
+    {
+        show_usage(USAGE_STRING);
+        return EXIT_FAILURE;
+    }
     /*
      * is this a device or a file?
      */
@@ -135,14 +126,14 @@ int main(int argc, char **argv)
         case S_IFIFO:
             die(_("unable to create file system on specified device \"%s\""), fs_name);
         case S_IFREG:
-            if (!frc)
+            if (!frc && !rstr)
                 die(_("file by that name already exists - use -x to force"));
             /*
              * file does exist; use its current size as the desired capacity
              * (unless the user has specified a new size)
              */
             if ((fs = open(fs_name, O_WRONLY | F_WRLCK, S_IRUSR | S_IWUSR)) < 0)
-                msg(gettext("could not open file system %s"), fs_name);
+                log_message(LOG_ERROR, _("could not open file system %s"), fs_name);
             fs_size = fs_size ? fs_size : (uint64_t)lseek(fs, 0, SEEK_END) / RATIO_BYTE_MB;
             break;
         default:
@@ -156,7 +147,7 @@ int main(int argc, char **argv)
     uint64_t fs_blocks = 0x0;
     if (rstr)
     {
-        msg(_("restoring superblock on %s"), fs_name);
+        log_message(LOG_INFO, _("restoring superblock on %s"), fs_name);
         fs_blocks = lseek(fs, 0, SEEK_END) / SIZE_BYTE_BLOCK;
     }
     else
@@ -170,9 +161,9 @@ int main(int argc, char **argv)
          * display some information about the soon-to-be file system to the
          * user
          */
-        msg(_("location      : %s"), fs_name);
+        printf(_("location      : %s"), fs_name);
         fs_blocks = fs_size * RATIO_BYTE_MB / SIZE_BYTE_BLOCK;
-        msg(_("total blocks  : %8ju"), fs_blocks);
+        printf(_("total blocks  : %8ju"), fs_blocks);
         {
             char *units = strdup("MB");
             float volume = fs_size;
@@ -186,7 +177,7 @@ int main(int argc, char **argv)
                 volume /= RATIO_MB_GB;
                 units = strdup("GB");
             }
-            msg(_("volume        : %8.2f %s"), volume, units);
+            printf(_("volume        : %8.2f %s"), volume, units);
             free(units);
         }
         {
@@ -203,7 +194,7 @@ int main(int argc, char **argv)
                 fs_data /= RATIO_MB_GB;
                 units = strdup("GB");
             }
-            msg(_("data capacity : %8.2f %s"), fs_data, units);
+            printf(_("data capacity : %8.2f %s"), fs_data, units);
             free(units);
         }
         {
@@ -221,7 +212,7 @@ int main(int argc, char **argv)
                 fs_avail /= RATIO_MB_GB;
                 units = strdup("GB");
             }
-            msg(_("usable space  : %8.2f %s"), fs_avail, units);
+            printf(_("usable space  : %8.2f %s"), fs_avail, units);
             free(units);
         }
         /*
@@ -261,7 +252,7 @@ int main(int argc, char **argv)
                 memcpy(buffer[j].next, next, SIZE_BYTE_NEXT);
             }
             if (write(fs, buffer, RATIO_BYTE_MB) != RATIO_BYTE_MB)
-                msg(_("could not create the file system"));
+                log_message(LOG_ERROR, _("could not create the file system"));
         }
     }
     /*
@@ -275,19 +266,23 @@ int main(int argc, char **argv)
          * use TLV format for storing data in SB
          */
         list_t *header = list_create(NULL);
-        list_append(&header, tlv_combine(STEGFS_FS_NAME, strlen(PATH_ROOT), PATH_ROOT));
-        list_append(&header, tlv_combine(STEGFS_VERSION, strlen(VER), VER));
+        tlv_t t = tlv_combine(STEGFS_FS_NAME, strlen(PATH_ROOT), PATH_ROOT);
+        list_append(&header, &t);
+        t = tlv_combine(STEGFS_VERSION, strlen(SFS_VERSION), SFS_VERSION);
+        list_append(&header, &t);
         {
             MCRYPT mc = mcrypt_module_open(MCRYPT_SERPENT, NULL, MCRYPT_CBC, NULL);
             char *mca = mcrypt_enc_get_algorithms_name(mc);
-            list_append(&header, tlv_combine(STEGFS_CRYPTO, strlen(mca), mca));
+            t = tlv_combine(STEGFS_CRYPTO, strlen(mca), mca);
+            list_append(&header, &t);
             mcrypt_generic_deinit(mc);
             mcrypt_module_close(mc);
             free(mca);
         }
         {
             char *mha = (char *)mhash_get_hash_name(MHASH_TIGER);
-            list_append(&header, tlv_combine(STEGFS_HASH, strlen(mha), mha));
+            t = tlv_combine(STEGFS_HASH, strlen(mha), mha);
+            list_append(&header, &t);
             free(mha);
         }
         uint8_t *tlv_data = NULL;
@@ -301,8 +296,13 @@ int main(int argc, char **argv)
         memcpy(sb.next, &fs_blocks, SIZE_BYTE_NEXT);
 
         lseek(fs, 0, SEEK_SET);
-        if ( write(fs, &sb, sizeof( stegfs_block_t )) != sizeof( stegfs_block_t ))
-            msg(_("could not create the file system"));
+        if (write(fs, &sb, sizeof( stegfs_block_t )) != sizeof( stegfs_block_t ))
+            log_message(LOG_ERROR, _("could not create the file system"));
+
+        tlv_t *tt;
+        while ((tt = (tlv_t *)list_remove(&header, 0)))
+            free(tt->value);
+        list_delete(&header);
     }
 
     close(fs);
@@ -335,30 +335,3 @@ static uint64_t size_in_mb(const char *s)
     return v;
 }
 
-static int64_t usage(void)
-{
-    fprintf(stderr, _("Usage:\n"));
-    fprintf(stderr, _("  mk%s [OPTION]... FILESYSTEM\n"), APP);
-    return EXIT_SUCCESS;
-}
-
-int64_t show_help(void)
-{
-    /*
-     * TODO translate
-     */
-    show_version();
-    usage();
-    fprintf(stderr, "\nOptions:\n\n");
-    fprintf(stderr, "  -f, --filesystem  FILE SYSTEM  Where to write the file system to\n");
-    fprintf(stderr, "  -s, --size        SIZE         Size of the file system in MB\n");
-    fprintf(stderr, "  -x, --force                    Force overwriting an existing file\n");
-    fprintf(stderr, "  -r, --restore                  Restore the default stegfs superblock\n");
-    fprintf(stderr, "  -h, --help                     Show this help list\n");
-    fprintf(stderr, "  -l, --licence                  Show overview of GNU GPL\n");
-    fprintf(stderr, "  -v, --version                  Show version information\n\n");
-    fprintf(stderr, "  A tool for creating stegfs images.  If a device is used instead of\n");
-    fprintf(stderr, "  a file (eg: /dev/sda1) a size is not needed as the file system will\n");
-    fprintf(stderr, "  use all available space on that device/partition.\n");
-    return EXIT_SUCCESS;
-}
