@@ -367,7 +367,7 @@ int asprintf(char **buffer, char *fmt, ...)
     int nchars;
     va_list ap;
     
-    if (!(*buffer = (char*)malloc(size)))
+    if (!(*buffer = (char *)malloc(size)))
         die("out of memory @ %s:%d:%s [%d]", __FILE__, __LINE__, __func__, size);
           
     va_start(ap, fmt);
