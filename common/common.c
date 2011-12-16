@@ -360,6 +360,13 @@ extern ssize_t pwrite(int filedes, const void *buffer, size_t size, off_t offset
     return s;
 }
 
+/*
+ * Copyright (C) 2001 Federico Di Gregorio <fog@debian.org> 
+ * Copyright (C) 1991, 1994-1999, 2000, 2001 Free Software Foundation, Inc.
+ *
+ * This code has been derived from an example in the glibc2 documentation.
+ * This file is part of the psycopg module.
+ */
 int asprintf(char **buffer, char *fmt, ...)
 {
     /* guess we need no more than 200 chars of space */
