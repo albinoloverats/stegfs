@@ -161,9 +161,9 @@ int main(int argc, char **argv)
          * display some information about the soon-to-be file system to the
          * user
          */
-        printf(_("location      : %s"), fs_name);
+        printf(_("location      : %s\n"), fs_name);
         fs_blocks = fs_size * RATIO_BYTE_MB / SIZE_BYTE_BLOCK;
-        printf(_("total blocks  : %8ju"), fs_blocks);
+        printf(_("total blocks  : %8ju\n"), fs_blocks);
         {
             char *units = strdup("MB");
             float volume = fs_size;
@@ -177,7 +177,7 @@ int main(int argc, char **argv)
                 volume /= RATIO_MB_GB;
                 units = strdup("GB");
             }
-            printf(_("volume        : %8.2f %s"), volume, units);
+            printf(_("volume        : %8.2f %s\n"), volume, units);
             free(units);
         }
         {
@@ -194,7 +194,7 @@ int main(int argc, char **argv)
                 fs_data /= RATIO_MB_GB;
                 units = strdup("GB");
             }
-            printf(_("data capacity : %8.2f %s"), fs_data, units);
+            printf(_("data capacity : %8.2f %s\n"), fs_data, units);
             free(units);
         }
         {
@@ -212,7 +212,7 @@ int main(int argc, char **argv)
                 fs_avail /= RATIO_MB_GB;
                 units = strdup("GB");
             }
-            printf(_("usable space  : %8.2f %s"), fs_avail, units);
+            printf(_("usable space  : %8.2f %s\n"), fs_avail, units);
             free(units);
         }
         /*
@@ -299,10 +299,7 @@ int main(int argc, char **argv)
         if (write(fs, &sb, sizeof( stegfs_block_t )) != sizeof( stegfs_block_t ))
             log_message(LOG_ERROR, _("could not create the file system"));
 
-        tlv_t *tt;
-        while ((tt = (tlv_t *)list_remove(&header, 0)))
-            free(tt->value);
-        list_delete(&header);
+        list_delete(&header, true);
     }
 
     close(fs);
