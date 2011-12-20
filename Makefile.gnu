@@ -14,7 +14,7 @@ CPPFLAGS = -I. -Isrc -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 `pkg-config fuse --cfl
 LDFLAGS  = -r -s -o
 LIBS     = `pkg-config fuse --libs-only-l` -lmhash -lmcrypt -lpthread
 
-all: $(fuseob) $(mkfsob) $(common) language
+all: $(fuseob) $(mkfsob) $(common) man language
 	@$(CC) $(LIBS) -o $(app) $(fuseob) $(common)
 	@echo "built \`$(fuseob) $(common)' --> \`$(app)'"
 	@$(CC) $(LIBS) -o $(mkfs) $(mkfsob) $(common)
@@ -35,6 +35,9 @@ $(mkfsob): $(object) mkfs.o
 $(common):
 	@$(MAKE) -C common
 
+man:
+	@gzip -c doc/stegfs.1 > doc/stegfs.1.gz
+
 documentation:
 	@doxygen
 
@@ -46,8 +49,8 @@ install:
 	-@echo "installed \`stegfs' --> \`$(PREFIX)/usr/bin/stegfs'"
 	 @install -c -m 755 -s -D -T mkstegfs $(PREFIX)/usr/bin/mkstegfs
 	-@echo "installed \`mkstegfs' --> \`$(PREFIX)/usr/bin/stegfs'"
-	 @install -c -m 644 -D -T doc/stegfs.1.gz $(PREFIX)/usr/man/man1/stegfs.1.gz
-	-@echo "installed \`doc/stegfs.1.gz' --> \`$(PREFIX)/usr/man/man1/stegfs.1.gz'"
+	 @install -c -m 644 -D -T doc/stegfs.1.gz $(PREFIX)/usr/share/man/man1/stegfs.1.gz
+	-@echo "installed \`doc/stegfs.1.gz' --> \`$(PREFIX)/usr/share/man/man1/stegfs.1.gz'"
 
 uninstall:
 	-@echo "TODO!!!"
@@ -60,4 +63,4 @@ distclean: clean
 	@rm -f $(app) $(mkfs) $(fuseob) $(mkfsob) $(common)
 	@$(MAKE) -C common distclean
 	@$(MAKE) -C po distclean
-	@rm -frv doc/{html,latex}
+	@rm -frv doc/{html,latex} doc/stegfs.1.gz
