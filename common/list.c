@@ -39,15 +39,17 @@ extern list_t *list_create(int (*fn)(const void *, const void *))
     return NEW_LIST;
 }
 
-extern void list_delete(list_t **l)
+extern void list_delete2(list_t **l, bool f)
 {
     log_message(LOG_EVERYTHING, "%s:%d:%s(%p)", __FILE__, __LINE__, __func__, l);
-    if (!l || *l == NEW_LIST)
+    if (!l || !*l || *l == NEW_LIST)
         return;
     list_t *x = list_find_first(*l);
     while (true)
     {
         list_t *y = x->next;
+        if (f && x->object)
+            free(x->object);
         x->object = NULL;
         x->prev = NULL;
         x->next = NULL;
@@ -60,7 +62,7 @@ extern void list_delete(list_t **l)
     return;
 }
 
-extern void list_append(list_t **l, const void * const restrict o)
+extern void list_append(list_t **l, void * const restrict o)
 {
     log_message(LOG_EVERYTHING, "%s:%d:%s(%p, %p)", __FILE__, __LINE__, __func__, l, o);
     if (!l || *l == NEW_LIST)
