@@ -83,7 +83,15 @@ extern list_t *init7(const char * const restrict a, const char * const restrict 
         list_t *y = list_create(NULL);
         if (c)
         {
-            y = parse_config(c, d);
+            const char *cf = c;
+            if (conf.found && strcmp(c, conf.option))
+            {
+                log_message(LOG_DEFAULT, "Using non-standard config file : %s", conf.option);
+                cf = conf.option;
+            }
+            else
+                log_message(LOG_VERBOSE, "Using default config file : %s", c);
+            y = parse_config(cf, d);
             /*
              * reparse command line arguments as they should always override config file settings
              */
