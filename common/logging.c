@@ -29,6 +29,7 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <sys/types.h>
+#include <time.h>
 
 #ifdef WIN32
 extern char *program_invocation_short_name;
@@ -86,7 +87,7 @@ extern void log_binary(log_e l, const void * const restrict v, uint64_t s)
         {
             c = 1;
             log_message(l, "%s", b);
-            memset(b, 0x00, sizeof( b ));
+            memset(b, 0x00, sizeof b);
         }
         sprintf(b, "%s%02X%s", b, z[i], (c % sizeof( uint32_t )) ? "" : " ");
     }
@@ -115,7 +116,10 @@ extern void log_message(log_e l, const char * const restrict s, ...)
         flockfile(f);
         if (f == stderr)
             fprintf(f, "\r%s: ", program_invocation_short_name);
-        fprintf(f, "(%d) [%s] ", getpid(), l < LOG_LEVEL_COUNT ? LOG_LEVELS[l] : "(unknown)");
+        char dtm[20];
+        time_t tm = time(NULL);
+        strftime(dtm, sizeof dtm, "%Y-%m-%d %T", localtime(&tm));
+        fprintf(f, "[%s] (%d) [%s] ", dtm, getpid(), l < LOG_LEVEL_COUNT ? LOG_LEVELS[l] : "(unknown)");
         vfprintf(f, s, ap);
         fprintf(f, "\n");
         fflush(f);
