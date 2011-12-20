@@ -43,7 +43,7 @@
      */
     typedef struct list_t
     {
-        void *object;        /*!< Pointer to this item in the list */
+        const void *object;  /*!< Pointer to this item in the list */
         struct list_t *prev; /*!< Pointer to previous list item */
         struct list_t *next; /*!< Pointer to next list item */
     } __attribute__((aligned))
@@ -122,7 +122,7 @@
      *
      * Append a new object onto the tail end of the list
      */
-    extern void list_append(list_t **l, void * const restrict o) __attribute__((nonnull(1, 2)));
+    extern void list_append(list_t **l, const void * const restrict o) __attribute__((nonnull(1, 2)));
 
     /*!
      * \brief         Remove i'th object from a list

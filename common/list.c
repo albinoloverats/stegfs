@@ -49,7 +49,7 @@ extern void list_delete2(list_t **l, bool f)
     {
         list_t *y = x->next;
         if (f && x->object)
-            free(x->object);
+            free((void *)x->object);
         x->object = NULL;
         x->prev = NULL;
         x->next = NULL;
@@ -62,7 +62,7 @@ extern void list_delete2(list_t **l, bool f)
     return;
 }
 
-extern void list_append(list_t **l, void * const restrict o)
+extern void list_append(list_t **l, const void * const restrict o)
 {
     log_message(LOG_EVERYTHING, "%s:%d:%s(%p, %p)", __FILE__, __LINE__, __func__, l, o);
     if (!l || *l == NEW_LIST)
