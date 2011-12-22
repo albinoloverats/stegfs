@@ -28,6 +28,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <time.h>
+#include <execinfo.h>
 
 #ifdef WIN32
 char *program_invocation_short_name = NULL;
@@ -272,6 +273,7 @@ extern void sigint(int s)
 
 extern void die(const char * const restrict s, ...)
 {
+    int ex = errno;
     if (s)
     {
         char *d = NULL;
@@ -291,19 +293,28 @@ extern void die(const char * const restrict s, ...)
 #endif
         va_end(ap);
     }
-    if (errno)
+    if (ex)
     {
-        char * const restrict e = strdup(strerror(errno));
+        char * const restrict e = strdup(strerror(ex));
         for (uint32_t i = 0; i < strlen(e); i++)
             e[i] = tolower(e[i]);
         log_message(LOG_FATAL, "%s", e);
         free(e);
     }
+    void *bt[BACKTRACE_BUFFER_LIMIT];
+    int c = backtrace(bt, BACKTRACE_BUFFER_LIMIT);
+    char **sym = backtrace_symbols(bt, c);
+    if (sym)
+    {
+        for (int i = 0; i < c; i++)
+            log_message(LOG_DEBUG, "%s", sym[i]);
+        free(sym);
+    }
     /*
-     * TODO if running a GUI don't necessarily exit with alerting the user first
+     * TODO if running a GUI don't necessarily exit without alerting the user first
      * Users seem to dislike applications just quitting for no apparent reason!
      */
-    exit(errno);
+    exit(ex);
 }
 
 extern void chill(uint32_t m)

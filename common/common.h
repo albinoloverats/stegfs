@@ -141,9 +141,11 @@
         "along with this program.  If not, see <http://www.gnu.org/licenses/>.\n"
 
     #define ONE_MILLION 1000000 /*!< Integer value for 1 million */
-    #define TEN_MILLION 1000000  /*!< Integer value for 10 million */
+    #define TEN_MILLION 10000000 /*!< Integer value for 10 million */
 
     #define RANDOM_SEED_SIZE 3 /*!< Size of random seed value in bytes */
+
+    #define BACKTRACE_BUFFER_LIMIT 1024 /*!< Maximum number of elements in the backtrace buffer */
 
     /*!
      * \brief  Structure to hold configuration file options
