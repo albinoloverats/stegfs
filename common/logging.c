@@ -35,6 +35,10 @@
 extern char *program_invocation_short_name;
 #endif
 
+#ifdef __APPLE__
+#define program_invocation_short_name getprogname()
+#endif
+
 /*@null@*/static FILE *log_destination = NULL;
 static log_e log_current_level = LOG_INFO;
 

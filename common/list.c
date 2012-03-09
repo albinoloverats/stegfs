@@ -84,7 +84,7 @@ extern void list_append(list_t **l, const void * const restrict o)
 
 extern void *list_remove(list_t **l, const uint64_t i)
 {
-    log_message(LOG_EVERYTHING, "%s:%d:%s(%p, %ju)", __FILE__, __LINE__, __PRETTY_FUNCTION__, l, i);
+    log_message(LOG_EVERYTHING, "%s:%d:%s(%p, %" PRIu64 ")", __FILE__, __LINE__, __PRETTY_FUNCTION__, l, i);
     if (!l || *l == NEW_LIST)
         return NULL;
     const uint64_t s = list_size(*l);
@@ -107,7 +107,7 @@ extern void *list_remove(list_t **l, const uint64_t i)
 
 extern list_t *list_move_to(list_t *l, const uint64_t i)
 {
-    log_message(LOG_EVERYTHING, "%s:%d:%s(%p, %ju)", __FILE__, __LINE__, __PRETTY_FUNCTION__, l, i);
+    log_message(LOG_EVERYTHING, "%s:%d:%s(%p, %" PRIu64 ")", __FILE__, __LINE__, __PRETTY_FUNCTION__, l, i);
     if (!l || l == NEW_LIST)
         return NULL;
     if (i >= list_size(l))
@@ -120,7 +120,7 @@ extern list_t *list_move_to(list_t *l, const uint64_t i)
 
 extern void *list_get(list_t *l, const uint64_t i)
 {
-    log_message(LOG_EVERYTHING, "%s:%d:%s(%p, %ju)", __FILE__, __LINE__, __PRETTY_FUNCTION__, l, i);
+    log_message(LOG_EVERYTHING, "%s:%d:%s(%p, %" PRIu64 ")", __FILE__, __LINE__, __PRETTY_FUNCTION__, l, i);
     if (!l || l == NEW_LIST)
         return NULL;
     return (void *)list_move_to(l, i)->object;
@@ -266,7 +266,7 @@ extern void list_debug(list_t *l)
     uint64_t i = 0;
     while (true)
     {
-        log_message(LOG_DEBUG, "object %02ju: %16p << %16p >> %16p = %p [%ju]", i, x->prev, x, x->next, x->object, x->object ? ((compare_id_t *)x->object)->id : (uint64_t)-1);
+        log_message(LOG_DEBUG, "object %02" PRIu64 ": %16p << %16p >> %16p = %p [%" PRIu64 "]", i, x->prev, x, x->next, x->object, x->object ? ((compare_id_t *)x->object)->id : (uint64_t)-1);
         x = x->next;
         if (!x)
             break;

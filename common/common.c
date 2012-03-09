@@ -147,7 +147,7 @@ extern list_t *parse_args(char **v, list_t *a)
                 if (arg->has_option && v[i + 1] && strncmp(v[i + 1], "-", 1))
                 {
                     i++;
-                    asprintf(&arg->option, v[i]);
+                    asprintf(&arg->option, "%s", v[i]);
                 }
                 arg->found = true;
             }
@@ -186,7 +186,7 @@ extern list_t *parse_args(char **v, list_t *a)
                 if (!strcmp(arg->long_option, o))
                 {
                     arg->found = true;
-                    asprintf(&arg->option, v);
+                    asprintf(&arg->option, "%s", v);
                     break;
                 }
             }
@@ -281,7 +281,7 @@ extern void die(const char * const restrict s, ...)
         va_start(ap, s);
 #ifndef _WIN32
         vasprintf(&d, s, ap);
-        log_message(LOG_FATAL, d);
+        log_message(LOG_FATAL, "%s", d);
 #else
         uint8_t l = 0xFF;
         d = calloc(l, sizeof( uint8_t ));

@@ -48,7 +48,7 @@ extern uint64_t tlv_build(uint8_t **b, list_t *l)
         z += sizeof( uint8_t ) + sizeof( uint16_t ) + t->length;
         uint8_t *x = realloc(*b, z);
         if (!x)
-            die("out of memory @ %s:%d:%s [%ju]", __FILE__, __LINE__, __func__, z);
+            die("out of memory @ %s:%d:%s [%" PRIu64 "]", __FILE__, __LINE__, __func__, z);
         memcpy(x + c, &(t->tag), sizeof( uint8_t ));
         memcpy(x + c + sizeof( uint8_t ), &(t->length), sizeof( uint16_t ));
         memcpy(x + c + sizeof( uint8_t ) + sizeof( uint16_t ), t->value, t->length);
