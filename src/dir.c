@@ -18,7 +18,7 @@
  *
  */
 
-#include "src/dir.h"
+#include "dir.h"
 
 #include <stdlib.h>
 #include <string.h>

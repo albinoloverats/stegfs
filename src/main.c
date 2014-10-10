@@ -36,12 +36,9 @@
 #include "common/common.h"
 #include "common/list.h"
 
-#define _IN_FUSE_STEGFS_
-#include "src/fuse-stegfs.h"
-#undef _IN_FUSE_STEGFS_
+#include "stegfs.h"
 
-#include "src/dir.h"
-
+#include "dir.h"
 
 static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
 {
@@ -67,8 +64,8 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
         /*
          * get basic info about the file system itself
          */
-        stegfs_fs_info_t info;
-        lib_stegfs_info(&info);
+        stegfs_t info;
+        stegfs_info(&info);
         stbuf->st_size = info.size;
     }
     else if (!strncmp(path, PATH_BMAP, strlen(PATH_BMAP)) && strcmp(path, PATH_BMAP))
@@ -103,7 +100,7 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
             this.path = dir_get_path(p);
             this.pass = dir_get_pass(p);
             this.data = NULL;
-            stbuf->st_ino = lib_stegfs_stat(&this, NULL);
+            stbuf->st_ino = stegfs_stat(&this, NULL);
             stbuf->st_mode  = S_IFREG | 0600;
             stbuf->st_nlink = 1;
             stbuf->st_ctime = this.time;
@@ -162,10 +159,10 @@ static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t fill
         /*
          * read the list of used blocks from the bitmap
          */
-        stegfs_fs_info_t fs;
-        lib_stegfs_info(&fs);
+        stegfs_t fs;
+        stegfs_info(&fs);
         uint64_t size = fs.blocks * sizeof( uint8_t ) / CHAR_BIT;
-        uint8_t *map = lib_stegfs_cache_map();
+        uint8_t *map = stegfs_cache_map();
         if (map)
             for (uint64_t i = 0; i < size; i++)
                 for (uint8_t j = 0; j < CHAR_BIT; j++)
@@ -184,9 +181,10 @@ static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t fill
                         }
                     }
     }
+#if 0
     else
     {
-        list_t *files = lib_stegfs_cache_get();
+        list_t *files = stegfs_cache_get();
         if (files)
         {
             char *p = NULL;
@@ -225,6 +223,7 @@ static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t fill
             }
         }
     }
+#endif
 
     STEGFS_UNLOCK(fuse_lock);
     return e;
@@ -244,7 +243,7 @@ static int fuse_stegfs_unlink(const char *path)
         this.path = dir_get_path(p);
         this.pass = dir_get_pass(p);
         this.data = NULL;
-        lib_stegfs_kill(&this);
+        stegfs_kill(&this);
         free(p);
     }
     else
@@ -307,7 +306,7 @@ static int fuse_stegfs_write(const char *path, const char *buf, size_t size, off
             if (this->mode == STEGFS_WRITE)
             {
                 /*
-                 * only increae the buffer if we need to
+                 * only increase the buffer if we need to
                  */
                 void *x = NULL;
                 if ((unsigned)(offset + size) > this->size)
@@ -384,7 +383,7 @@ static int fuse_stegfs_open(const char *path, struct fuse_file_info *info)
         else
         {
             this->mode = STEGFS_READ;
-            lib_stegfs_load(this);
+            stegfs_load(this);
         }
         free(p);
         list_append(&fuse_cache, this);
@@ -443,7 +442,7 @@ static int fuse_stegfs_flush(const char *path, struct fuse_file_info *info)
         {
             found = true;
             if (this->mode == STEGFS_WRITE && this->size)
-                e = lib_stegfs_save(this);
+                e = stegfs_save(this);
             break;
         }
     }
@@ -546,7 +545,7 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    lib_stegfs_init(fs, do_cache);
+    stegfs_init(fs, do_cache);
 
     fuse_cache = list_create(NULL);
     stegfs_file_t *x = calloc(1, sizeof( stegfs_file_t ));
@@ -568,4 +567,3 @@ int main(int argc, char **argv)
 
     return fuse_main(dbg ? ARGS_DEFAULT + 1 : ARGS_DEFAULT, args, &fuse_stegfs_functions, NULL);
 }
-

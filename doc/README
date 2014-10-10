@@ -100,13 +100,13 @@ Technical Data:
         |  (Starting blocks + timestamp) |           |
         |  [File system infomration]     |           |
         |                                |           |
+        |    1KB blocks would give:      |           |
+        |   8192 bits/block              |           |
+        |   7808 bits-o-data/block       |           |
+        |     61 serpent operations      |           |
         |                                |           |
-        |                                |           |
-        |                                |           |
-        |                                |           |
-        |                                |           |
-        |                                |           |
-        |                                |           |
+        | BUT: it leaves a lot of empty  |           |
+        |      space in file headers     |           |
         |                                |           |
         |                                |           |
         |                                |           |

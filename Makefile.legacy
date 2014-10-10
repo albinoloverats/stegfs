@@ -1,0 +1,64 @@
+.PHONY: stegfs mkfs testfs most all install clean distclean uninstall
+
+PO_MAKE      = 
+PO_INSTALL   = 
+PO_CLEAN     = 
+PO_UNINSTALL = 
+
+OPTIONS := -L /usr/pkg/lib -lmhash -lmcrypt -lpthread -lgettextlib -lrefuse -std=c99 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-char-subscripts -pipe -D_FILE_OFFSET_BITS=64 -I ./ -I /usr/pkg/include/ -I`brew --prefix gettext`/include -o
+COMMON  := src/lib-stegfs.c src/dir.c common/common.c common/list.c
+
+most: a
+-include po/*.mk
+
+stegfs:
+# build the main fuse executable
+	 @cc $(OPTIONS) stegfs $(COMMON) src/fuse-stegfs.c
+	-@echo "compiled \`src/fuse-stegfs.c $(COMMON)' --> \`stegfs'"
+
+mkfs:
+# build the mkfs utility
+	 @cc $(OPTIONS) mkstegfs $(COMMON) src/mkfs.c
+	-@echo "compiled \`src/mkfs.c $(COMMON)' --> \`mkstegfs'"
+man:
+# compress the man page
+	 @gzip -c doc/stegfs.1 > doc/stegfs.1.gz
+	-@echo "compressed \`doc/stegfs.1' --> \`doc/stegfs.1.gz'"
+
+testfs:
+# build the testfs utility
+	 @cc -lncurses $(OPTIONS) teststegfs $(COMMON) src/testfs.c
+	-@echo "compiled \`src/testfs.c $(COMMON)' --> \`teststegfs'"
+
+a: stegfs mkfs man $(PO_MAKE)
+
+all: a testfs
+
+install: $(PO_INSTALL)
+# install stegfs
+	 @install -c -m 755 -s -D -T stegfs $(PREFIX)/usr/bin/stegfs
+	-@echo "installed \`stegfs' --> \`$(PREFIX)/usr/bin/stegfs'"
+# install the mkfs
+	 @install -c -m 755 -s -D -T mkstegfs $(PREFIX)/usr/bin/mkstegfs
+	-@echo "installed \`mkstegfs' --> \`$(PREFIX)/usr/bin/stegfs'"
+# finally the man page
+	 @install -c -m 644 -D -T doc/stegfs.1.gz $(PREFIX)/usr/man/man1/stegfs.1.gz
+	-@echo "installed \`doc/stegfs.1.gz' --> \`$(PREFIX)/usr/man/man1/stegfs.1.gz'"
+
+clean: $(PO_CLEAN)
+	-@rm -f stegfs mkstegfs doc/stegfs.1.gz
+	-@echo "removed \`stegfs'"
+	-@echo "removed \`mkstegfs'"
+	-@echo "removed \`doc/stegfs.1.gz'"
+
+distclean: clean
+	-@/bin/rm -f teststegfs
+	-@echo "removed \`teststegfs'"
+
+uninstall: $(PO_UNINSTALL)
+	-@rm -f $(PREFIX)/usr/man/man1/stegfs.1.gz
+	-@echo "removed \`$(PREFIX)/usr/man/man1/stegfs.1.gz'"
+	-@rm -f $(PREFIX)/usr/bin/mkstegfs
+	-@echo "removed \`$(PREFIX)/usr/bin/mkstegfs'"
+	-@rm -f $(PREFIX)/usr/bin/stegfs
+	-@echo "removed \`$(PREFIX)/usr/bin/stegfs'"

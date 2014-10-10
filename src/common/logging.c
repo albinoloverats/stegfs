@@ -1,6 +1,6 @@
 /*
- * Common code shared between projects
- * Copyright (c) 2009-2011, albinoloverats ~ Software Development
+ * Common code for logging messages
+ * Copyright © 2009-2013, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -18,29 +18,31 @@
  *
  */
 
-#include "logging.h"
-#include "common.h"
-
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
 #include <unistd.h>
-#include <errno.h>
 #include <stdarg.h>
-#include <sys/types.h>
+#include <errno.h>
 #include <time.h>
+#include <ctype.h>
+#include <string.h>
+#include <sys/types.h>
 
-#ifdef WIN32
-extern char *program_invocation_short_name;
+#ifndef __APPLE__
+    #include "common/common.h"
+    #include "common/logging.h"
+#else
+    #include "common.h"
+    #include "logging.h"
 #endif
 
-#ifdef __APPLE__
-#define program_invocation_short_name getprogname()
+#ifdef _WIN32
+    #include "common/win32_ext.h"
+    extern char *program_invocation_short_name;
 #endif
 
 /*@null@*/static FILE *log_destination = NULL;
-static log_e log_current_level = LOG_INFO;
+static log_e log_current_level = LOG_DEFAULT;
 
 static const char *LOG_LEVELS[] =
 {
@@ -53,6 +55,8 @@ static const char *LOG_LEVELS[] =
     "FATAL"
 };
 
+static int levenshtein(const char * const restrict, const char * const restrict);
+
 extern void log_redirect(const char * const restrict f)
 {
     if (f)
@@ -61,20 +65,16 @@ extern void log_redirect(const char * const restrict f)
 
 extern log_e log_parse_level(const char * const restrict l)
 {
-    log_e e = LOG_DEFAULT;
     for (uint8_t i = 0; i < LOG_LEVEL_COUNT; i++)
-    {
-        if (!strcasecmp(l, LOG_LEVELS[i]))
-        {
-            e = i;
-            break;
-        }
-    }
-    return e;
+        if (!strcasecmp(l, LOG_LEVELS[i]) || levenshtein(l, LOG_LEVELS[i]) < 5)
+            return (log_e)i;
+    return LOG_DEFAULT;
 }
 
 extern void log_relevel(log_e l)
 {
+    if (l > LOG_FATAL)
+        l = LOG_FATAL;
     log_current_level = l;
 }
 
@@ -102,6 +102,10 @@ extern void log_message(log_e l, const char * const restrict s, ...)
 {
     if (!s)
     {
+        /*
+         * NULL value for s causes error message based on errno to be
+         * displayed at log level error
+         */
         if (errno)
         {
             char * const restrict e = strdup(strerror(errno));
@@ -112,22 +116,50 @@ extern void log_message(log_e l, const char * const restrict s, ...)
         }
         return;
     }
+    if (l < log_current_level)
+        return;
     va_list ap;
     va_start(ap, s);
-    if (l >= log_current_level)
-    {
-        FILE *f = log_destination ? : stderr;
-        flockfile(f);
-        if (f == stderr)
-            fprintf(f, "\r%s: ", program_invocation_short_name);
-        char dtm[20];
-        time_t tm = time(NULL);
-        strftime(dtm, sizeof dtm, "%Y-%m-%d %T", localtime(&tm));
-        fprintf(f, "[%s] (%d) [%s] ", dtm, getpid(), l < LOG_LEVEL_COUNT ? LOG_LEVELS[l] : "(unknown)");
-        vfprintf(f, s, ap);
-        fprintf(f, "\n");
-        fflush(f);
-        funlockfile(f);
-    }
+    FILE *f = log_destination ? : stderr;
+    flockfile(f);
+    if (f == stderr)
+        fprintf(f, "\r%s: ", program_invocation_short_name);
+    char dtm[20];
+    time_t tm = time(NULL);
+    strftime(dtm, sizeof dtm, "%Y-%m-%d %T", localtime(&tm));
+    fprintf(f, "[%s] (%d) [%s] ", dtm, getpid(), l < LOG_LEVEL_COUNT ? LOG_LEVELS[l] : "(unknown)");
+    vfprintf(f, s, ap);
+    fprintf(f, "\n");
+    fflush(f);
+    funlockfile(f);
     va_end(ap);
+    return;
+}
+
+static int levenshtein(const char * const restrict s, const char * const restrict t)
+{
+    const int len_s = strlen(s);
+    const int len_t = strlen(t);
+    if (!len_s)
+        return len_t;
+    if (!len_t)
+        return len_s;
+
+    char *s1 = strndup(s, len_s - 1);
+    const int a = levenshtein(s1, t) + 1;
+
+    char *t1 = strndup(t, len_t - 1);
+    const int b = levenshtein(s, t1) + 1;
+
+    int c = levenshtein(s1, t1);
+    free(s1);
+    free(t1);
+    if (tolower(s[len_s - 1]) != tolower(t[len_t - 1]))
+        c++;
+
+    if (c > b)
+        c = b;
+    if (c > a)
+        c = a;
+    return c;
 }

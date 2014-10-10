@@ -18,8 +18,8 @@
  *
  */
 
-#define _IN_LIB_STEGFS_
-#include "lib-stegfs.h"
+#define _IN_STEGFS_
+#include "stegfs.h"
 #include "dir.h"
 
 #include "common/common.h"
@@ -29,20 +29,40 @@
 #include <libintl.h>
 #include <sys/time.h>
 
-extern void lib_stegfs_init(const char * const restrict fs, const bool c)
+#include <mcrypt.h>
+
+static void stegfs_init_hash(stegfs_file_t *, void *, void *);
+static MCRYPT stegfs_init_crypt(stegfs_file_t *, uint8_t);
+
+static void stegfs_cache_add(const stegfs_file_t * const restrict file) __attribute__((nonnull(1)));
+static void stegfs_cache_del(const stegfs_file_t * const restrict file) __attribute__((nonnull(1)));
+
+static int64_t stegfs_block_save(uint64_t, MCRYPT, stegfs_block_t *);
+static int64_t stegfs_block_load(uint64_t, MCRYPT, stegfs_block_t *);
+
+static uint64_t stegfs_block_find(const char * const restrict path) __attribute__((nonnull(1)));
+static bool stegfs_block_ours(const uint64_t offset, const uint64_t * const restrict hash) __attribute__((nonnull(2)));
+
+static void stegfs_random_seed(void);
+
+static stegfs_t *file_system;
+//static pthread_mutex_t stegfs_lock;
+
+
+extern void stegfs_init(const char * const restrict fs, const bool c)
 {
-    file_system = calloc(1, sizeof( stegfs_fs_info_t ));
+    file_system = calloc(1, sizeof( stegfs_t ));
     if (!file_system)
         die(_("out of memory @ %s:%i"), __FILE__, __LINE__);
     if ((file_system->id = open(fs, O_RDWR, S_IRUSR | S_IWUSR)) < 3)
         die(_("could not open file system %s"), fs);
     /*
      * check the first block to see if everything looks okay - actually
-     * just check the magic numbers of the end of the block; in the 
+     * just check the magic numbers of the end of the block; in the
      * future we could check version and algorithm info from the TLV
      * data block
      */
-#ifndef DEBUGGING
+#ifndef __DEBUG__
     stegfs_block_t super;
     lseek(file_system->id, 0, SEEK_SET);
     if (read(file_system->id, &super, sizeof( stegfs_block_t )) != sizeof( stegfs_block_t ))
@@ -52,7 +72,7 @@ extern void lib_stegfs_init(const char * const restrict fs, const bool c)
         log_message(LOG_FATAL, _("magic number failure in superblock for %s"), fs);
         die(_("use mkstegfs to restore superblock"));
     }
-#endif /* ! DEBUGGING */
+#endif /* ! __DEBUG__ */
     file_system->size = lseek(file_system->id, 0, SEEK_END);
     file_system->blocks = file_system->size / SIZE_BYTE_BLOCK;
     if (c)
@@ -71,7 +91,7 @@ extern void lib_stegfs_init(const char * const restrict fs, const bool c)
     return;
 }
 
-extern void lib_stegfs_info(stegfs_fs_info_t * const restrict info)
+extern void stegfs_info(stegfs_t * const restrict info)
 {
     info->id = file_system->id;
     info->size = file_system->size;
@@ -79,7 +99,7 @@ extern void lib_stegfs_info(stegfs_fs_info_t * const restrict info)
     return;
 }
 
-static void lib_stegfs_cache_add(const stegfs_file_t * const restrict file)
+static void stegfs_cache_add(const stegfs_file_t * const restrict file)
 {
     const uint64_t max = list_size(file_system->files);
     for (uint64_t i = 0; i < max; i++)
@@ -95,7 +115,7 @@ static void lib_stegfs_cache_add(const stegfs_file_t * const restrict file)
     return;
 }
 
-static void lib_stegfs_cache_del(const stegfs_file_t * const restrict file)
+static void stegfs_cache_del(const stegfs_file_t * const restrict file)
 {
     const uint64_t max = list_size(file_system->files);
     for (uint64_t i = 0; i < max; i++)
@@ -113,17 +133,17 @@ static void lib_stegfs_cache_del(const stegfs_file_t * const restrict file)
     return;
 }
 
-extern list_t *lib_stegfs_cache_get(void)
+extern void /*list_t*/ *stegfs_cache_get(void)
 {
     return file_system->files;
 }
 
-extern uint8_t *lib_stegfs_cache_map(void)
+extern uint8_t *stegfs_cache_map(void)
 {
     return file_system->bitmap;
 }
 
-static void lib_stegfs_init_hash(stegfs_file_t *file, void *header, void *path)
+static void stegfs_init_hash(stegfs_file_t *file, void *header, void *path)
 {
     /*
      * find the header blocks for the file
@@ -155,7 +175,7 @@ static void lib_stegfs_init_hash(stegfs_file_t *file, void *header, void *path)
     return;
 }
 
-static MCRYPT lib_stegfs_init_crypt(stegfs_file_t *file, uint8_t ivi)
+static MCRYPT stegfs_init_crypt(stegfs_file_t *file, uint8_t ivi)
 {
     MCRYPT c = mcrypt_module_open(MCRYPT_SERPENT, NULL, MCRYPT_CBC, NULL);
     uint8_t key[SIZE_BYTE_TIGER] = { 0x00 };
@@ -190,13 +210,13 @@ static MCRYPT lib_stegfs_init_crypt(stegfs_file_t *file, uint8_t ivi)
     return c;
 }
 
-extern uint64_t lib_stegfs_stat(stegfs_file_t *file, stegfs_block_t *block)
+extern uint64_t stegfs_stat(stegfs_file_t *file, stegfs_block_t *block)
 {
     uint16_t header[MAX_COPIES] = INIT_HEADER;
     uint64_t path[SIZE_LONG_PATH] = INIT_PATH;
     bool found = false;
     uint64_t inode = 0x0;
-    lib_stegfs_init_hash(file, &header, &path);
+    stegfs_init_hash(file, &header, &path);
     bool fb = false;
     if (!block)
     {
@@ -214,16 +234,16 @@ extern uint64_t lib_stegfs_stat(stegfs_file_t *file, stegfs_block_t *block)
             for (int8_t j = (sizeof( uint64_t ) / sizeof( uint16_t )); j >= 0; --j)
                 inode = (inode << 0x10) | header[i + j];
             inode %= file_system->blocks;
-            if (lib_stegfs_block_ours(inode, path))
+            if (stegfs_block_ours(inode, path))
             {
                 /*
                  * found a header block which might be ours, if we can read
                  * its contents we're in business
                  */
-                MCRYPT c = lib_stegfs_init_crypt(file, i);
+                MCRYPT c = stegfs_init_crypt(file, i);
                 if (c)
                 {
-                    if (!lib_stegfs_block_load(inode, c, block))
+                    if (!stegfs_block_load(inode, c, block))
                     {
                         /*
                         * if we're here we were able to successfully open the header
@@ -249,23 +269,23 @@ extern uint64_t lib_stegfs_stat(stegfs_file_t *file, stegfs_block_t *block)
     return found ? inode : 0;
 }
 
-extern int64_t lib_stegfs_kill(stegfs_file_t *file)
+extern int64_t stegfs_kill(stegfs_file_t *file)
 {
     /*
      * TODO find all blocks for this file and wipe them
      */
-    lib_stegfs_cache_del(file);
+    stegfs_cache_del(file);
     /*
      * TODO find a way to unmark blocks in the bitmap
      */
     return -EXIT_SUCCESS;
 }
 
-extern int64_t lib_stegfs_save(stegfs_file_t *file)
+extern int64_t stegfs_save(stegfs_file_t *file)
 {
     /*
      * some initial preparations - such as: is the file larger than the
-     * file system? because that wouldn't be good :s
+     * file system? Because that wouldn't be good :-S
      */
     if (MAX_COPIES * file->size > file_system->size * RATIO_DATA_BLOCK)
         return -EFBIG;
@@ -274,28 +294,28 @@ extern int64_t lib_stegfs_save(stegfs_file_t *file)
      */
     uint16_t header[MAX_COPIES] = INIT_HEADER;
     uint64_t path[SIZE_LONG_PATH] = INIT_PATH;
-    lib_stegfs_init_hash(file, &header, &path);
+    stegfs_init_hash(file, &header, &path);
     /*
      * work through the file to be hidden (MAX_COPIES) times
      */
     uint64_t start[MAX_COPIES] = { 0x0 };
     /*
-     * TODO: rewrite save so that it fullfills the following:
+     * TODO: rewrite save so that it fulfils the following:
      * 1. If the file is being re-saved, check all existing and still valid
      *    blocks and write to those first (in the same order as before)
-     * 2. Delete any unnecessary blocks after the end fo the file if the new
+     * 2. Delete any unnecessary blocks after the end of the file if the new
      *    size is small
      * 3. If the file is being written for the first time, continue as before
      *
-     * This will require the following new fatures:
-     * 1. Being able to travers a file from beginning to end down any of its
+     * This will require the following new features:
+     * 1. Being able to traverse a file from beginning to end down any of its
      *    branches
      */
     for (uint8_t i = 0; i < MAX_COPIES; i++)
     {
-        if (!(start[i] = lib_stegfs_block_find(file->path)))
+        if (!(start[i] = stegfs_block_find(file->path)))
             return -ENOSPC;
-        MCRYPT c = lib_stegfs_init_crypt(file, i);
+        MCRYPT c = stegfs_init_crypt(file, i);
         if (!c)
             return -ENOMEM;
         /*
@@ -308,7 +328,7 @@ extern int64_t lib_stegfs_save(stegfs_file_t *file)
             memmove(data, file->data + j, j + SIZE_BYTE_DATA > file->size ? file->size % SIZE_BYTE_DATA : SIZE_BYTE_DATA);
             stegfs_block_t block;
             uint64_t cb = next;
-            if (!(next = lib_stegfs_block_find(file->path)))
+            if (!(next = stegfs_block_find(file->path)))
                 return -ENOSPC;
             /*
              * build the block; this includes putting in the data,
@@ -323,7 +343,7 @@ extern int64_t lib_stegfs_save(stegfs_file_t *file)
              * save the block - if there is a problem, give up with IO
              * error
              */
-            if (lib_stegfs_block_save(cb, c, &block))
+            if (stegfs_block_save(cb, c, &block))
                 return -EIO;
         }
         mcrypt_generic_deinit(c);
@@ -353,10 +373,10 @@ extern int64_t lib_stegfs_save(stegfs_file_t *file)
             /*
              * write this copy of the header
              */
-            MCRYPT c = lib_stegfs_init_crypt(file, i);
+            MCRYPT c = stegfs_init_crypt(file, i);
             if (!c)
                 return -ENOMEM;
-            if (lib_stegfs_block_save(head, c, &block))
+            if (stegfs_block_save(head, c, &block))
                 return -EIO;
             mcrypt_generic_deinit(c);
             mcrypt_module_close(c);
@@ -365,14 +385,14 @@ extern int64_t lib_stegfs_save(stegfs_file_t *file)
     /*
      * add file to list of known filenames
      */
-    lib_stegfs_cache_add(file);
+    stegfs_cache_add(file);
     /*
      * success :D
      */
     return -EXIT_SUCCESS;
 }
 
-static int64_t lib_stegfs_block_save(uint64_t offset, MCRYPT crypto, stegfs_block_t *block)
+static int64_t stegfs_block_save(uint64_t offset, MCRYPT crypto, stegfs_block_t *block)
 {
     /*
      * calculate the hash of the data
@@ -388,24 +408,24 @@ static int64_t lib_stegfs_block_save(uint64_t offset, MCRYPT crypto, stegfs_bloc
     /*
      * encrypt the data
      */
-#ifndef DEBUGGING
+#ifndef __DEBUG__
     uint8_t cdata[SIZE_BYTE_SERPENT * 7] = { 0x00 };
     memmove(cdata, ((uint8_t *)block) + SIZE_BYTE_SERPENT, SIZE_BYTE_BLOCK - SIZE_BYTE_PATH);
     mcrypt_generic(crypto, cdata, sizeof( cdata ));
     memmove(((uint8_t *)block) + SIZE_BYTE_SERPENT, cdata, SIZE_BYTE_BLOCK - SIZE_BYTE_PATH);
-#endif /* ! DEBUGGING */
+#endif /* ! __DEBUG__ */
     /*
      * write the encrypted block to this block location
      */
     return pwrite(file_system->id, block, sizeof( stegfs_block_t ), offset * SIZE_BYTE_BLOCK) != sizeof( stegfs_block_t ) ? -errno : -EXIT_SUCCESS;
 }
 
-extern int64_t lib_stegfs_load(stegfs_file_t *file)
+extern int64_t stegfs_load(stegfs_file_t *file)
 {
     uint64_t path[SIZE_LONG_PATH] = INIT_PATH;
-    lib_stegfs_init_hash(file, NULL, path);
+    stegfs_init_hash(file, NULL, path);
     stegfs_block_t head_block;
-    lib_stegfs_stat(file, &head_block);
+    stegfs_stat(file, &head_block);
     /*
      * if we don't know the size of the file then we didn't find an
      * uncorrupted header - give up
@@ -425,7 +445,7 @@ extern int64_t lib_stegfs_load(stegfs_file_t *file)
     uint64_t total = 0x0;
     for (uint8_t i = 0; i < MAX_COPIES; i++)
     {
-        MCRYPT c = lib_stegfs_init_crypt(file, i);
+        MCRYPT c = stegfs_init_crypt(file, i);
         if (!c)
             return -ENOMEM;
         uint64_t next = start[i];
@@ -434,10 +454,10 @@ extern int64_t lib_stegfs_load(stegfs_file_t *file)
         /*
          * now we're ready to read this copy of the file
          */
-        while (lib_stegfs_block_ours(next, path))
+        while (stegfs_block_ours(next, path))
         {
             stegfs_block_t block;
-            if (lib_stegfs_block_load(next, c, &block))
+            if (stegfs_block_load(next, c, &block))
                 break;
             /*
              * woo - we now have successfully decrypted another block
@@ -460,7 +480,7 @@ extern int64_t lib_stegfs_load(stegfs_file_t *file)
             }
             if (bytes >= file->size)
             {
-                lib_stegfs_cache_add(file); /* we now know this files exists :) */
+                stegfs_cache_add(file); /* we now know this files exists :) */
                 return -EXIT_SUCCESS;
             }
             memmove(&next, block.next, SIZE_BYTE_NEXT);
@@ -477,17 +497,17 @@ extern int64_t lib_stegfs_load(stegfs_file_t *file)
     return -EDIED;
 }
 
-static int64_t lib_stegfs_block_load(uint64_t offset, MCRYPT crypto, stegfs_block_t *block)
+static int64_t stegfs_block_load(uint64_t offset, MCRYPT crypto, stegfs_block_t *block)
 {
     errno = EXIT_SUCCESS;
     if (pread(file_system->id, block, sizeof( stegfs_block_t ), offset * SIZE_BYTE_BLOCK) == sizeof( stegfs_block_t ))
     {
-#ifndef DEBUGGING
+#ifndef __DEBUG__
         uint8_t data[SIZE_BYTE_SERPENT * 7] = { 0x00 };
         memmove(data, ((uint8_t *)block) + SIZE_BYTE_SERPENT, SIZE_BYTE_BLOCK - SIZE_BYTE_PATH);
         mdecrypt_generic(crypto, data, sizeof( data ));
         memmove(((uint8_t *)block) + SIZE_BYTE_SERPENT, data, SIZE_BYTE_BLOCK - SIZE_BYTE_PATH);
-#endif /* ! DEBUGGING */
+#endif /* ! __DEBUG__ */
         /*
          * check the hash of the decrypted data
          */
@@ -503,7 +523,7 @@ static int64_t lib_stegfs_block_load(uint64_t offset, MCRYPT crypto, stegfs_bloc
     return -errno;
 }
 
-static uint64_t lib_stegfs_block_find(const char * const restrict path)
+static uint64_t stegfs_block_find(const char * const restrict path)
 {
     uint64_t block = 0x0;
     int16_t att = 0;
@@ -513,7 +533,7 @@ static uint64_t lib_stegfs_block_find(const char * const restrict path)
     {
         if (++att >= MAX_BLOCK_LOOKUP)
             return 0; /* out of time with no block found */
-        lib_stegfs_random_seed();
+        stegfs_random_seed();
         /*
          * pick us a 64bit block number
          */
@@ -545,7 +565,7 @@ static uint64_t lib_stegfs_block_find(const char * const restrict path)
                 uint8_t * const restrict ph = mhash_end(h);
                 memmove((void *)hash, ph, SIZE_BYTE_PATH);
                 free(ph);
-                if (lib_stegfs_block_ours(block, hash))
+                if (stegfs_block_ours(block, hash))
                 {
                     used = true;
                     break; /* this block exists somewhere down our path */
@@ -566,7 +586,7 @@ static uint64_t lib_stegfs_block_find(const char * const restrict path)
     return found ? block : 0;
 }
 
-static bool lib_stegfs_block_ours(const uint64_t offset, const uint64_t * const restrict hash)
+static bool stegfs_block_ours(const uint64_t offset, const uint64_t * const restrict hash)
 {
     const uint8_t const data[SIZE_BYTE_PATH] = { 0x00 };
     if (pread(file_system->id, (void *)data, SIZE_BYTE_PATH, offset * SIZE_BYTE_BLOCK) < 0)
@@ -576,7 +596,7 @@ static bool lib_stegfs_block_ours(const uint64_t offset, const uint64_t * const 
     return true;
 }
 
-static void lib_stegfs_random_seed(void)
+static void stegfs_random_seed(void)
 {
     struct timeval now;
     gettimeofday(&now, NULL);

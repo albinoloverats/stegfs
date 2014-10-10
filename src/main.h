@@ -21,7 +21,7 @@
 #ifndef _FUSE_STEGFS_H_
     #define _FUSE_STEGFS_H_
 
-    #include "src/lib-stegfs.h"
+    #include "stegfs.h"
 
     #define SFS_NAME "stegfs"
     #define SFS_VERSION "201110"
@@ -88,6 +88,8 @@
         .flush    = fuse_stegfs_flush
     };
     static pthread_mutex_t fuse_lock;
+#if 0
     static list_t *fuse_cache;
+#endif
 
 #endif /* _IN_FUSE_STEGFS_ */
