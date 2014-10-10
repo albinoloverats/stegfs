@@ -1,6 +1,6 @@
 /*
  * stegfs ~ a steganographic file system for unix-like systems
- * Copyright (c) 2007-2011, albinoloverats ~ Software Development
+ * Copyright © 2007-2014, albinoloverats ~ Software Development
  * email: stegfs@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -18,70 +18,59 @@
  *
  */
 
-#include "src/dir.h"
+#include "dir.h"
 
 #include <stdlib.h>
 #include <string.h>
 
-extern char *dir_get_file(const char * const restrict p)
+extern char *dir_get_file(const char * const restrict path)
 {
-    char * const restrict z = strdup(p);
-    if (!z)
-        return NULL;
-    const char * const restrict f = strrchr(z, ':');
-    char * const restrict e = strchr(z, ':') ? : z + strlen(z);
-    char *r = NULL;
-    *e = 0x00;
-    if (!strrchr(p, '/'))
-        r = strndup(p, f - z);
-    else
-        r = strndup(strrchr(z, '/') + 1, f - strrchr(z, '/'));
-    free(z);
-    return r;
+    char *file = strrchr(path, '/') + 1;
+    char *pass = strrchr(path, ':');
+    if (!file)
+        file = (char *)path;
+    if (!pass)
+        pass = strchr(file, '\0');
+    return strndup(file, pass - file);
 }
 
-extern uint16_t dir_get_deep(const char * const restrict p)
+extern uint16_t dir_get_deep(const char * const restrict path)
 {
-    if (!strlen(p))
-        return 0;
-    uint16_t c = 0;
-    if (p[0] != '/')
-        c++;
-    char * restrict z = strdup(p);
-    if (!z)
-        return 0;
-    char * const restrict e = strchr(z, ':') ? : z + strlen(z);
-    *e = 0x00;
-    while ((z = strchr(z, '/')))
-        if (++z >= e) /* if we run past the end of the string break */
+    uint16_t d = 0;
+    char *ptr = (char *)path;
+    while ((ptr = strchr(ptr, '/')))
+    {
+        d++;
+        ptr++;
+    }
+    return d;
+}
+
+extern char *dir_get_part(const char * const restrict path, const uint16_t index)
+{
+    char *ptr = (char *)path;
+    for (uint16_t i = 0; i < index; i++)
+    {
+        ptr = strchr(ptr, '/');
+        if (!ptr)
             break;
-        else
-            c++;
-    free(z);
-    return ++c;
+        ptr++;
+    }
+    return strndup(ptr, strchrnul(ptr, '/') - ptr);
 }
 
-extern char *dir_get_part(const char * const restrict p, const uint16_t x)
+extern char *dir_get_pass(const char * const restrict path)
 {
-    if (x > dir_get_deep(p))
-        return NULL;
-    char *z = strdup(p);
-    if (!z)
-        return NULL;
-    char *s = NULL;
-    for (uint16_t i = 0; i <= x; i++)
-        s = strsep(&z, "/");
-    return s;
-}
-
-extern char *dir_get_pass(const char * const restrict p)
-{
-    if (!strrchr(p, ':'))
+    if (!strrchr(path, ':'))
         return strdup("");
-    return strdup(strrchr(p, ':') + 1);
+    return strdup(strrchr(path, ':') + 1);
 }
 
-extern char *dir_get_path(const char * const restrict p)
+extern char *dir_get_path(const char * const restrict path)
 {
-    return strndup(p, strrchr(p, '/') - p);
+    char *p = strndup(path, strrchr(path, '/') - path);
+    if (strlen(p))
+        return p;
+    free(p);
+    return strdup("/");
 }

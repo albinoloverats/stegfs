@@ -1,0 +1,152 @@
+stegfs ‐ 201500                                    -------- ---, 2015
+===============
+
+Changes
+-------
+
+* Complete rewrite **NOT BACKWARDS COMPATIBLE**
+  - Stores block locations (and other vales) as big endian
+  - Change key/IV processing
+* Remove multithreaded capability (we’ll bring it back soon)
+* Files are:
+  - Read when they’re opened
+  - Written when they’re closed
+  - Cached until the file system is unmounted
+
+Ideas For Another Day
+---------------------
+
+* Bring back multithreaded support
+* Allow user configured algorithm (select during mkfs)
+* Cache time limit (force forget if a file isn't accessed)
+* Don't break backwards compatibility!
+
+About
+-----
+
+stegfs is a steganographic file system in userspace. Steganographic file
+systems allow the user plausible deniability of files within. It achieves
+this by becoming a lossy file system: writing a file to the file system
+may overwrite an existing file without warning.
+
+Each file system block is 128 bytes, with 80 being used for actual data,
+with the rest being used to verify the integrity of the data, and point
+to the location of the next block. (Yes this makes it VERY inefficient,
+but the possibility of not being able to retrieve data eclipses this.)
+
+stegfs uses a file hierarchy similar to that of conventional file
+systems. However, all directories must start with a + symbol; allowing
+stegfs to easily distinguish between files and directories. For each
+sub-directory, a check is made to ensure that the current block isn’t
+already being used by another file down that path. Files at a deeper
+level ‘know’ about the files above them, but files in the root directory
+know only of those other files also in the root. Therefore, files at a
+deeper level are less likely to overwrite another file, but are more
+susceptible to being overwritten themselves.
+
+NB ‐ Files and directories do not need to be created, they already exist,
+just try stat’ing a file to see what this means ;‐) (that said, just
+because a file might exist doesn’t mean it does or contains any valid
+data).
+
+Files can be stored with or without a password. The convention adopted
+for stegfs is “/dir/tree/file:passwd”; that is, everything after a colon
+is used at the password for encrypting and decrypting the file. In
+addition to this, as with the directory hierarchy and the file name, the
+password is also used to locate the header blocks for files.
+
+mkstegfs
+--------
+
+When creating a stegfs file system, the size of the file created (or the
+size of the partition on which it will be created) is shown; this is the
+number of bytes (MB, GB, etc) which are used to house everything,
+including header information, about the files on the file system. Below
+this is the capacity available for actual file data ‐ 5/8 of a block is
+used for data (see below). Finally, the maximum usable space under ideal
+conditions where no files are compomised: each file is written 9 times to
+minimise the loss, and maximise the chance of being able to recover it.
+Under normal working conditions it’s highly likely this value will never
+be achieved due to the Birthday Paradox.
+
+Build/Installation
+------------------
+
+* Simply
+  $ make
+  # make install
+
+* Eventually you may need the following
+  $ make clean
+  # make uninstall
+
+Technical Data
+--------------
+
+Units used here (and through-out stegfs) are in powers of 2 - think 1024
+not 1000.
+
+Using 64 bits to represent the block numbers allows up to 1.845e19
+blocks. This allows a theoretical maximum partition size of 2ZB, and a
+theoretical capacity of over 1.25ZB. Although the maximum file size will
+always be 1/9 of the overall capacity due to file replication.
+
+In practice, due to the limits of the open64() function used by the GNU
+C Library and the Linux kernel, the maximum usable limit stands as 8EB.
+This gives approximately 70 trillion blocks, equalling upto 5EB of
+available storage space. (Other limits may exist on other systems.)
+
+RAM requirements for stegfs are a little on the high side too: it will
+use between 0.8% and just over 1.6% of the total file system size. This
+might not seem like much but if you were to have a 1TB stegfs partition
+it would need at least 8GB of RAM to even start, and in excess of 16GB
+if you were to fill it to capacity!
+
+* Serpent:
+  - 128‐bit block
+  - 192‐bit key
+
+* Tiger:
+  - 192‐bit hash
+  -  64‐bit words
+
+* Standard (Header) [Superblock] File Block:
+
+     Chunk Name        Size (in bits)
+    +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+
+    | Directory/Path Checksum    128 |  |
+    |  [Nothing - 0xFF]              |  +‐ Tiger128
+    |                                |  |
+    |                                |  |
+    +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+‐‐‐‐‐‐‐‐+
+    | Data                       640 |           |
+    |  (Starting blocks + timestamp) |           |
+    |  [File system infomration]     |           |
+    |                                |           |
+    |                                |           |
+    |                                |           |
+    |                                |           |
+    |                                |           |
+    |                                |           |
+    |                                |           |
+    |                                |           |
+    |                                |           |
+    |                                |           |
+    |                                |           |
+    |                                |           |
+    |                                |           |
+    |                                |           |
+    |                                |           |
+    |                                |           +‐ Serpent (x7)
+    |                                |           |
+    +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+ ‐‐‐‐‐‐‐+
+    | Checksum                   192 |  |        |
+    |  [Hash of "stegfs" (extended   |  |        |
+    |                         UUID)] |  |        |
+    |                                |  +‐ Tiger |
+    |                                |  |        |
+    |                                |  |        |
+    +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+        |
+    | Next block                  64 |           |
+    |  (File size) [Total blocks]    |           |
+    +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐‐‐‐‐‐‐‐‐‐+
