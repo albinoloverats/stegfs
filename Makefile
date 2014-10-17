@@ -15,7 +15,7 @@ LIBS     = `pkg-config fuse --libs-only-l` -lmhash -lmcrypt -lpthread
 all: stegfs mkfs
 
 stegfs:
-	 @$(CC) $(LIBS) $(CFLAGS) $(CPPFLAGS) $(SOURCE) -o $(STEGFS)
+	 @$(CC) $(LIBS) $(CFLAGS) $(CPPFLAGS) $(SOURCE) $(COMMON) -o $(STEGFS)
 	-@echo "built ‘$(SOURCE)’ --> ‘$(STEGFS)’"
 
 mkfs:

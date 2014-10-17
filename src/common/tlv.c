@@ -42,9 +42,9 @@
 
 typedef struct
 {
-    size_t tags;
-    tlv_t *buffer;
-    uint8_t *export;
+    size_t  tags;
+    tlv_t  *buffer;
+    byte_t *export;
 }
 tlv_private_t;
 
@@ -97,7 +97,7 @@ extern bool tlv_has_tag(TLV_HANDLE ptr, uint8_t tag)
     return ptr ? tlv_value_of(ptr, tag) != NULL : false;
 }
 
-extern uint8_t *tlv_value_of(TLV_HANDLE ptr, uint8_t tag)
+extern byte_t *tlv_value_of(TLV_HANDLE ptr, uint8_t tag)
 {
     tlv_private_t *tlv_ptr = (tlv_private_t *)ptr;
     if (!tlv_ptr)
@@ -108,7 +108,18 @@ extern uint8_t *tlv_value_of(TLV_HANDLE ptr, uint8_t tag)
     return NULL;
 }
 
-extern uint8_t *tlv_export_aux(TLV_HANDLE ptr, bool nbo)
+extern uint16_t tlv_size_of(TLV_HANDLE ptr, uint8_t tag)
+{
+    tlv_private_t *tlv_ptr = (tlv_private_t *)ptr;
+    if (!tlv_ptr)
+        return 0;
+    for (unsigned i = 0; i < tlv_ptr->tags; i++)
+        if (tlv_ptr->buffer[i].tag == tag)
+            return tlv_ptr->buffer[i].length;
+    return 0;
+}
+
+extern byte_t *tlv_export_aux(TLV_HANDLE ptr, bool nbo)
 {
     tlv_private_t *tlv_ptr = (tlv_private_t *)ptr;
     if (!tlv_ptr)

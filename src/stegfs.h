@@ -57,7 +57,9 @@ typedef enum
     TAG_STEGFS,
     TAG_VERSION,
     TAG_CIPHER,
-    TAG_HASH
+    TAG_HASH,
+    TAG_MODE,
+    TAG_MAX
 }
 stegfs_tag_e;
 
@@ -99,6 +101,9 @@ typedef struct stegfs_t
 {
     uint64_t       size;   /*!< Size of file system in bytes (not capacity) */
     int64_t        handle; /*!< Handle to file system file/device */
+    char          *cipher;
+    char          *hash;
+    char          *mode;
     bool          *used;   /*!< Used block tracker */
     stegfs_cache_t cache;  /*!< File cache */
 }

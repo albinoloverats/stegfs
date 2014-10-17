@@ -22,11 +22,13 @@
 #include <fcntl.h>
 #include <libintl.h>
 #include <sys/time.h>
+#include <netinet/in.h>
 
 #include <mcrypt.h>
 #include <mhash.h>
 
 #include "common/common.h"
+#include "common/tlv.h"
 
 #include "stegfs.h"
 #include "dir.h"
@@ -43,7 +45,8 @@ static void block_delete(uint64_t);
 static bool block_in_use(uint64_t, const char * const restrict);
 static uint64_t block_assign(const char * const restrict);
 
-static MCRYPT crypto_init(const stegfs_file_t * const restrict, uint8_t);
+static MCRYPT cipher_init(const stegfs_file_t * const restrict, uint8_t);
+static MHASH hash_init(void);
 static void seed_prng(void);
 
 
@@ -52,13 +55,52 @@ static stegfs_t file_system;
 
 extern bool stegfs_init(const char * const restrict fs)
 {
-    // TODO check file system header - if there's an error: return false
-    seed_prng();
     file_system.handle = open(fs, O_RDWR, S_IRUSR | S_IWUSR);
     file_system.size = lseek(file_system.handle, 0, SEEK_END);
     file_system.used = calloc(file_system.size / SIZE_BYTE_BLOCK, sizeof( bool ));
     file_system.cache.size = 0;
     file_system.cache.file = NULL;
+    stegfs_block_t block;
+    if (!pread(file_system.handle, &block, sizeof block, 0))
+        return false;
+    if (ntohll(block.hash[0]) != MAGIC_0 ||
+        ntohll(block.hash[1]) != MAGIC_1 ||
+        ntohll(block.hash[2]) != MAGIC_2)
+        return false;
+    if (ntohll(block.next[0]) != file_system.size / SIZE_BYTE_BLOCK)
+        return false;
+    TLV_HANDLE tlv = tlv_init();
+    for (int i = 0, j = 0; i < TAG_MAX; i++)
+    {
+        tlv_t t;
+        memcpy(&t.tag, block.data + j, sizeof t.tag);
+        j += sizeof t.tag;
+        memcpy(&t.length, block.data + j, sizeof t.length);
+        j += sizeof t.length;
+        t.length = ntohs(t.length);
+        t.value = malloc(t.length);
+        memcpy(t.value, block.data + j, t.length);
+        j += t.length;
+        tlv_append(&tlv, t);
+        free(t.value);
+    }
+    if (!tlv_has_tag(tlv, TAG_STEGFS) ||
+        !tlv_has_tag(tlv, TAG_VERSION) ||
+        !tlv_has_tag(tlv, TAG_CIPHER) ||
+        !tlv_has_tag(tlv, TAG_HASH) ||
+        !tlv_has_tag(tlv, TAG_MODE))
+        return false;
+
+    if (strncmp((char *)tlv_value_of(tlv, TAG_STEGFS), STEGFS_NAME, strlen(STEGFS_NAME)))
+        return false;
+    if (strncmp((char *)tlv_value_of(tlv, TAG_VERSION), STEGFS_VERSION, strlen(STEGFS_VERSION)))
+        return false;
+    file_system.cipher = strndup((char *)tlv_value_of(tlv, TAG_CIPHER), tlv_size_of(tlv, TAG_CIPHER));
+    file_system.hash = strndup((char *)tlv_value_of(tlv, TAG_HASH), tlv_size_of(tlv, TAG_HASH));
+    file_system.mode = strndup((char *)tlv_value_of(tlv, TAG_MODE), tlv_size_of(tlv, TAG_MODE));
+
+    tlv_deinit(&tlv);
+    seed_prng();
     return true;
 }
 
@@ -118,7 +160,7 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
     /*
      * figure out where the file's inode blocks are
      */
-    MHASH hash = mhash_init(MHASH_TIGER);
+    MHASH hash = hash_init();
     mhash(hash, file->path, strlen(file->path));
     mhash(hash, file->name, strlen(file->name));
     uint8_t *inodes = mhash_end(hash);
@@ -132,7 +174,7 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
         for (int j = (sizeof (uint64_t) / sizeof (uint8_t) ); j >= 0; --j)
             file->inodes[i] = (file->inodes[i] << 0x08) | inodes[i + j];
         file->inodes[i] %= file_system.size / SIZE_BYTE_BLOCK;
-        MCRYPT mc = crypto_init(file, i);
+        MCRYPT mc = cipher_init(file, i);
         stegfs_block_t inode;
         memset(&inode, 0x00, SIZE_BYTE_BLOCK);
         if (block_read(file->inodes[i], &inode, mc, file->path))
@@ -142,7 +184,7 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
             file->size = ntohll(file->size);
             for (int i = 0; i <= MAX_COPIES; i++)
             {
-                MCRYPT nc = crypto_init(file, i);
+                MCRYPT nc = cipher_init(file, i);
                 uint64_t val;
                 memcpy(&val, inode.data + i * sizeof val, sizeof val);
                 val = ntohll(val);
@@ -215,7 +257,7 @@ extern bool stegfs_file_read(stegfs_file_t *file)
         uint64_t blocks = file->size / SIZE_BYTE_DATA + 1;
         if (file->blocks[i][0] != blocks)
             continue; /* this copy is corrupt; try the next */
-        MCRYPT mc = crypto_init(file, i);
+        MCRYPT mc = cipher_init(file, i);
         for (uint64_t j = 1, k = 0; j <= file->blocks[i][0] && file->blocks[i][j]; j++, k++)
         {
             /*
@@ -306,7 +348,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
     bool e = false;
     for (int i = 0; i < MAX_COPIES; i++)
     {
-        MCRYPT mc = crypto_init(file, i);
+        MCRYPT mc = cipher_init(file, i);
         for (uint64_t j = 1, k = 0; j <= blocks; j++, k++)
         {
             stegfs_block_t block;
@@ -336,7 +378,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
     memcpy(inode.next, &z, sizeof file->size);
     for (int i = 0; i < MAX_COPIES; i++)
     {
-        MCRYPT mc = crypto_init(file, i);
+        MCRYPT mc = cipher_init(file, i);
         if (block_write(file->inodes[i], inode, mc, file->path))
             file_system.used[file->inodes[i]] = true;
         else
@@ -380,7 +422,7 @@ static bool block_read(uint64_t bid, stegfs_block_t *block, MCRYPT mc, const cha
     if (z < 0)
         return false;
     /* check path hash */
-    MHASH hash = mhash_init(MHASH_TIGER);
+    MHASH hash = hash_init();
     mhash(hash, path, strlen(path));
     void *p = mhash_end(hash);
     if (memcmp(block->path, p, sizeof block->path))
@@ -397,7 +439,7 @@ static bool block_read(uint64_t bid, stegfs_block_t *block, MCRYPT mc, const cha
         memcpy(((uint8_t *)block) + SIZE_BYTE_SERPENT, data, SIZE_BYTE_BLOCK - SIZE_BYTE_PATH);
 #endif
     /* check data hash */
-    hash = mhash_init(MHASH_TIGER);
+    hash = hash_init();
     mhash(hash, block->data, sizeof block->data);
     p = mhash_end(hash);
     if (memcmp(block->hash, p, sizeof block->hash))
@@ -418,13 +460,13 @@ static bool block_write(uint64_t bid, stegfs_block_t block, MCRYPT mc, const cha
         return false;
     }
     /* compute path hash */
-    MHASH hash = mhash_init(MHASH_TIGER);
+    MHASH hash = hash_init();
     mhash(hash, path, strlen(path));
     void *p = mhash_end(hash);
     memcpy(block.path, p, sizeof block.path);
     free(p);
     /* compute data hash */
-    hash = mhash_init(MHASH_TIGER);
+    hash = hash_init();
     mhash(hash, block.data, sizeof block.data);
     p = mhash_end(hash);
     memcpy(block.hash, p, sizeof block.hash);
@@ -475,7 +517,7 @@ static bool block_in_use(uint64_t bid, const char * const restrict path)
         asprintf(&p, "%s/%s", p ? : "", e ? : "");
         if (e)
             free(e);
-        MHASH hash = mhash_init(MHASH_TIGER);
+        MHASH hash = hash_init();
         mhash(hash, p, strlen(p));
         void *h = mhash_end(hash);
         stegfs_block_t block;
@@ -594,12 +636,12 @@ static void cache_remove(const stegfs_file_t * const restrict file)
     return;
 }
 
-static MCRYPT crypto_init(const stegfs_file_t * const restrict file, uint8_t ivi)
+static MCRYPT cipher_init(const stegfs_file_t * const restrict file, uint8_t ivi)
 {
-    MCRYPT c = mcrypt_module_open(MCRYPT_SERPENT, NULL, MCRYPT_CBC, NULL);
+    MCRYPT c = mcrypt_module_open(file_system.cipher, NULL, file_system.mode, NULL);
     /* create the initial key for the encryption algorithm */
     uint8_t key[SIZE_BYTE_TIGER] = { 0x00 };
-    MHASH hash = mhash_init(MHASH_TIGER);
+    MHASH hash = hash_init();
     mhash(hash, file->path, strlen(file->path));
     mhash(hash, file->name, strlen(file->name));
     if (file->pass)
@@ -611,7 +653,7 @@ static MCRYPT crypto_init(const stegfs_file_t * const restrict file, uint8_t ivi
     free(h);
     /* create the initial iv for the encryption algorithm */
     uint8_t ivs[SIZE_BYTE_SERPENT] = { 0x00 };
-    hash = mhash_init(MHASH_TIGER);
+    hash = hash_init();
     if (file->pass)
         mhash(hash, file->pass, strlen(file->pass));
     else
@@ -627,13 +669,24 @@ static MCRYPT crypto_init(const stegfs_file_t * const restrict file, uint8_t ivi
     return c;
 }
 
+static MHASH hash_init(void)
+{
+    for (size_t i = 0; i < mhash_count(); i++)
+    {
+        if (mhash_get_hash_name_static(i) &&
+                !strcasecmp(file_system.hash, (char *)mhash_get_hash_name_static(i)))
+            return mhash_init(i);
+    }
+    return NULL;
+}
+
 static void seed_prng(void)
 {
     struct timeval now;
     gettimeofday(&now, NULL);
     uint64_t t = now.tv_sec * MILLION + now.tv_usec;
     uint16_t s[RANDOM_SEED_SIZE] = { 0x0 };
-    MHASH h = mhash_init(MHASH_TIGER);
+    MHASH h = hash_init();
     mhash(h, &t, sizeof( uint64_t ));
     uint8_t * const restrict ph = mhash_end(h);
     memcpy(s, ph, RANDOM_SEED_SIZE * sizeof( uint16_t ));

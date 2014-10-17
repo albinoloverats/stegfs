@@ -162,34 +162,33 @@ static MCRYPT crypto_init(void)
     return c;
 }
 
-static void superblock_info(stegfs_block_t *sb, char *cipher, char *hash)
+static void superblock_info(stegfs_block_t *sb, char *cipher, char *mode, char *hash)
 {
     TLV_HANDLE tlv = tlv_init();
 
-    char *x = strdup(STEGFS_NAME);
-    tlv_t t = { TAG_STEGFS, strlen(x), x };
-    for (size_t i = 0; i < strlen(x); i++)
-        x[i] = toupper(x[i]);
+    tlv_t t = { TAG_STEGFS, strlen(STEGFS_NAME), (byte_t *)STEGFS_NAME };
     tlv_append(&tlv, t);
-    free(x);
 
     t.tag = TAG_VERSION;
     t.length = strlen(STEGFS_VERSION);
-    t.value = STEGFS_VERSION;
+    t.value = (byte_t *)STEGFS_VERSION;
     tlv_append(&tlv, t);
 
-    for (size_t i = 0; i < strlen(cipher); i++)
-        cipher[i] = toupper(cipher[i]);
     t.tag = TAG_CIPHER;
     t.length = strlen(cipher);
-    t.value = cipher;
+    t.value = (byte_t *)cipher;
     tlv_append(&tlv, t);
 
-    for (size_t i = 0; i < strlen(hash); i++)
-        hash[i] = toupper(hash[i]);
+    t.tag = TAG_MODE;
+    t.length = strlen(mode);
+    t.value = (byte_t *)mode;
+    tlv_append(&tlv, t);
+
     t.tag = TAG_HASH;
     t.length = strlen(hash);
-    t.value = hash;
+    for (size_t i = 0; i < strlen(hash); i++)
+        hash[i] = tolower(hash[i]);
+    t.value = (byte_t *)hash;
     tlv_append(&tlv, t);
 
     memcpy(sb->data, tlv_export(tlv), tlv_size(tlv));
@@ -285,10 +284,10 @@ int main(int argc, char **argv)
     printf("\rwriting      : %8.3f %%\n", 100.0);
 
 superblock:
-    printf("superblock     : ");
+    printf("superblock   : ");
     stegfs_block_t sb;
     memset(sb.path, 0xFF, sizeof sb.path);
-    superblock_info(&sb, MCRYPT_SERPENT, (char *)mhash_get_hash_name(MHASH_TIGER));
+    superblock_info(&sb, MCRYPT_SERPENT, MCRYPT_CBC, (char *)mhash_get_hash_name(MHASH_TIGER));
     sb.hash[0] = htonll(MAGIC_0);
     sb.hash[1] = htonll(MAGIC_1);
     sb.hash[2] = htonll(MAGIC_2);

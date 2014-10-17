@@ -51,9 +51,9 @@ typedef void * TLV_HANDLE; /*<! Handle type for TLV functions */
  */
 typedef struct
 {
-    uint8_t tag;     /*!< The tag value */
+    uint8_t  tag;    /*!< The tag value */
     uint16_t length; /*!< The length of the value */
-    void *value;     /*!< The actual data */
+    byte_t  *value;  /*!< The actual data */
 }
 tlv_t;
 
@@ -106,7 +106,10 @@ extern bool tlv_has_tag(TLV_HANDLE h, uint8_t t) __attribute__((nonnull(1)));
  * Get the value for the given tag. If there are duplicates in the array
  * this will return the value of the first.
  */
-extern uint8_t *tlv_value_of(TLV_HANDLE h, uint8_t t) __attribute__((nonnull(1)));
+extern byte_t *tlv_value_of(TLV_HANDLE h, uint8_t t) __attribute__((nonnull(1)));
+
+
+extern uint16_t tlv_size_of(TLV_HANDLE ptr, uint8_t t) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Export the TLV array
@@ -118,7 +121,7 @@ extern uint8_t *tlv_value_of(TLV_HANDLE h, uint8_t t) __attribute__((nonnull(1))
  * (defaults to true) specifies wherther to use network byte order for
  * the length value.
  */
-extern uint8_t *tlv_export_aux(TLV_HANDLE h, bool e) __attribute__((nonnull(1)));
+extern byte_t *tlv_export_aux(TLV_HANDLE h, bool e) __attribute__((nonnull(1)));
 
 /*!
  * \brief         The number of TLV items in the array
