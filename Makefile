@@ -7,10 +7,10 @@ SOURCE   = src/main.c src/dir.c src/stegfs.c
 MKSRC    = src/mkfs.c
 COMMON   = src/common/error.c src/common/tlv.c
 
-CFLAGS   = -Wall -Wextra -Werror -Wno-unused-parameter -std=gnu99 `libgcrypt-config --cflags` -pipe -O0 -ggdb
+CFLAGS   = -Wall -Wextra -Werror -Wno-unused-parameter -std=gnu99 -I/usr/local/include -pipe -O0 -ggdb
 CPPFLAGS = -Isrc -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64
 
-LIBS     = `pkg-config fuse --libs-only-l` -lmhash -lmcrypt -lpthread
+LIBS     = -lmhash -lmcrypt -lpthread -L/usr/local/lib -lfuse
 
 all: stegfs mkfs
 
