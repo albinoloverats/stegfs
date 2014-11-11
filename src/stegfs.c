@@ -20,7 +20,8 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <libintl.h>
+#include <unistd.h>
+#include <sys/stat.h>
 #include <sys/time.h>
 #include <netinet/in.h>
 
@@ -145,7 +146,8 @@ extern bool stegfs_file_will_fit(stegfs_file_t *file)
 
 extern void stegfs_file_create(const char * const restrict path, bool write)
 {
-    stegfs_file_t file = { 0x0 };
+    stegfs_file_t file;
+    memset(&file, 0x00, sizeof file);
     file.path = dir_get_path(path);
     file.name = dir_get_file(path);
     file.pass = dir_get_pass(path);

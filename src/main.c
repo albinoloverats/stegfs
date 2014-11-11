@@ -18,11 +18,12 @@
  *
  */
 
-#define FUSE_USE_VERSION 27
 
 #include <errno.h>
 
+#define FUSE_USE_VERSION 27
 #include <fuse.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -32,6 +33,8 @@
 
 #include <limits.h>
 #include <fcntl.h>
+
+#include <sys/stat.h>
 
 #include "dir.h"
 #include "stegfs.h"
@@ -98,7 +101,7 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
     stegfs_t file_system = stegfs_info();
     char *f = dir_get_file(path); /* used to check for symlink */
     /* common attributes for root/files/directories */
-    stbuf->st_dev     = MAGIC_0;
+    stbuf->st_dev     = (dev_t)MAGIC_0;
     stbuf->st_ino     = 0;
     stbuf->st_mode    = S_IFDIR | 0700;
     stbuf->st_nlink   = 2;
@@ -128,7 +131,8 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
     }
     else if (f[0] != SYMBOL_DIR)
     {
-        stegfs_file_t file = { 0x0 };
+        stegfs_file_t file;
+        memset(&file, 0x00, sizeof file);
         file.path = dir_get_path(path);
         file.name = dir_get_file(path);
         file.pass = dir_get_pass(path);
@@ -204,7 +208,8 @@ static int fuse_stegfs_unlink(const char *path)
 {
     errno = EXIT_SUCCESS;
 
-    stegfs_file_t file = { 0x0 };
+    stegfs_file_t file;
+    memset(&file, 0x00, sizeof file);
     file.path = dir_get_path(path);
     file.name = dir_get_file(path);
     file.pass = dir_get_pass(path);
@@ -225,7 +230,8 @@ static int fuse_stegfs_read(const char *path, char *buf, size_t size, off_t offs
     int r;
 
     stegfs_t file_system = stegfs_info();
-    stegfs_file_t file = { 0x0 };
+    stegfs_file_t file;
+    memset(&file, 0x00, sizeof file);
     file.path = dir_get_path(path);
     file.name = dir_get_file(path);
     file.pass = dir_get_pass(path);
@@ -258,7 +264,8 @@ static int fuse_stegfs_write(const char *path, const char *buf, size_t size, off
     int r;
 
     stegfs_t file_system = stegfs_info();
-    stegfs_file_t file = { 0x0 };
+    stegfs_file_t file;
+    memset(&file, 0x00, sizeof file);
     file.path = dir_get_path(path);
     file.name = dir_get_file(path);
     file.pass = dir_get_pass(path);
@@ -305,7 +312,8 @@ done:
 
 static int fuse_stegfs_open(const char *path, struct fuse_file_info *info)
 {
-    stegfs_file_t file = { 0x0 };
+    stegfs_file_t file;
+    memset(&file, 0x00, sizeof file);
     file.path = dir_get_path(path);
     file.name = dir_get_file(path);
     file.pass = dir_get_pass(path);
@@ -325,7 +333,8 @@ static int fuse_stegfs_flush(const char *path, struct fuse_file_info *info)
     errno = EXIT_SUCCESS;
 
     stegfs_t file_system = stegfs_info();
-    stegfs_file_t file = { 0x0 };
+    stegfs_file_t file;
+    memset(&file, 0x00, sizeof file);
     file.path = dir_get_path(path);
     file.name = dir_get_file(path);
     file.pass = dir_get_pass(path);
@@ -363,7 +372,8 @@ static int fuse_stegfs_mknod(const char *path, mode_t mode, dev_t rdev)
 static int fuse_stegfs_release(const char *path, struct fuse_file_info *info)
 {
     stegfs_t file_system = stegfs_info();
-    stegfs_file_t file = { 0x0 };
+    stegfs_file_t file;
+    memset(&file, 0x00, sizeof file);
     file.path = dir_get_path(path);
     file.name = dir_get_file(path);
     file.pass = dir_get_pass(path);
