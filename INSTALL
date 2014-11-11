@@ -1,0 +1,38 @@
+To install stegfs you (currently) need to compile it, and then manually
+move the binaries to wherever you want them.
+
+Below is a list of OS's and the libraries that you (might) need to
+install:
+
+* Arch
+  - fuse
+  - libmcrypt
+  - mhash
+
+* Debian
+  - fuse
+  - libfuse-dev
+  - libmcrypt4
+  - libmcrypt4-dev
+  - libmhash2
+  - libmhash-dev
+
+* Fedora
+  - fuse-libs
+  - fuse-devel
+  - libmcrypt
+  - libmcrypt-devel
+  - mhash
+  - mhash-devel
+
+* Slackware
+  - fuse
+  - mcrypt
+  - mhash
+
+* FreeBSD
+  - fuse
+  - fusefs-libs
+  - libmcrypt
+  - mcrypt ¿maybe?
+  - mhash
