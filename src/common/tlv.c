@@ -28,16 +28,11 @@
     #include <netinet/in.h>
 #endif
 
-#ifndef __APPLE__
-    #include "common/common.h"
-    #include "common/tlv.h"
-#else
-    #include "common.h"
-    #include "tlv.h"
-#endif
+#include "common.h"
+#include "tlv.h"
 
 #ifdef _WIN32
-    #include "common/win32_ext.h"
+    #include "win32_ext.h"
 #endif
 
 typedef struct

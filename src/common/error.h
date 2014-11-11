@@ -1,5 +1,5 @@
 /*
- * Common code for error handling
+ * Common code for error reporting
  * Copyright © 2009-2014, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *

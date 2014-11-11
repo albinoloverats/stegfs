@@ -1,5 +1,5 @@
 /*
- * Common code for error handling
+ * Common code for error reporting
  * Copyright © 2009-2014, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
@@ -33,11 +33,7 @@
 #include <ctype.h>
 #include <string.h>
 
-#ifndef __APPLE__
-    #include "common/error.h"
-#else
-    #include "error.h"
-#endif
+#include "error.h"
 
 #ifdef _WIN32
     #include "common/win32_ext.h"
