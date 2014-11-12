@@ -26,7 +26,7 @@
 #include <time.h>
 
 #define STEGFS_NAME    "stegfs"
-#define STEGFS_VERSION "201500"
+#define STEGFS_VERSION "2015.00"
 
 /* size (in bytes) for various blocks of data */
 #define SIZE_BYTE_SERPENT   0x10                      /*  16 bytes -- 128 bits */
