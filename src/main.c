@@ -423,10 +423,7 @@ int main(int argc, char **argv)
     char *fs = NULL;
     char *mp = NULL;
 
-    char **fuse_args = malloc(argc - 1);
-    fuse_args[0] = strdup(argv[0]);
-
-    for (int i = 1, j = 1; i < argc; i++)
+    for (int i = 1; i < argc; i++)
     {
         struct stat s;
         memset(&s, 0x00, sizeof s);
@@ -437,12 +434,18 @@ int main(int argc, char **argv)
             case S_IFLNK:
             case S_IFREG:
                 fs = strdup(argv[i]);
+                /*
+                 * stegfs is currently single threaded (much more work
+                 * is needed to overcome this) so until that time, we'll
+                 * force that condition here
+                 */
+                asprintf(&argv[i], "-s");
                 break;
             case S_IFDIR:
                 mp = strdup(argv[i]);
+                break;
             default:
-                fuse_args[j] = strdup(argv[i]);
-                j++;
+                /* ignore unknown options (they might be fuse options) */
                 break;
         }
     }
@@ -459,5 +462,5 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    return fuse_main(argc - 1, fuse_args, &fuse_stegfs_functions, NULL);
+    return fuse_main(argc, argv, &fuse_stegfs_functions, NULL);
 }
