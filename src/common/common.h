@@ -61,8 +61,10 @@
 #endif
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN || BYTE_ORDER == LITTLE_ENDIAN || _WIN32
-    #define ntohll(x) __bswap_64(x) /*!< Do need to swap bytes from network byte order */
-    #define htonll(x) __bswap_64(x) /*!< Do need to swap bytes to network byte order */
+    #ifndef __APPLE__
+        #define ntohll(x) __bswap_64(x) /*!< Do need to swap bytes from network byte order */
+        #define htonll(x) __bswap_64(x) /*!< Do need to swap bytes to network byte order */
+    #endif
 #elif __BYTE_ORDER == __BIG_ENDIAN || BYTE_ORDER == BIG_ENDIAN
     #define ntohll(x) (x) /*!< No need to swap bytes from network byte order */
     #define htonll(x) (x) /*!< No need to swap bytes to network byte order */

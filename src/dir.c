@@ -18,10 +18,12 @@
  *
  */
 
-#include "dir.h"
-
 #include <stdlib.h>
 #include <string.h>
+
+#include "common/apple.h"
+
+#include "dir.h"
 
 extern char *dir_get_file(const char * const restrict path)
 {

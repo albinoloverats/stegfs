@@ -5,12 +5,12 @@ MKFS	 = mkstegfs
 
 SOURCE   = src/main.c src/dir.c src/stegfs.c
 MKSRC    = src/mkfs.c
-COMMON   = src/common/error.c src/common/tlv.c
+COMMON   = src/common/error.c src/common/tlv.c src/common/apple.c
 
-CFLAGS   = -Wall -Wextra -Werror -Wno-unused-parameter -std=gnu99 -I/usr/local/include -pipe -O0 -ggdb
+CFLAGS   = -Wall -Wextra -Werror -Wno-unused-parameter -std=gnu99 `pkg-config --cflags fuse` -pipe -O0 -ggdb
 CPPFLAGS = -Isrc -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64
 
-LIBS     = -lmhash -lmcrypt -lpthread -L/usr/local/lib -lfuse
+LIBS     = -lmhash -lmcrypt -lpthread `pkg-config --libs fuse`
 
 all: stegfs mkfs
 
