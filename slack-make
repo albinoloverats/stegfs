@@ -1,6 +1,6 @@
 #!/bin/sh
 
-app=encrypt
+app=stegfs
 version=2014.00
 pkgdir=build
 
