@@ -8,4 +8,4 @@ Standards-Version: 3.7.2
 Package: stegfs
 Architecture: any
 Depends: libfuse2 (>= 2.7), libmcrypt4 (>= 2.5), libmhash2 (>= 0.9), ${shlibs:Depends}, ${misc:Depends}
-Description: stegfs is a Fuse based file system which provides absolute security. Using encryption to secure files, and the art of steganography to hide them, stegfs aims to ensure that the existence of such files isn't guaranteed. Implemented as a Fuse based file system and using the mhash and mcrypt libraries to provide the cryptographic hash and symmetric block cipher functions, stegfs is at the cutting edge of secure file system technology.
+Description: stegfs is a FUSE based file system which provides absolute security. Using encryption to secure files, and the art of steganography to hide them, stegfs aims to ensure that the existence of such files isn't guaranteed. Implemented as a FUSE based file system and using the mhash and mcrypt libraries to provide the cryptographic hash and symmetric block cipher functions, stegfs is at the cutting edge of secure file system technology.
