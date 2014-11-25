@@ -1,5 +1,5 @@
-stegfs ‐ 201500                                    -------- ---, 2015
-===============
+stegfs - 2015.00                                          ---- ---- ----
+================
 
 Changes
 -------
@@ -18,36 +18,46 @@ Ideas For Another Day
 
 * Bring back multithreaded support
 * Allow user configured algorithm (select during mkfs)
-* Cache time limit (force forget if a file isn't accessed)
-* Don't break backwards compatibility!
+* Cache time limit (force forget if a file isn’t accessed)
+* Don’t break backwards compatibility (again)!
 
 About
 -----
 
 stegfs is a steganographic file system in userspace. Steganographic file
-systems allow the user plausible deniability of files within. It achieves
-this by becoming a lossy file system: writing a file to the file system
-may overwrite an existing file without warning.
+systems allow the user plausible deniability of files within. It
+achieves this by becoming a lossy file system: writing a file to the
+file system may overwrite an existing file without warning.
 
-Each file system block is 128 bytes, with 80 being used for actual data,
-with the rest being used to verify the integrity of the data, and point
-to the location of the next block. (Yes this makes it VERY inefficient,
-but the possibility of not being able to retrieve data eclipses this.)
+The typical use case for stegfs is either as a file on an existing file
+system, similar to many other FUSE based file systems, but it can also
+function as a file system on its own partition, like traditional
+“in-kernel” file systems---it doesn't really matter. With that in mind,
+it’s not expected to be a primary workstation file system, but more of a
+USB or SD-card file system. Great for keeping documents hidden from
+prying eyes when moving data between systems. (It also works well with
+online based storage provides too.)
+
+One suggested way of using stegfs is to have it located as the final
+partition on a USB drive, and keep less secret data in the root or
+within one or two subdirectories, and then keep more secret data further
+down the hierarchy---obviously with each file having a unique password.
 
 stegfs uses a file hierarchy similar to that of conventional file
 systems. However, all directories must start with a + symbol; allowing
 stegfs to easily distinguish between files and directories. For each
-sub-directory, a check is made to ensure that the current block isn’t
-already being used by another file down that path. Files at a deeper
-level ‘know’ about the files above them, but files in the root directory
-know only of those other files also in the root. Therefore, files at a
-deeper level are less likely to overwrite another file, but are more
-susceptible to being overwritten themselves.
+subdirectory, a check is made to ensure that the current block isn’t
+already being used by another file down that path. Files written at
+deeper levels will not overwrite files above them, but files in the root
+directory are likely to overwrite portions of files further away from
+the root. Therefore, files at a deeper level are less likely to
+overwrite another file, but are more susceptible to being overwritten
+themselves.
 
-NB ‐ Files and directories do not need to be created, they already exist,
-just try stat’ing a file to see what this means ;‐) (that said, just
-because a file might exist doesn’t mean it does or contains any valid
-data).
+NB ‐ Files and directories do not need to be created, they already
+exist, just try stat’ing a file to see what this means ;‐) (that said,
+just because a file might exist doesn’t mean it does or contains any
+valid data).
 
 Files can be stored with or without a password. The convention adopted
 for stegfs is “/dir/tree/file:passwd”; that is, everything after a colon
@@ -64,10 +74,10 @@ number of bytes (MB, GB, etc) which are used to house everything,
 including header information, about the files on the file system. Below
 this is the capacity available for actual file data ‐ 5/8 of a block is
 used for data (see below). Finally, the maximum usable space under ideal
-conditions where no files are compomised: each file is written 9 times to
-minimise the loss, and maximise the chance of being able to recover it.
-Under normal working conditions it’s highly likely this value will never
-be achieved due to the Birthday Paradox.
+conditions where no files are compomised: each file is written 9 times
+to minimise the loss, and maximise the chance of being able to recover
+it. Under normal working conditions it’s highly likely this value will
+never be achieved due to the Birthday Paradox.
 
 Build/Installation
 ------------------
@@ -85,6 +95,11 @@ Technical Data
 
 Units used here (and through-out stegfs) are in powers of 2 - think 1024
 not 1000.
+
+Each file system block is 128 bytes, with 80 being used for actual data,
+with the rest being used to verify the integrity of the data, and point
+to the location of the next block. (Yes this makes it VERY inefficient,
+but the possibility of not being able to retrieve data eclipses this.)
 
 Using 64 bits to represent the block numbers allows up to 1.845e19
 blocks. This allows a theoretical maximum partition size of 2ZB, and a
