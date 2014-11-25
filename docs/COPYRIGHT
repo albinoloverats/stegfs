@@ -1,0 +1,11 @@
+    Copyright © 2006-2014, albinoloverats ~ Software Development
+
+stegfs is available  under the terms of the  GNU General Public License,
+version 3 or later.
+
+Other components of stegfs are freely  available under one free software
+licence or another:
+ * mcrypt and libmcrypt is available under the terms of the GNU  General
+   Public License version 2.0 (GPLv2).
+ * mhash is available  under the terms of the GNU  Lesser General Public
+   License (LGPL).
