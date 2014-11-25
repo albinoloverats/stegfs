@@ -1,5 +1,8 @@
-To install stegfs you (currently) need to compile it, and then manually
-move the binaries to wherever you want them.
+Compiling/Installing From Source
+================================
+
+Prerequisites
+-------------
 
 Below is a list of OS's and the libraries that you (might) need to
 install:
@@ -36,3 +39,13 @@ install:
   - libmcrypt
   - mcrypt ¿maybe?
   - mhash
+
+The Process
+-----------
+
+NB - There is no configure step, so just do the following:
+* make
+
+To install stegfs you (currently) need to compile it, and then manually
+move the binaries to wherever you want them (there is no make install,
+yet).

@@ -1,0 +1,77 @@
+Technical Data
+==============
+
+Units used here (and through-out stegfs) are in powers of 2 - think 1024
+not 1000.
+
+Each file system block is 128 bytes, with 80 being used for actual data,
+with the rest being used to verify the integrity of the data, and point
+to the location of the next block. (Yes this makes it VERY inefficient,
+but the possibility of not being able to retrieve data eclipses this.)
+
+Using 64 bits to represent the block numbers allows up to 1.845e19
+blocks. This allows a theoretical maximum partition size of 2ZB, and a
+theoretical capacity of over 1.25ZB. Although the maximum file size will
+always be 1/9 of the overall capacity due to file replication.
+
+In practice, due to the limits of the open64() function used by the GNU
+C Library and the Linux kernel, the maximum usable limit stands as 8EB.
+This gives approximately 70 trillion blocks, equalling upto 5EB of
+available storage space. (Other limits may exist on other systems.)
+
+RAM requirements for stegfs are a little on the high side too: it will
+use between 0.8% and just over 1.6% of the total file system size. This
+might not seem like much but if you were to have a 1TB stegfs partition
+it would need at least 8GB of RAM to even start, and in excess of 16GB
+if you were to fill it to capacity!
+
+* Serpent:
+  - 128‐bit block
+  - 192‐bit key
+
+* Tiger:
+  - 192‐bit hash
+  -  64‐bit words
+
+Block Layout
+------------
+
+     Chunk Name        Size (in bits)
+    +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+
+    | Directory/Path Checksum    128 |  |
+    |  [Nothing - 0xFF]              |  +‐ Tiger128
+    |                                |  |
+    |                                |  |
+    +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+‐‐‐‐‐‐‐‐+
+    | Data                       640 |           |
+    |  (Starting blocks + timestamp) |           |
+    |  [File system infomration]     |           |
+    |                                |           |
+    |                                |           |
+    |                                |           |
+    |                                |           |
+    |                                |           |
+    |                                |           |
+    |                                |           |
+    |                                |           |
+    |                                |           |
+    |                                |           |
+    |                                |           |
+    |                                |           |
+    |                                |           |
+    |                                |           |
+    |                                |           |
+    |                                |           +‐ Serpent (x7)
+    |                                |           |
+    +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+ ‐‐‐‐‐‐‐+
+    | Checksum                   192 |  |        |
+    |  [Hash of "stegfs" (extended   |  |        |
+    |                         UUID)] |  |        |
+    |                                |  +‐ Tiger |
+    |                                |  |        |
+    |                                |  |        |
+    +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+        |
+    | Next block                  64 |           |
+    |  (File size) [Total blocks]    |           |
+    +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐‐‐‐‐‐‐‐‐‐+
+
