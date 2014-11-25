@@ -1,10 +1,10 @@
 stegfs: stegfs (a steganographic file system)
 stegfs:
-stegfs: stegfs is a steganographic file system in userspace.
-stegfs: Steganographic file systems allow the user plausible deniability of
-stegfs: files within. It achieves this by becoming a lossy file system: writing
-stegfs: a file to the file system may overwrite an existing file without
-stegfs: warning.
+stegfs: A FUSE based file system which provides absolute security. Using
+stegfs: encryption to secure files, and the art of steganography to hide them,
+stegfs: stegfs aims to ensure that the existence of such files cannot be proven.
+stegfs:
+stegfs:
 stegfs:
 stegfs: Dependencies: fuse mcrypt mhash
 stegfs: It's likely your system already has all of these are they're included
