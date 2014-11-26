@@ -46,5 +46,6 @@ clean:
 
 distclean: clean
 	@rm -fv $(STEGFS).1.gz
-	@rm -fvr pkg
-	@rm -fv $(STEGFS)*pkg.tar.xz
+	@rm -fvr pkg build
+	@rm -fv $(STEGFS)*.pkg.tar.xz
+	@rm -fv $(STEGFS)*.tgz
