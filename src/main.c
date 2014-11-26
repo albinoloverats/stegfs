@@ -36,6 +36,7 @@
 
 #include <sys/stat.h>
 
+#include "help.h"
 #include "dir.h"
 #include "stegfs.h"
 
@@ -423,8 +424,20 @@ int main(int argc, char **argv)
     char *fs = NULL;
     char *mp = NULL;
 
+    bool h = false;
+
     for (int i = 1; i < argc; i++)
     {
+        if (!strcmp(argv[i], "--licence") || !strcmp(argv[i], "-l"))
+            show_licence();
+        if (!strcmp(argv[i], "--version") || !strcmp(argv[i], "-v"))
+            show_version();
+        if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-h"))
+        {
+            show_help();
+            h = true;
+            break; // break to allow FUSE to show its options
+        }
         struct stat s;
         memset(&s, 0x00, sizeof s);
         stat(argv[i], &s);
@@ -450,13 +463,13 @@ int main(int argc, char **argv)
         }
     }
 
-    if (!mp || !fs)
+    if (!h && !(mp && fs))
     {
         fprintf(stderr, "Missing file system and/or mount point!\n");
-        return EXIT_FAILURE;
+        show_usage();
     }
 
-    if (!stegfs_init(fs))
+    if (!h && !stegfs_init(fs))
     {
         fprintf(stderr, "Could not initialise file system!\n");
         return EXIT_FAILURE;

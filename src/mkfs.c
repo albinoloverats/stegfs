@@ -196,24 +196,24 @@ static void superblock_info(stegfs_block_t *sb, char *cipher, char *mode, char *
     return;
 }
 
-static void print_usage(char *arg)
+static void print_usage_help(char *arg)
 {
-    fprintf(stderr, "Usage: %s [-s] [-f] <file system>\n", arg);
+    fprintf(stderr, "Usage: %s <-s size> <file system>\n", arg);
     fprintf(stderr, "\n");
     fprintf(stderr, "  -s <size> Desired file system size, required when creating a file system in\n");
     fprintf(stderr, "            a nomal file\n");
     fprintf(stderr, "  -f        Force overwrite existing file, required when overwriting a file\n");
     fprintf(stderr, "            system in a normal file\n");
-    fprintf(stderr, "  -r        Rewrite the superblock (perhaps it become corrupt)\n");
-    fprintf(stderr, "\n");
-    fprintf(stderr, "Neither options are necessary when creating a file system on a block device.\n");
-    exit(EXIT_FAILURE);
+    fprintf(stderr, "  -r        Rewrite the superblock (perhaps it became corrupt)\n");
+    fprintf(stderr, "\nNotes:\n  • Size option isn't necessary when creating a file system on a block device.\n");
+    fprintf(stderr, "  • Size are in megabytes unless otherwise told: GB, TB, PB, or EB.\n");
+    exit(EXIT_SUCCESS);
 }
 
 int main(int argc, char **argv)
 {
     if (argc <= 1)
-        print_usage(argv[0]);
+        print_usage_help(argv[0]);
 
     char *path = NULL;
     uint64_t size = 0;
@@ -223,7 +223,7 @@ int main(int argc, char **argv)
     for (int i = 1; i < argc; i++)
     {
         if (!strcmp("-h", argv[i]))
-            print_usage(argv[0]);
+            print_usage_help(argv[0]);
         else if (!strcmp("-s", argv[i]))
             size = parse_size(argv[(++i)]);
         else if (!strcmp("-f", argv[i]))
