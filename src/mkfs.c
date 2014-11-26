@@ -96,7 +96,7 @@ static uint64_t parse_size(const char * const restrict s)
     /*
      * parse the value for our file system size (if using a file on an
      * existing file system) allowing for suffixes: MB, GB, TB, PB and
-     * EB - sizes less than 1MB or greater than an Exbibyte are not
+     * EB - sizes less than 1MB or greater than an Exbibyte are not yet
      * supported
      */
     char *f;
@@ -198,15 +198,15 @@ static void superblock_info(stegfs_block_t *sb, char *cipher, char *mode, char *
 
 static void print_usage_help(char *arg)
 {
-    fprintf(stderr, "Usage: %s <-s size> <file system>\n", arg);
+    fprintf(stderr, "Usage: %s [-s size] <file system>\n", arg);
     fprintf(stderr, "\n");
-    fprintf(stderr, "  -s <size> Desired file system size, required when creating a file system in\n");
-    fprintf(stderr, "            a nomal file\n");
-    fprintf(stderr, "  -f        Force overwrite existing file, required when overwriting a file\n");
-    fprintf(stderr, "            system in a normal file\n");
-    fprintf(stderr, "  -r        Rewrite the superblock (perhaps it became corrupt)\n");
+    fprintf(stderr, "  -s size Desired file system size, required when creating a file system in\n");
+    fprintf(stderr, "          a nomal file\n");
+    fprintf(stderr, "  -f      Force overwrite existing file, required when overwriting a file\n");
+    fprintf(stderr, "          system in a normal file\n");
+    fprintf(stderr, "  -r      Rewrite the superblock (perhaps it became corrupt)\n");
     fprintf(stderr, "\nNotes:\n  • Size option isn't necessary when creating a file system on a block device.\n");
-    fprintf(stderr, "  • Size are in megabytes unless otherwise told: GB, TB, PB, or EB.\n");
+    fprintf(stderr, "  • Size are in megabytes unless otherwise specified: GB, TB, PB, or EB.\n");
     exit(EXIT_SUCCESS);
 }
 
@@ -222,7 +222,7 @@ int main(int argc, char **argv)
 
     for (int i = 1; i < argc; i++)
     {
-        if (!strcmp("-h", argv[i]))
+        if (!strcmp("--help", argv[i]) || !strcmp("-h", argv[i]))
             print_usage_help(argv[0]);
         else if (!strcmp("-s", argv[i]))
             size = parse_size(argv[(++i)]);

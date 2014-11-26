@@ -6,7 +6,7 @@
 .SH SYNOPSIS
 \fBstegfs\fR <\fIfile system\fR> <\fImount point\fR> [\fIFUSE options ...\fR]
 .P
-\fBmkstegfs\fR <\fB\-s\fR \fIsize\fR> <\fIfile system\fR>
+\fBmkstegfs\fR [\fB\-s\fR \fIsize\fR] <\fIfile system\fR>
 .SH DESCRIPTION
 \fBstegfs\fR is a FUSE based file system which provides absolute security. Using
 encryption to secure files, and the art of steganography to hide them, stegfs
@@ -42,7 +42,7 @@ Rewrite the superblock (perhaps it became corrupt)
 .SH NOTES
 Size option isn't necessary when creating a file system on a block device.
 .P
-Size are in megabytes unless otherwise told: GB, TB, PB, or EB.
+Size are in megabytes unless otherwise specified: GB, TB, PB, or EB.
 .SH AUTHOR
 Written by Ashley Morgan Anderson
 .SH BUGS
