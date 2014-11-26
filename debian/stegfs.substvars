@@ -1,1 +1,2 @@
-shlibs:Depends=libc6 (>= 2.7-1), libfuse2 (>= 2.6), libmcrypt4, libmhash2
+shlibs:Depends=libc6 (>= 2.2.5), libfuse2 (>= 2.8.1), libmcrypt4, libmhash2
+misc:Depends=
