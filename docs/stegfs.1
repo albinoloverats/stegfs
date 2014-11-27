@@ -3,10 +3,14 @@
 \fBstegfs\fR \- A (FUSE based) steganographic file system for Unix-like operating systems
 .P
 \fBmkstegfs\fR \- mkfs binary to create stegfs file systems
+.P
+\fBcpstegfs\fR \- stegfs file copy utility
 .SH SYNOPSIS
 \fBstegfs\fR <\fIfile system\fR> <\fImount point\fR> [\fIFUSE options ...\fR]
 .P
 \fBmkstegfs\fR [\fB\-s\fR \fIsize\fR] <\fIfile system\fR>
+.P
+\fBcpstegfs\fR <\fIsource ...\fR> <\fIdestination\fR>
 .SH DESCRIPTION
 \fBstegfs\fR is a FUSE based file system which provides absolute security. Using
 encryption to secure files, and the art of steganography to hide them, stegfs
@@ -14,7 +18,7 @@ aims to ensure that the existence of such files isn't guaranteed. Implemented as
 a FUSE based file system and using the mhash and mcrypt libraries to provide the
 cryptographic hash and symmetric block cipher functions, stegfs is at the
 cutting edge of secure file system technology.
-.SH OPTIONS \fIstegfs\fR
+.SH OPTIONS
 .TP
 .BR \-h ", " \-\-help\fR
 Display list of arguments
@@ -39,10 +43,14 @@ Force overwrite existing file, required when overwriting a file system in a norm
 .TP
 .BR \-r\fR
 Rewrite the superblock (perhaps it became corrupt)
-.SH NOTES
+.SH NOTES \fImkstegfs\fR
 Size option isn't necessary when creating a file system on a block device.
 .P
 Size are in megabytes unless otherwise specified: GB, TB, PB, or EB.
+.SH NOTES \fIcpstegfs\fR
+The cpstegfs file copying utility will copy any number of files or directories
+on to a stegfs, preceeding each directory with the necessary + which allows
+stegfs to distiguish between files and folders.
 .SH AUTHOR
 Written by Ashley Morgan Anderson
 .SH BUGS
