@@ -14,9 +14,9 @@ CPPFLAGS = -Isrc -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -DGIT_COMMIT=\"`git log | 
 
 LIBS     = -lmhash -lmcrypt -lpthread `pkg-config --libs fuse`
 
-all: stegfs mkfs copy man
+all: sfs mkfs copy man
 
-stegfs:
+sfs:
 	 @$(CC) $(LIBS) $(CFLAGS) $(CPPFLAGS) $(SOURCE) $(COMMON) -o $(STEGFS)
 	-@echo "built ‘$(SOURCE)’ --> ‘$(STEGFS)’"
 

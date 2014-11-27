@@ -34,6 +34,7 @@
 #include <limits.h>
 #include <fcntl.h>
 
+#include <sys/statvfs.h>
 #include <sys/stat.h>
 
 #include "help.h"
@@ -55,6 +56,7 @@
 /*
  * standard file system functions (used by fuse)
  */
+static int fuse_stegfs_statfs(const char *, struct statvfs *);
 static int fuse_stegfs_getattr(const char *, struct stat *);
 static int fuse_stegfs_readlink(const char *, char *, size_t);
 static int fuse_stegfs_readdir(const char *, void *, fuse_fill_dir_t, off_t, struct fuse_file_info *);
@@ -76,6 +78,7 @@ static int fuse_stegfs_flush(const char *, struct fuse_file_info *);
 
 static struct fuse_operations fuse_stegfs_functions =
 {
+    .statfs   = fuse_stegfs_statfs,
     .getattr  = fuse_stegfs_getattr,
     .readdir  = fuse_stegfs_readdir,
     .unlink   = fuse_stegfs_unlink,
@@ -95,6 +98,30 @@ static struct fuse_operations fuse_stegfs_functions =
     .flush    = fuse_stegfs_flush
 };
 
+static int fuse_stegfs_statfs(const char *path, struct statvfs *stvbuf)
+{
+    errno = EXIT_SUCCESS;
+
+    stegfs_t file_system = stegfs_info();
+
+    stvbuf->f_bsize = SIZE_BYTE_BLOCK;
+    stvbuf->f_frsize = SIZE_BYTE_DATA;
+    stvbuf->f_blocks = file_system.size / SIZE_BYTE_BLOCK;
+    stvbuf->f_bfree = stvbuf->f_blocks; // / MAX_COPIES
+    for (uint64_t i = 0; i < stvbuf->f_blocks; i++)
+        if (file_system.used[i])
+            stvbuf->f_bfree--;
+    stvbuf->f_bavail = stvbuf->f_bfree;
+    stvbuf->f_files = stvbuf->f_bfree;
+    stvbuf->f_ffree = stvbuf->f_bfree;
+    stvbuf->f_favail = stvbuf->f_bfree;
+    stvbuf->f_fsid = MAGIC_0;
+    stvbuf->f_flag = ST_NOSUID;
+    stvbuf->f_namemax = -1;
+
+    return -errno;
+}
+
 static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
 {
     errno = EXIT_SUCCESS;
@@ -111,8 +138,8 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
     stbuf->st_atime   = time(NULL);
     stbuf->st_ctime   = time(NULL);
     stbuf->st_mtime   = time(NULL);
-    stbuf->st_size    = 0x0;
-    stbuf->st_blksize = 512; /* it's not the ideal size but 80 isn't allowed */
+    stbuf->st_size    = 0;
+    stbuf->st_blksize = 512;//MAX_COPIES * SIZE_BYTE_DATA; /* it's not the ideal size but 80 isn't allowed */
 
     if (path_equals(DIRECTORY_ROOT, path))
         /* path is / so get basic info about the file system itself */
@@ -170,7 +197,7 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
         free(file.name);
         free(file.pass);
     }
-    stbuf->st_blocks = (int)(stbuf->st_size / 512);
+    stbuf->st_blocks = (int)(stbuf->st_size / stbuf->st_blksize) + 1;
     free(f);
 
     return -errno;
@@ -197,10 +224,42 @@ static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t fill
                 filler(buf, b, NULL, 0);
             }
 
+    char **dirs = calloc(file_system.cache.size, sizeof(char *));
     /* add cached files to directory (if they're in this directory) */
+    for (uint64_t i = 0, j = 0; i < file_system.cache.size; i++)
+        if (file_system.cache.file[i].path)
+        {
+            char *dp = dir_get_path(file_system.cache.file[i].path);
+            if (path_equals(path, file_system.cache.file[i].path))
+                filler(buf, file_system.cache.file[i].name, NULL, 0);
+            else if (path_equals(path, dp))
+            {
+                char *dn = dir_get_file(file_system.cache.file[i].path);
+                bool found = false;
+                for (uint64_t k = 0; k < j; k++)
+                    if (!strcmp(dn, dirs[k]))
+                    {
+                        found = true;
+                        break;
+                    }
+                if (found)
+                    free(dn);
+                else
+                {
+                    dirs[j] = dn;
+                    j++;
+                }
+            }
+            free(dp);
+        }
     for (uint64_t i = 0; i < file_system.cache.size; i++)
-        if (file_system.cache.file[i].path && path_equals(path, file_system.cache.file[i].path))
-            filler(buf, file_system.cache.file[i].name, NULL, 0);
+    {
+        if (!dirs[i])
+            break;
+        filler(buf, dirs[i], NULL, 0);
+        free(dirs[i]);
+    }
+    free(dirs);
 
     return -errno;
 }
