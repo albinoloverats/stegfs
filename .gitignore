@@ -1,7 +1,5 @@
 src/common/cli.c
 src/common/cli.h
-src/common/fs.c
-src/common/fs.h
 src/common/version.c
 src/common/version.h
 src/common/win32_ext.c
