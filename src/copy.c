@@ -65,14 +65,14 @@ static void copy_file(const char *source, const char *dest)
     int64_t f = open(source, O_RDONLY | F_RDLCK, S_IRUSR | S_IWUSR);
     if (f < 0)
     {
-        perror(NULL);
+        perror(source);
         return;
     }
     int64_t g = open(dest, O_CREAT | O_TRUNC | F_WRLCK | O_WRONLY, S_IRUSR | S_IWUSR);
     if (g < 0)
     {
         close(f);
-        perror(NULL);
+        perror(dest);
         return;
     }
     int64_t r;
@@ -107,7 +107,11 @@ static void recurse_tree(const char *dir, const char *dest, const char **display
             switch (s.st_mode & S_IFMT)
             {
                 case S_IFDIR:
-                    recursive_mkdir(new, S_IWUSR | S_IRUSR | S_IXUSR);
+                    /*
+                     * this is purely for debugging purposes - stegfs is
+                     * 'directory-on-demand'
+                     */
+                    //recursive_mkdir(new, S_IWUSR | S_IRUSR | S_IXUSR);
                     recurse_tree(filename, dest, display);
                     break;
                 case S_IFREG:
@@ -136,6 +140,14 @@ int main(int argc, char **argv)
         fprintf(stderr, "Usage: %s <source ...> <destination>\n", argv[0]);
         return EXIT_FAILURE;
     }
+
+    fprintf(stderr, "WARNING!! When copying to a stegfs partition it does so without setting\n");
+    fprintf(stderr, "          a password for any of the files!\n\n");
+    fprintf(stderr, "Type 'yes please' if this is what you want... ");
+    char yes[11];
+    fgets(yes, sizeof yes, stdin);
+    if (strcasecmp("yes please", yes))
+        return EXIT_FAILURE;
 
     for (int i = 1; i < argc - 1; i++)
     {

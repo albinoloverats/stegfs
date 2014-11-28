@@ -7,7 +7,7 @@ Changes
 * Complete rewrite **NOT BACKWARDS COMPATIBLE**
   - Stores block locations (and other vales) as big endian
   - Change key/IV processing
-* Remove multithreaded capability (we’ll bring it back soon)
+* Remove multi-threaded capability (we’ll bring it back soon)
 * Files are:
   - Read when they’re opened
   - Written when they’re closed
@@ -16,7 +16,7 @@ Changes
 Ideas For Another Day
 ---------------------
 
-* Bring back multithreaded support
+* Bring back multi-threaded support
 * Allow user configured algorithm (select during mkfs)
 * Cache time limit (force forget if a file isn’t accessed)
 * Don’t break backwards compatibility (again)!
@@ -78,3 +78,17 @@ conditions where no files are compomised: each file is written 9 times
 to minimise the loss, and maximise the chance of being able to recover
 it. Under normal working conditions it’s highly likely this value will
 never be achieved due to the Birthday Paradox.
+
+cpstegfs
+--------
+
+This tool will copy a directory tree to a stegfs partition, making sure
+that all copied directories get a + prefix (this is what allows stegfs
+to distinguish between files and folders).
+
+WARNING!! This utility will copy files without setting a password. This
+means that each file is encrypted with a key just derived from the path
+and file name.
+
+Whilst this can be useful for less sensitive data it is not recommended
+for more secretive secrets.
