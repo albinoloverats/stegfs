@@ -12,6 +12,11 @@ Changes
   - Read when they’re opened
   - Written when they’re closed
   - Cached until the file system is unmounted
+* Directories are:
+  - Still not stored
+  - Are cached while mounted
+  - DO NOT NEED + PREFIX!!
+  - Do require creating on each mount (if you want to access your files)
 
 Ideas For Another Day
 ---------------------
@@ -32,7 +37,7 @@ file system may overwrite an existing file without warning.
 The typical use case for stegfs is either as a file on an existing file
 system, similar to many other FUSE based file systems, but it can also
 function as a file system on its own partition, like traditional
-“in-kernel” file systems---it doesn't really matter. With that in mind,
+“in-kernel” file systems---it doesn’t really matter. With that in mind,
 it’s not expected to be a primary workstation file system, but more of a
 USB or SD-card file system. Great for keeping documents hidden from
 prying eyes when moving data between systems. (It also works well with
@@ -44,20 +49,13 @@ within one or two subdirectories, and then keep more secret data further
 down the hierarchy---obviously with each file having a unique password.
 
 stegfs uses a file hierarchy similar to that of conventional file
-systems. However, all directories must start with a + symbol; allowing
-stegfs to easily distinguish between files and directories. For each
-subdirectory, a check is made to ensure that the current block isn’t
-already being used by another file down that path. Files written at
-deeper levels will not overwrite files above them, but files in the root
-directory are likely to overwrite portions of files further away from
-the root. Therefore, files at a deeper level are less likely to
-overwrite another file, but are more susceptible to being overwritten
-themselves.
-
-NB ‐ Files and directories do not need to be created, they already
-exist, just try stat’ing a file to see what this means ;‐) (that said,
-just because a file might exist doesn’t mean it does or contains any
-valid data).
+systems. For each subdirectory, a check is made to ensure that the
+current block isn’t already being used by another file down that path.
+Files written at deeper levels will not overwrite files above them, but
+files in the root directory are likely to overwrite portions of files
+further away from the root. Therefore, files at a deeper level are less
+likely to overwrite another file, but are more susceptible to being
+overwritten themselves.
 
 Files can be stored with or without a password. The convention adopted
 for stegfs is “/dir/tree/file:passwd”; that is, everything after a colon
@@ -78,17 +76,3 @@ conditions where no files are compomised: each file is written 9 times
 to minimise the loss, and maximise the chance of being able to recover
 it. Under normal working conditions it’s highly likely this value will
 never be achieved due to the Birthday Paradox.
-
-cpstegfs
---------
-
-This tool will copy a directory tree to a stegfs partition, making sure
-that all copied directories get a + prefix (this is what allows stegfs
-to distinguish between files and folders).
-
-WARNING!! This utility will copy files without setting a password. This
-means that each file is encrypted with a key just derived from the path
-and file name.
-
-Whilst this can be useful for less sensitive data it is not recommended
-for more secretive secrets.

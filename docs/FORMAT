@@ -75,3 +75,12 @@ Block Layout
     |  (File size) [Total blocks]    |           |
     +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐‐‐‐‐‐‐‐‐‐+
 
+Example/Exmplanation
+--------------------
+
+A 1GB file system has 8,388,608 blocks (8,388,607 are available for file
+data, as the first contains file system information). Each of these
+blocks can store 80 bytes of data, leading to 640MB of total capacity.
+As each file is duplicated multiple times (9×) the single largest file
+size is 71MB--this is also the maximum available capacity if everything
+is stored in the / of the file system.
