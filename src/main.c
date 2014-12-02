@@ -99,7 +99,7 @@ static int fuse_stegfs_statfs(const char *path, struct statvfs *stvbuf)
 
     stvbuf->f_bsize = SIZE_BYTE_BLOCK;
     stvbuf->f_frsize = SIZE_BYTE_DATA;
-    stvbuf->f_blocks = file_system.size / SIZE_BYTE_BLOCK;
+    stvbuf->f_blocks = (file_system.size / SIZE_BYTE_BLOCK) - 1;
     stvbuf->f_bfree = stvbuf->f_blocks; // / MAX_COPIES
     for (uint64_t i = 0; i < stvbuf->f_blocks; i++)
         if (file_system.used[i])
@@ -132,7 +132,7 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
     stbuf->st_ctime   = time(NULL);
     stbuf->st_mtime   = time(NULL);
     stbuf->st_size    = 0;
-    stbuf->st_blksize = 0;//512;//MAX_COPIES * SIZE_BYTE_DATA; /* it's not the ideal size but 80 isn't allowed */
+    stbuf->st_blksize = 0;//512;//MAX_COPIES * SIZE_BYTE_DATA; /* it’s not the ideal size but 80 isn’t allowed */
 
     if (path_equals(DIRECTORY_ROOT, path))
     {
@@ -143,6 +143,21 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
             if (file_system.cache2.child[i] && !file_system.cache2.child[i]->file)
                 stbuf->st_nlink++;
     }
+#ifdef __DEBUG__
+    else if (path_equals(PATH_PROC, path))
+        /* if path == /+proc/ */
+        stbuf->st_mode = S_IFDIR | 0500;
+    else if (path_starts_with(PATH_PROC, path))
+    {
+        /*
+         * if we’re looking at files in /+proc/ treat them as blocks (as
+         * that’s hat we’re representing)
+         */
+        stbuf->st_mode  = S_IFBLK;
+        stbuf->st_nlink = 1;
+        stbuf->st_size  = 0;
+    }
+#endif
     else
     {
         stegfs_cache2_t c;
@@ -152,7 +167,6 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
             if (c.file)
             {
                 stbuf->st_mode  = S_IFREG | 0600;
-                stbuf->st_nlink = 1;
                 stbuf->st_ctime = c.file->time;
                 stbuf->st_mtime = c.file->time;
                 stbuf->st_size  = c.file->size;
@@ -182,7 +196,6 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
                         break;
                     }
                 stbuf->st_mode  = S_IFREG | 0600;
-                stbuf->st_nlink = 1;
                 stbuf->st_ctime = file.time;
                 stbuf->st_mtime = file.time;
                 stbuf->st_size  = file.size;
@@ -196,8 +209,10 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
     }
     if (stbuf->st_mode & S_IFREG)
     {
+        stbuf->st_nlink = 1;
         stbuf->st_blksize = 512;
-        stbuf->st_blocks = (int)(stbuf->st_size / stbuf->st_blksize) + 1;
+        lldiv_t d = lldiv(stbuf->st_size, stbuf->st_blksize);
+        stbuf->st_blocks = d.quot + (d.rem ? 1 : 0);
     }
     free(f);
 
@@ -228,6 +243,18 @@ static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t fill
             if (file_system.cache2.child[i]->name)
                 filler(buf, file_system.cache2.child[i]->name, NULL, 0);
     }
+#ifdef __DEBUG__
+    else if (path_equals(PATH_PROC, path))
+    {
+        for (uint64_t i = 0; i < file_system.size / SIZE_BYTE_BLOCK; i++)
+            if (file_system.used[i])
+            {
+                char b[21] = { 0x0 }; // max digits for UINT64_MAX
+                snprintf(b, sizeof b, "%ju", i);
+                filler(buf, b, NULL, 0);
+            }
+    }
+#endif
     else
     {
         stegfs_cache2_t c;
@@ -282,7 +309,7 @@ static int fuse_stegfs_write(const char *path, const char *buf, size_t size, off
 
     /*
      * if the file is cached (has been read/written to already) then
-     * just buffer this data until it's released/flushed
+     * just buffer this data until it’s released/flushed
      */
     while (true)
     {
@@ -417,6 +444,9 @@ int main(int argc, char **argv)
     char *mp = NULL;
 
     bool h = false;
+#ifdef __DEBUG__
+    bool d = false;
+#endif
 
     for (int i = 1; i < argc; i++)
     {
@@ -430,6 +460,10 @@ int main(int argc, char **argv)
             h = true;
             break; // break to allow FUSE to show its options
         }
+#ifdef __DEBUG__
+        if (!strcmp(argv[i], "-d"))
+            d = true;
+#endif
         struct stat s;
         memset(&s, 0x00, sizeof s);
         stat(argv[i], &s);
@@ -441,7 +475,7 @@ int main(int argc, char **argv)
                 fs = strdup(argv[i]);
                 /*
                  * stegfs is currently single threaded (much more work
-                 * is needed to overcome this) so until that time, we'll
+                 * is needed to overcome this) so until that time, we’ll
                  * force that condition here
                  */
                 asprintf(&argv[i], "-s");
@@ -466,6 +500,14 @@ int main(int argc, char **argv)
         fprintf(stderr, "Could not initialise file system!\n");
         return EXIT_FAILURE;
     }
+
+#ifdef __DEBUG__
+    if (!d)
+    {
+        argv[argc] = strdup("-d");
+        argc++;
+    }
+#endif
 
     return fuse_main(argc, argv, &fuse_stegfs_functions, NULL);
 }

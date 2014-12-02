@@ -36,6 +36,8 @@
 #include <inttypes.h>
 
 #define DIRECTORY_ROOT "/"
+#define DIRECTORY_PROC "proc"
+#define PATH_PROC DIRECTORY_ROOT DIRECTORY_PROC
 
 #define path_equals(X, Y)       (X && Y && !strcmp(X, Y))
 #define path_starts_with(X, Y)  (X && Y && !strncmp(X, Y, strlen(X)))
