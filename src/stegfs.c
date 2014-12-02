@@ -217,7 +217,8 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
                     file->blocks[i][0] = blocks;
                     file->blocks[i][1] = val;
                     /*
-                     * travsers file block tree
+                     * travsers file block tree; whilst the whole block
+                     * is read, the actual file data is discarded
                      */
                     for (uint64_t j = 2 ; j <= blocks; j++)
                     {

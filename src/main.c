@@ -403,13 +403,17 @@ static int fuse_stegfs_release(const char *path, struct fuse_file_info *info)
     errno = EXIT_SUCCESS;
 
     stegfs_cache2_t *c = NULL;
-    if ((c = stegfs_cache2_exists(path, NULL)) && c->file && c->file->write)
-        if (stegfs_file_will_fit(c->file))
+    if ((c = stegfs_cache2_exists(path, NULL)) && c->file)
+    {
+        if (c->file->write && stegfs_file_will_fit(c->file))
         {
             if (stegfs_file_write(c->file))
                 errno = EXIT_SUCCESS;
             c->file->write = false;
         }
+        free(c->file->data);
+        c->file->data = NULL;
+    }
 
     return -errno;
 }
