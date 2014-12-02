@@ -25,7 +25,7 @@
 
 #include "dir.h"
 
-extern char *dir_get_file(const char * const restrict path)
+extern char *dir_get_name(const char * const restrict path)
 {
     char *file = strrchr(path, '/') + 1;
     char *pass = strrchr(path, ':');
@@ -50,6 +50,8 @@ extern uint16_t dir_get_deep(const char * const restrict path)
 
 extern char *dir_get_part(const char * const restrict path, const uint16_t index)
 {
+    if (!index)
+        return strdup(DIRECTORY_ROOT);
     char *ptr = (char *)path;
     for (uint16_t i = 0; i < index; i++)
     {
@@ -74,5 +76,5 @@ extern char *dir_get_path(const char * const restrict path)
     if (strlen(p))
         return p;
     free(p);
-    return strdup("/");
+    return strdup(DIRECTORY_ROOT);
 }

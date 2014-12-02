@@ -35,17 +35,19 @@
 
 #include <inttypes.h>
 
+#define DIRECTORY_ROOT "/"
+
 #define path_equals(X, Y)       (X && Y && !strcmp(X, Y))
 #define path_starts_with(X, Y)  (X && Y && !strncmp(X, Y, strlen(X)))
 
 /*!
- * \brief         Extract the file part of the /path/file:password
+ * \brief         Extract the name part of the /path/file:password
  * \param[in]  p  Path: /path/file:password
- * \return        Newly allocated string: file name
+ * \return        Newly allocated string: name
  *
  * Working backwards, cut off the password and leading directories
  */
-extern char *dir_get_file(const char * const restrict p) __attribute__((nonnull(1)));
+extern char *dir_get_name(const char * const restrict p) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Determine how deep down the hierarchy path goes
