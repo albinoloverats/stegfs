@@ -41,17 +41,6 @@
 #include "dir.h"
 #include "stegfs.h"
 
-#define DIRECTORY_ROOT "/"
-#define DIRECTORY_PROC "+proc"
-#define DIRECTORY_BMAP "+bitmap"
-
-#define PATH_PROC DIRECTORY_ROOT DIRECTORY_PROC
-#define PATH_BMAP PATH_PROC DIRECTORY_ROOT DIRECTORY_BMAP
-
-//#define SYMBOL_SEP '/'
-#define SYMBOL_DIR '+'
-//#define SYMBOL_LNK ','
-
 
 /*
  * standard file system functions (used by fuse)
@@ -59,6 +48,7 @@
 static int fuse_stegfs_statfs(const char *, struct statvfs *);
 static int fuse_stegfs_getattr(const char *, struct stat *);
 static int fuse_stegfs_readlink(const char *, char *, size_t);
+static int fuse_stegfs_mkdir(const char *, mode_t);
 static int fuse_stegfs_readdir(const char *, void *, fuse_fill_dir_t, off_t, struct fuse_file_info *);
 static int fuse_stegfs_unlink(const char *);
 static int fuse_stegfs_read(const char *, char *, size_t, off_t , struct fuse_file_info *);
@@ -66,10 +56,11 @@ static int fuse_stegfs_write(const char *, const char *, size_t, off_t , struct 
 static int fuse_stegfs_open(const char *, struct fuse_file_info *);
 static int fuse_stegfs_release(const char *, struct fuse_file_info *);
 
+static int fuse_stegfs_create(const char *, mode_t, struct fuse_file_info *);
+static int fuse_stegfs_mknod(const char *, mode_t, dev_t);
 /*
  * empty functions; required by fuse, but not used by stegfs
  */
-static int fuse_stegfs_mknod(const char *, mode_t, dev_t);
 static int fuse_stegfs_truncate(const char *, off_t);
 static int fuse_stegfs_utime(const char *, struct utimbuf *);
 static int fuse_stegfs_chmod(const char *, mode_t);
@@ -80,6 +71,7 @@ static struct fuse_operations fuse_stegfs_functions =
 {
     .statfs   = fuse_stegfs_statfs,
     .getattr  = fuse_stegfs_getattr,
+    .mkdir    = fuse_stegfs_mkdir,
     .readdir  = fuse_stegfs_readdir,
     .unlink   = fuse_stegfs_unlink,
     .read     = fuse_stegfs_read,
@@ -87,6 +79,7 @@ static struct fuse_operations fuse_stegfs_functions =
     .open     = fuse_stegfs_open,
     .release  = fuse_stegfs_release,
     .truncate = fuse_stegfs_truncate,
+    .create   = fuse_stegfs_create,
     .mknod    = fuse_stegfs_mknod,
     /*
      * empty functions; required by fuse, but not used by stegfs
@@ -127,78 +120,95 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
     errno = EXIT_SUCCESS;
 
     stegfs_t file_system = stegfs_info();
-    char *f = dir_get_file(path); /* used to check for symlink */
+    char *f = dir_get_name(path); /* used to check for symlink */
     /* common attributes for root/files/directories */
     stbuf->st_dev     = (dev_t)MAGIC_0;
     stbuf->st_ino     = 0;
-    stbuf->st_mode    = S_IFDIR | 0700;
-    stbuf->st_nlink   = 2;
+    stbuf->st_mode    = 0;//S_IFDIR | 0700;
+    stbuf->st_nlink   = 0;
     stbuf->st_uid     = fuse_get_context()->uid;
     stbuf->st_gid     = fuse_get_context()->gid;
     stbuf->st_atime   = time(NULL);
     stbuf->st_ctime   = time(NULL);
     stbuf->st_mtime   = time(NULL);
     stbuf->st_size    = 0;
-    stbuf->st_blksize = 512;//MAX_COPIES * SIZE_BYTE_DATA; /* it's not the ideal size but 80 isn't allowed */
+    stbuf->st_blksize = 0;//512;//MAX_COPIES * SIZE_BYTE_DATA; /* it's not the ideal size but 80 isn't allowed */
 
     if (path_equals(DIRECTORY_ROOT, path))
+    {
         /* path is / so get basic info about the file system itself */
-        stbuf->st_size = file_system.size;
-    else if (path_equals(PATH_PROC, path) || path_equals(PATH_BMAP, path))
-        /* if path == /+proc/ */
-        stbuf->st_mode = S_IFDIR | 0500;
-    else if (path_starts_with(PATH_PROC, path) && !path_starts_with(PATH_BMAP, path))
-    {
-        /*
-         * if we're looking at files in /+proc/ treat them as blocks (as
-         * that's hat we're representing)
-         */
-        stbuf->st_mode  = S_IFBLK;
-        stbuf->st_nlink = 1;
-        stbuf->st_size  = 0;
+        stbuf->st_mode  = S_IFDIR | 0700;
+        stbuf->st_nlink = 2;
+        for (uint64_t i = 0; i < file_system.cache2.ents; i++)
+            if (file_system.cache2.child[i] && !file_system.cache2.child[i]->file)
+                stbuf->st_nlink++;
     }
-    else if (f[0] != SYMBOL_DIR)
+    else
     {
-        stegfs_file_t file;
-        memset(&file, 0x00, sizeof file);
-        file.path = dir_get_path(path);
-        file.name = dir_get_file(path);
-        file.pass = dir_get_pass(path);
-        /* check if the file has been cached */
-        bool cached = false;
-        for (uint64_t i = 0; i < file_system.cache.size; i++)
-            if (stegfs_file_cached(file))
-            {
-                for (int j = 0; j < MAX_COPIES; j++)
-                    file.inodes[j] = file_system.cache.file[i].inodes[j];
-                file.time = file_system.cache.file[i].time;
-                file.size = file_system.cache.file[i].size;
-                cached = true;
-                break;
-            }
-        /* if file wasn't cached; find it */
-        if (cached || stegfs_file_stat(&file))
+        stegfs_cache2_t c;
+        memset(&c, 0x00, sizeof c);
+        if (stegfs_cache2_exists(path, &c))
         {
-            for (int i = 0; i < MAX_COPIES; i++)
-                if (file.inodes[i])
-                {
-                    stbuf->st_ino = (ino_t)file.inodes[i];
-                    break;
-                }
-            stbuf->st_mode  = S_IFREG | 0600;
-            stbuf->st_nlink = 1;
-            stbuf->st_ctime = file.time;
-            stbuf->st_mtime = file.time;
-            stbuf->st_size  = file.size;
+            if (c.file)
+            {
+                stbuf->st_mode  = S_IFREG | 0600;
+                stbuf->st_nlink = 1;
+                stbuf->st_ctime = c.file->time;
+                stbuf->st_mtime = c.file->time;
+                stbuf->st_size  = c.file->size;
+            }
+            else
+            {
+                stbuf->st_mode  = S_IFDIR | 0700;
+                stbuf->st_nlink = 2;
+                for (uint64_t i = 0; i < c.ents; i++)
+                    if (c.child[i] && !c.child[i]->file)
+                        stbuf->st_nlink++;
+            }
         }
         else
-            errno = ENOENT;
-        free(file.path);
-        free(file.name);
-        free(file.pass);
+        {
+            stegfs_file_t file;
+            memset(&file, 0x00, sizeof file);
+            file.path = dir_get_path(path);
+            file.name = dir_get_name(path);
+            file.pass = dir_get_pass(path);
+            if (stegfs_file_stat(&file))
+            {
+                for (int i = 0; i < MAX_COPIES; i++)
+                    if (file.inodes[i])
+                    {
+                        stbuf->st_ino = (ino_t)file.inodes[i];
+                        break;
+                    }
+                stbuf->st_mode  = S_IFREG | 0600;
+                stbuf->st_nlink = 1;
+                stbuf->st_ctime = file.time;
+                stbuf->st_mtime = file.time;
+                stbuf->st_size  = file.size;
+            }
+            else
+                errno = ENOENT;
+            free(file.path);
+            free(file.name);
+            free(file.pass);
+        }
     }
-    stbuf->st_blocks = (int)(stbuf->st_size / stbuf->st_blksize) + 1;
+    if (stbuf->st_mode & S_IFREG)
+    {
+        stbuf->st_blksize = 512;
+        stbuf->st_blocks = (int)(stbuf->st_size / stbuf->st_blksize) + 1;
+    }
     free(f);
+
+    return -errno;
+}
+
+static int fuse_stegfs_mkdir(const char *path, mode_t mode)
+{
+    errno = EXIT_SUCCESS;
+
+    stegfs_cache2_add(path, NULL);
 
     return -errno;
 }
@@ -213,53 +223,20 @@ static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t fill
     stegfs_t file_system = stegfs_info();
 
     if (path_equals(DIRECTORY_ROOT, path))
-        /* if in / add /+proc */
-        filler(buf, DIRECTORY_PROC, NULL, 0);
-    else if (path_equals(PATH_PROC, path))
-        for (uint64_t i = 0; i < file_system.size / SIZE_BYTE_BLOCK; i++)
-            if (file_system.used[i])
-            {
-                char b[21] = { 0x0 }; // max digits for UINT64_MAX
-                snprintf(b, sizeof b, "%ju", i);
-                filler(buf, b, NULL, 0);
-            }
-
-    char **dirs = calloc(file_system.cache.size, sizeof(char *));
-    /* add cached files to directory (if they're in this directory) */
-    for (uint64_t i = 0, j = 0; i < file_system.cache.size; i++)
-        if (file_system.cache.file[i].path)
-        {
-            char *dp = dir_get_path(file_system.cache.file[i].path);
-            if (path_equals(path, file_system.cache.file[i].path))
-                filler(buf, file_system.cache.file[i].name, NULL, 0);
-            else if (path_equals(path, dp))
-            {
-                char *dn = dir_get_file(file_system.cache.file[i].path);
-                bool found = false;
-                for (uint64_t k = 0; k < j; k++)
-                    if (!strcmp(dn, dirs[k]))
-                    {
-                        found = true;
-                        break;
-                    }
-                if (found)
-                    free(dn);
-                else
-                {
-                    dirs[j] = dn;
-                    j++;
-                }
-            }
-            free(dp);
-        }
-    for (uint64_t i = 0; i < file_system.cache.size; i++)
     {
-        if (!dirs[i])
-            break;
-        filler(buf, dirs[i], NULL, 0);
-        free(dirs[i]);
+        for (uint64_t i = 0; i < file_system.cache2.ents; i++)
+            if (file_system.cache2.child[i]->name)
+                filler(buf, file_system.cache2.child[i]->name, NULL, 0);
     }
-    free(dirs);
+    else
+    {
+        stegfs_cache2_t c;
+        memset(&c, 0x00, sizeof c);
+        if (stegfs_cache2_exists(path, &c))
+            for (uint64_t i = 0; i < c.ents; i++)
+                if (c.child[i]->name)
+                    filler(buf, c.child[i]->name, NULL, 0);
+    }
 
     return -errno;
 }
@@ -271,7 +248,7 @@ static int fuse_stegfs_unlink(const char *path)
     stegfs_file_t file;
     memset(&file, 0x00, sizeof file);
     file.path = dir_get_path(path);
-    file.name = dir_get_file(path);
+    file.name = dir_get_name(path);
     file.pass = dir_get_pass(path);
 
     stegfs_file_delete(&file);
@@ -287,87 +264,53 @@ static int fuse_stegfs_read(const char *path, char *buf, size_t size, off_t offs
 {
     errno = EXIT_SUCCESS;
 
-    int r;
+    stegfs_cache2_t *c = NULL;
+    if ((c = stegfs_cache2_exists(path, NULL)) && c->file)
+    {
+        if ((unsigned)(offset + size) > c->file->size)
+            size = c->file->size - offset;
+        memcpy(buf, c->file->data + offset, size);
+        return size;
+    }
 
-    stegfs_t file_system = stegfs_info();
-    stegfs_file_t file;
-    memset(&file, 0x00, sizeof file);
-    file.path = dir_get_path(path);
-    file.name = dir_get_file(path);
-    file.pass = dir_get_pass(path);
-
-    for (uint64_t i = 0; i < file_system.cache.size; i++)
-        if (stegfs_file_cached(file))
-        {
-            if ((unsigned)(offset + size) > file_system.cache.file[i].size)
-                size = file_system.cache.file[i].size - offset;
-            memcpy(buf, file_system.cache.file[i].data + offset, size);
-            r = size;
-            goto done;
-        }
-
-    errno = ENOENT;
-    r = -errno;
-
-done:
-    free(file.path);
-    free(file.name);
-    free(file.pass);
-
-    return r;
+    return -ENOENT;
 }
 
 static int fuse_stegfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *info)
 {
     errno = EXIT_SUCCESS;
 
-    int r;
-
-    stegfs_t file_system = stegfs_info();
-    stegfs_file_t file;
-    memset(&file, 0x00, sizeof file);
-    file.path = dir_get_path(path);
-    file.name = dir_get_file(path);
-    file.pass = dir_get_pass(path);
-
     /*
      * if the file is cached (has been read/written to already) then
      * just buffer this data until it's released/flushed
      */
-buffer:
-    for (uint64_t i = 0; i < file_system.cache.size; i++)
-        if (stegfs_file_cached(file))
+    while (true)
+    {
+        stegfs_cache2_t *c = NULL;
+        if ((c = stegfs_cache2_exists(path, NULL)) && c->file)
         {
-            if (!stegfs_file_will_fit(file_system.cache.file))
+            if (!stegfs_file_will_fit(c->file))
+                return -errno;
+            if (!c->file->write)
             {
-                r = -errno;
-                goto done;
+                errno = EBADF;
+                return -errno;
             }
-            if (!file_system.cache.file[i].write)
-            {
-                r = -EBADF;
-                goto done;
-            }
-            file_system.cache.file[i].size = file_system.cache.file[i].size > size + offset ? file_system.cache.file[i].size : size + offset;
-            file_system.cache.file[i].data = realloc(file_system.cache.file[i].data, file_system.cache.file[i].size);
-            file_system.cache.file[i].time = time(NULL);
-            memcpy(file_system.cache.file[i].data + offset, buf, size);
-            r = size;
-            goto done;
+            c->file->size = c->file->size > size + offset ? c->file->size : size + offset;
+            c->file->data = realloc(c->file->data, c->file->size);
+            c->file->time = time(NULL);
+            memcpy(c->file->data + offset, buf, size);
+            return size;
         }
-    /* the file wasn't found to exists, so create ti and try again */
-    stegfs_file_create(path, true);
-    goto buffer;
-    /*
-     * we “should” probably use some kind of loop - but fuck-it, I'm
-     * feeling rebelious ;-)
-     */
-done:
-    free(file.path);
-    free(file.name);
-    free(file.pass);
+        /*
+         * the file wasn’t found, so create it and try again, it should
+         * then fail if the file cannot fit, as at this point all that’s
+         * happening is increasing the cached buffer
+         */
+        stegfs_file_create(path, true);
+    }
 
-    return r;
+    return -EIO;
 }
 
 static int fuse_stegfs_open(const char *path, struct fuse_file_info *info)
@@ -375,7 +318,7 @@ static int fuse_stegfs_open(const char *path, struct fuse_file_info *info)
     stegfs_file_t file;
     memset(&file, 0x00, sizeof file);
     file.path = dir_get_path(path);
-    file.name = dir_get_file(path);
+    file.name = dir_get_name(path);
     file.pass = dir_get_pass(path);
 
     if (!stegfs_file_read(&file))
@@ -392,21 +335,10 @@ static int fuse_stegfs_flush(const char *path, struct fuse_file_info *info)
 {
     errno = EXIT_SUCCESS;
 
-    stegfs_t file_system = stegfs_info();
-    stegfs_file_t file;
-    memset(&file, 0x00, sizeof file);
-    file.path = dir_get_path(path);
-    file.name = dir_get_file(path);
-    file.pass = dir_get_pass(path);
-
-    for (uint64_t i = 0; i < file_system.cache.size; i++)
-        if (stegfs_file_cached(file) && file_system.cache.file[i].write)
-            if (stegfs_file_will_fit(&file_system.cache.file[i]))
-                errno = EXIT_SUCCESS;
-
-    free(file.path);
-    free(file.name);
-    free(file.pass);
+    stegfs_cache2_t *c = NULL;
+    if ((c = stegfs_cache2_exists(path, NULL)) && c->file)
+        if (stegfs_file_will_fit(c->file))
+            errno = EXIT_SUCCESS;
 
     return -errno;
 }
@@ -415,11 +347,21 @@ static int fuse_stegfs_truncate(const char *path, off_t offset)
 {
     struct stat s;
     fuse_stegfs_getattr(path, &s);
-    char *buf = malloc(s.st_size);
-    struct fuse_file_info info;
-    fuse_stegfs_read(path, buf, s.st_size, 0, &info);
+    char *buf = malloc(offset);
+    memset(buf, 0x00, offset);
+
+    fuse_stegfs_read(path, buf, offset, 0, NULL);
     fuse_stegfs_unlink(path);
-    fuse_stegfs_write(path, buf, offset, 0, &info);
+    fuse_stegfs_write(path, buf, offset, 0, NULL);
+
+    free(buf);
+
+    return -EXIT_SUCCESS;
+}
+
+static int fuse_stegfs_create(const char *path, mode_t mode, struct fuse_file_info *info)
+{
+    stegfs_file_create(path, true);
     return -EXIT_SUCCESS;
 }
 
@@ -431,27 +373,18 @@ static int fuse_stegfs_mknod(const char *path, mode_t mode, dev_t rdev)
 
 static int fuse_stegfs_release(const char *path, struct fuse_file_info *info)
 {
-    stegfs_t file_system = stegfs_info();
-    stegfs_file_t file;
-    memset(&file, 0x00, sizeof file);
-    file.path = dir_get_path(path);
-    file.name = dir_get_file(path);
-    file.pass = dir_get_pass(path);
+    errno = EXIT_SUCCESS;
 
-    for (uint64_t i = 0; i < file_system.cache.size; i++)
-        if (stegfs_file_cached(file) && file_system.cache.file[i].write && stegfs_file_will_fit(&file_system.cache.file[i]))
+    stegfs_cache2_t *c = NULL;
+    if ((c = stegfs_cache2_exists(path, NULL)) && c->file && c->file->write)
+        if (stegfs_file_will_fit(c->file))
         {
-            if (stegfs_file_write(&file_system.cache.file[i]))
+            if (stegfs_file_write(c->file))
                 errno = EXIT_SUCCESS;
-            file_system.cache.file[i].write = false;
-            break;
+            c->file->write = false;
         }
 
-    free(file.path);
-    free(file.name);
-    free(file.pass);
-
-    return -EXIT_SUCCESS; /* fuse says the return value is ignored */
+    return -errno;
 }
 
 /*

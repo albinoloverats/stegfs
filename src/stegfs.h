@@ -52,6 +52,8 @@
 #define MAGIC_1  0x33BE2B298B76F2ACLL
 #define MAGIC_2  0xC903284D7C593AF6LL
 
+
+
 typedef enum
 {
     TAG_STEGFS,
@@ -84,12 +86,14 @@ typedef struct stegfs_file_t
 }
 stegfs_file_t;
 
-typedef struct stegfs_cache_t
+typedef struct _stegfs_cache2
 {
-    uint64_t       size;
+    char *name;
+    uint64_t ents;
+    struct _stegfs_cache2 **child;
     stegfs_file_t *file;
 }
-stegfs_cache_t;
+stegfs_cache2_t;
 
 /*!
  * \brief  Structure to hold file system information
@@ -99,13 +103,13 @@ stegfs_cache_t;
  */
 typedef struct stegfs_t
 {
-    uint64_t       size;   /*!< Size of file system in bytes (not capacity) */
-    int64_t        handle; /*!< Handle to file system file/device */
-    char          *cipher;
-    char          *hash;
-    char          *mode;
-    bool          *used;   /*!< Used block tracker */
-    stegfs_cache_t cache;  /*!< File cache */
+    uint64_t        size;   /*!< Size of file system in bytes (not capacity) */
+    int64_t         handle; /*!< Handle to file system file/device */
+    char           *cipher;
+    char           *hash;
+    char           *mode;
+    bool           *used;   /*!< Used block tracker */
+    stegfs_cache2_t cache2; /*!< File cache version 2 */
 }
 stegfs_t;
 
@@ -142,8 +146,6 @@ extern bool stegfs_init(const char * const restrict fs) __attribute__((nonnull(1
  */
 extern stegfs_t stegfs_info(void);
 
-#define stegfs_file_cached(F) (file_system.cache.file[i].path && stegfs_files_equal(F, file_system.cache.file[i]))
-
 extern bool stegfs_files_equal(stegfs_file_t, stegfs_file_t);
 extern bool stegfs_file_will_fit(stegfs_file_t *);
 
@@ -153,5 +155,9 @@ extern bool stegfs_file_stat(stegfs_file_t *);
 extern bool stegfs_file_read(stegfs_file_t *);
 extern bool stegfs_file_write(stegfs_file_t *);
 extern void stegfs_file_delete(stegfs_file_t *);
+
+extern void stegfs_cache2_add(const char * const restrict, stegfs_file_t *);
+extern stegfs_cache2_t *stegfs_cache2_exists(const char * const restrict, stegfs_cache2_t *) __attribute__((nonnull(1)));
+extern void stegfs_cache2_remove(const char * const restrict) __attribute__((nonnull(1)));
 
 #endif /* ! _STEGFS_H_ */
