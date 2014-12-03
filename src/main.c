@@ -135,7 +135,7 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
     stbuf->st_ctime   = time(NULL);
     stbuf->st_mtime   = time(NULL);
     stbuf->st_size    = 0;
-    stbuf->st_blksize = 0;//SIZE_BYTE_DATA;
+    stbuf->st_blksize = 0;
 
     if (path_equals(DIRECTORY_ROOT, path))
     {
