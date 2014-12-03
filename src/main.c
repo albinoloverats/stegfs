@@ -37,6 +37,8 @@
 #include <sys/statvfs.h>
 #include <sys/stat.h>
 
+#include <mhash.h>
+
 #include "help.h"
 #include "dir.h"
 #include "stegfs.h"
@@ -220,7 +222,15 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
         stbuf->st_blocks = d.quot + (d.rem ? 1 : 0);
     }
     else if (stbuf->st_mode & S_IFDIR)
+    {
+        MHASH hash = mhash_init(MHASH_TIGER);
+        mhash(hash, path, strlen(path));
+        void *h = mhash_end(hash);
+        memcpy(&(stbuf->st_ino), h, sizeof stbuf->st_ino);
+        free(h);
+        stbuf->st_ino %= (file_system.size / SIZE_BYTE_BLOCK);
         stbuf->st_size = SIZE_BYTE_DATA;
+    }
     free(f);
 
     return -errno;
