@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <stdbool.h>
+#include <locale.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
@@ -40,7 +41,7 @@ static uint8_t stegfs_root_hash[] = { 0x60, 0xA6, 0x63, 0x2B, 0x77, 0xB6, 0xD5, 
                                       0x9A, 0x65, 0x59, 0x7B, 0x10, 0x3A, 0x97, 0x2D };/*, \
                                       0xE9, 0x78, 0x45, 0xCD, 0x43, 0x79, 0x5D, 0xF7 };*/
 
-static int64_t open_filesystem(const char * const restrict path, uint64_t *size, bool force, bool recreate)
+static int64_t open_filesystem(const char * const restrict path, uint64_t *size, bool force, bool recreate, bool dry)
 {
     int64_t fs = 0x0;
     struct stat s;
@@ -83,10 +84,12 @@ static int64_t open_filesystem(const char * const restrict path, uint64_t *size,
             /*
              * file doesn't exist - good, lets create it...
              */
-            if ((fs = open(path, O_WRONLY | F_WRLCK | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR)) < 0)
+            if (!dry && (fs = open(path, O_WRONLY | F_WRLCK | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR)) < 0)
                 die("could not open file system %s", path);
         break;
     }
+    if (dry)
+        close(fs);
     return fs;
 }
 
@@ -204,6 +207,7 @@ static void print_usage_help(char *arg)
     fprintf(stderr, "  -f      Force overwrite existing file, required when overwriting a file\n");
     fprintf(stderr, "          system in a normal file\n");
     fprintf(stderr, "  -r      Rewrite the superblock (perhaps it became corrupt)\n");
+    fprintf(stderr, "  -d      Dry run - print details about the file system that would have been created\n");
     fprintf(stderr, "\nNotes:\n  • Size option isn't necessary when creating a file system on a block device.\n");
     fprintf(stderr, "  • Size are in megabytes unless otherwise specified: GB, TB, PB, or EB.\n");
     exit(EXIT_SUCCESS);
@@ -218,6 +222,7 @@ int main(int argc, char **argv)
     uint64_t size = 0;
     bool force = false;
     bool recreate = false;
+    bool dry = false;
 
     for (int i = 1; i < argc; i++)
     {
@@ -229,16 +234,21 @@ int main(int argc, char **argv)
             force = true;
         else if (!strcmp("-r", argv[i]))
             recreate = true;
+        else if (!strcmp("-d", argv[i]))
+            dry = true;
         else
             path = argv[i];
     }
 
-    int64_t fs = open_filesystem(path, &size, force, recreate);
+    int64_t fs = open_filesystem(path, &size, force, recreate, dry);
 
     uint64_t blocks = size / SIZE_BYTE_BLOCK;
-    ftruncate(fs, size);
+    if (dry)
+        printf("dry run      : file system not modified\n");
+    else
+        ftruncate(fs, size);
 
-    if (recreate)
+    if (recreate && !dry)
         goto superblock;
     /*
      * display some “useful” information about the file system being
@@ -248,24 +258,28 @@ int main(int argc, char **argv)
     char *s2;
     int l;
 
+    setlocale(LC_NUMERIC, "");
+
     printf("location     : %s\n", path);
     double z = size / MEGABYTE;
-    printf("blocks       : %8ju\n", blocks);
+    printf("blocks       : %'10ju\n", blocks);
     char units[] = "MB";
     adjust_units(&z, units);
     sprintf(s1, "%f", z);
     s2 = strchr(s1, '.');
     l = s2 - s1;
-    printf("size         : %8.*g %s\n", (l + 2), z, units);
+    printf("size         : %'10.*g %s\n", (l + 2), z, units);
     z = ((double)size / SIZE_BYTE_BLOCK * SIZE_BYTE_DATA) / MEGABYTE;
     strcpy(units, "MB");
     adjust_units(&z, units);
     sprintf(s1, "%f", z);
     s2 = strchr(s1, '.');
     l = s2 - s1;
-    printf("capacity     : %8.*g %s\n", (l + 2), z, units);
-    printf("largest file : %8.*g %s\n", (l + 2), z / MAX_COPIES , units);
+    printf("capacity     : %'10.*g %s\n", (l + 2), z, units);
+    printf("largest file : %'10.*g %s\n", (l + 2), z / MAX_COPIES , units);
 
+    if (dry)
+        return EXIT_SUCCESS;
     /*
      * write “encrypted” blocks
      */
@@ -274,13 +288,13 @@ int main(int argc, char **argv)
     lseek(fs, 0, SEEK_SET);
     for (uint64_t i = 0; i < size / MEGABYTE; i++)
     {
-        printf("\rwriting      : %8.3f %%", PERCENT * i / (size / MEGABYTE));
+        printf("\rwriting      : %'10.3f %%", PERCENT * i / (size / MEGABYTE));
         mcrypt_generic(mc, rnd, sizeof rnd);
         for (int j = 0; j < MEGABYTE / SIZE_BYTE_BLOCK; j++)
             memcpy(rnd + j * SIZE_BYTE_BLOCK, stegfs_root_hash, sizeof stegfs_root_hash);
         write(fs, rnd, sizeof rnd);
     }
-    printf("\rwriting      : %8.3f %%\n", PERCENT);
+    printf("\rwriting      : %'10.3f %%\n", PERCENT);
 
 superblock:
     printf("superblock   : ");
