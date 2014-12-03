@@ -47,21 +47,21 @@
  */
 static int fuse_stegfs_statfs(const char *, struct statvfs *);
 static int fuse_stegfs_getattr(const char *, struct stat *);
-static int fuse_stegfs_readlink(const char *, char *, size_t);
 static int fuse_stegfs_mkdir(const char *, mode_t);
+static int fuse_stegfs_rmdir(const char *);
 static int fuse_stegfs_readdir(const char *, void *, fuse_fill_dir_t, off_t, struct fuse_file_info *);
 static int fuse_stegfs_unlink(const char *);
 static int fuse_stegfs_read(const char *, char *, size_t, off_t , struct fuse_file_info *);
 static int fuse_stegfs_write(const char *, const char *, size_t, off_t , struct fuse_file_info *);
 static int fuse_stegfs_open(const char *, struct fuse_file_info *);
 static int fuse_stegfs_release(const char *, struct fuse_file_info *);
-
+static int fuse_stegfs_truncate(const char *, off_t);
 static int fuse_stegfs_create(const char *, mode_t, struct fuse_file_info *);
 static int fuse_stegfs_mknod(const char *, mode_t, dev_t);
 /*
  * empty functions; required by fuse, but not used by stegfs
  */
-static int fuse_stegfs_truncate(const char *, off_t);
+static int fuse_stegfs_readlink(const char *, char *, size_t);
 static int fuse_stegfs_utime(const char *, struct utimbuf *);
 static int fuse_stegfs_chmod(const char *, mode_t);
 static int fuse_stegfs_chown(const char *, uid_t, gid_t);
@@ -72,6 +72,7 @@ static struct fuse_operations fuse_stegfs_functions =
     .statfs   = fuse_stegfs_statfs,
     .getattr  = fuse_stegfs_getattr,
     .mkdir    = fuse_stegfs_mkdir,
+    .rmdir    = fuse_stegfs_rmdir,
     .readdir  = fuse_stegfs_readdir,
     .unlink   = fuse_stegfs_unlink,
     .read     = fuse_stegfs_read,
@@ -97,20 +98,20 @@ static int fuse_stegfs_statfs(const char *path, struct statvfs *stvbuf)
 
     stegfs_t file_system = stegfs_info();
 
-    stvbuf->f_bsize = SIZE_BYTE_BLOCK;
-    stvbuf->f_frsize = SIZE_BYTE_DATA;
-    stvbuf->f_blocks = (file_system.size / SIZE_BYTE_BLOCK) - 1;
-    stvbuf->f_bfree = stvbuf->f_blocks; // / MAX_COPIES
+    stvbuf->f_bsize   = SIZE_BYTE_BLOCK;
+    stvbuf->f_frsize  = SIZE_BYTE_DATA;
+    stvbuf->f_blocks  = (file_system.size / SIZE_BYTE_BLOCK) - 1;
+    stvbuf->f_bfree   = stvbuf->f_blocks;
     for (uint64_t i = 0; i < stvbuf->f_blocks; i++)
         if (file_system.used[i])
             stvbuf->f_bfree--;
-    stvbuf->f_bavail = stvbuf->f_bfree;
-    stvbuf->f_files = stvbuf->f_bfree;
-    stvbuf->f_ffree = stvbuf->f_bfree;
-    stvbuf->f_favail = stvbuf->f_bfree;
-    stvbuf->f_fsid = MAGIC_0;
-    stvbuf->f_flag = ST_NOSUID;
-    stvbuf->f_namemax = -1;
+    stvbuf->f_bavail  = stvbuf->f_bfree;
+    stvbuf->f_files   = stvbuf->f_blocks;
+    stvbuf->f_ffree   = stvbuf->f_bfree;
+    stvbuf->f_favail  = stvbuf->f_bfree;
+    stvbuf->f_fsid    = MAGIC_0;
+    stvbuf->f_flag    = ST_NOSUID;
+    stvbuf->f_namemax = SYM_LENGTH;
 
     return -errno;
 }
@@ -132,30 +133,28 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
     stbuf->st_ctime   = time(NULL);
     stbuf->st_mtime   = time(NULL);
     stbuf->st_size    = 0;
-    stbuf->st_blksize = 0;//512;//MAX_COPIES * SIZE_BYTE_DATA; /* it’s not the ideal size but 80 isn’t allowed */
+    stbuf->st_blksize = 0;//SIZE_BYTE_DATA;
 
     if (path_equals(DIRECTORY_ROOT, path))
     {
-        /* path is / so get basic info about the file system itself */
         stbuf->st_mode  = S_IFDIR | 0700;
         stbuf->st_nlink = 2;
         for (uint64_t i = 0; i < file_system.cache2.ents; i++)
             if (file_system.cache2.child[i] && !file_system.cache2.child[i]->file)
                 stbuf->st_nlink++;
     }
-#ifdef __DEBUG__
+#ifdef USE_PROC
     else if (path_equals(PATH_PROC, path))
-        /* if path == /+proc/ */
+        /* if path == /proc */
         stbuf->st_mode = S_IFDIR | 0500;
     else if (path_starts_with(PATH_PROC, path))
     {
         /*
-         * if we’re looking at files in /+proc/ treat them as blocks (as
+         * if we’re looking at files in /proc treat them as blocks (as
          * that’s hat we’re representing)
          */
         stbuf->st_mode  = S_IFBLK;
         stbuf->st_nlink = 1;
-        stbuf->st_size  = 0;
     }
 #endif
     else
@@ -166,6 +165,12 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
         {
             if (c.file)
             {
+                for (int i = 0; i < MAX_COPIES; i++)
+                    if (c.file->inodes[i])
+                    {
+                        stbuf->st_ino = (ino_t)(c.file->inodes[i] % (file_system.size / SIZE_BYTE_BLOCK));
+                        break;
+                    }
                 stbuf->st_mode  = S_IFREG | 0600;
                 stbuf->st_ctime = c.file->time;
                 stbuf->st_mtime = c.file->time;
@@ -192,7 +197,7 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
                 for (int i = 0; i < MAX_COPIES; i++)
                     if (file.inodes[i])
                     {
-                        stbuf->st_ino = (ino_t)file.inodes[i];
+                        stbuf->st_ino = (ino_t)(file.inodes[i] % (file_system.size / SIZE_BYTE_BLOCK));
                         break;
                     }
                 stbuf->st_mode  = S_IFREG | 0600;
@@ -210,10 +215,12 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
     if (stbuf->st_mode & S_IFREG)
     {
         stbuf->st_nlink = 1;
-        stbuf->st_blksize = 512;
+        stbuf->st_blksize = SIZE_BYTE_DATA;
         lldiv_t d = lldiv(stbuf->st_size, stbuf->st_blksize);
         stbuf->st_blocks = d.quot + (d.rem ? 1 : 0);
     }
+    else if (stbuf->st_mode & S_IFDIR)
+        stbuf->st_size = SIZE_BYTE_DATA;
     free(f);
 
     return -errno;
@@ -224,6 +231,39 @@ static int fuse_stegfs_mkdir(const char *path, mode_t mode)
     errno = EXIT_SUCCESS;
 
     stegfs_cache2_add(path, NULL);
+
+    return -errno;
+}
+
+static int fuse_stegfs_rmdir(const char *path)
+{
+    errno = EXIT_SUCCESS;
+
+#ifdef USE_PROC
+    if (path_equals(path, PATH_PROC))
+    {
+        errno = EBUSY;
+        return -errno;
+    }
+#endif
+
+    stegfs_cache2_t *c = NULL;
+    if ((c = stegfs_cache2_exists(path, NULL)))
+    {
+        if (c->file)
+            errno = ENOTDIR;
+        else
+        {
+            bool empty = true;
+            for (uint64_t i = 0; i < c->ents; i++)
+                if (c->child[i]->name)
+                    empty = false;
+            if (!empty)
+                errno = ENOTEMPTY;
+            else
+                stegfs_cache2_remove(path);
+        }
+    }
 
     return -errno;
 }
@@ -243,7 +283,7 @@ static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t fill
             if (file_system.cache2.child[i]->name)
                 filler(buf, file_system.cache2.child[i]->name, NULL, 0);
     }
-#ifdef __DEBUG__
+#ifdef USE_PROC
     else if (path_equals(PATH_PROC, path))
     {
         for (uint64_t i = 0; i < file_system.size / SIZE_BYTE_BLOCK; i++)
