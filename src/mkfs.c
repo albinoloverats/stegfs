@@ -36,10 +36,9 @@
 
 #define RATIO 1024
 
-static uint8_t stegfs_root_hash[] = { 0x60, 0xA6, 0x63, 0x2B, \
-                                      0x77, 0xB6, 0xD5, 0x78, \
-                                      0x9A, 0x65, 0x59, 0x7B, \
-                                      0x10, 0x3A, 0x97, 0x2D };
+static uint8_t stegfs_root_hash[] = { 0x60, 0xA6, 0x63, 0x2B, 0x77, 0xB6, 0xD5, 0x78, \
+                                      0x9A, 0x65, 0x59, 0x7B, 0x10, 0x3A, 0x97, 0x2D };/*, \
+                                      0xE9, 0x78, 0x45, 0xCD, 0x43, 0x79, 0x5D, 0xF7 };*/
 
 static int64_t open_filesystem(const char * const restrict path, uint64_t *size, bool force, bool recreate)
 {
@@ -275,13 +274,13 @@ int main(int argc, char **argv)
     lseek(fs, 0, SEEK_SET);
     for (uint64_t i = 0; i < size / MEGABYTE; i++)
     {
-        printf("\rwriting      : %8.3f %%", 100.0 * i / (size / MEGABYTE));
+        printf("\rwriting      : %8.3f %%", PERCENT * i / (size / MEGABYTE));
         mcrypt_generic(mc, rnd, sizeof rnd);
-        for (int j = 0; j < 8192; j++)
+        for (int j = 0; j < MEGABYTE / SIZE_BYTE_BLOCK; j++)
             memcpy(rnd + j * SIZE_BYTE_BLOCK, stegfs_root_hash, sizeof stegfs_root_hash);
         write(fs, rnd, sizeof rnd);
     }
-    printf("\rwriting      : %8.3f %%\n", 100.0);
+    printf("\rwriting      : %8.3f %%\n", PERCENT);
 
 superblock:
     printf("superblock   : ");
