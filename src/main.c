@@ -382,20 +382,17 @@ static int fuse_stegfs_write(const char *path, const char *buf, size_t size, off
 
 static int fuse_stegfs_open(const char *path, struct fuse_file_info *info)
 {
-    stegfs_file_t file;
-    memset(&file, 0x00, sizeof file);
-    file.path = dir_get_path(path);
-    file.name = dir_get_name(path);
-    file.pass = dir_get_pass(path);
+    errno = EXIT_SUCCESS;
 
-    if (!stegfs_file_read(&file))
-        stegfs_file_create(path, info->flags & O_WRONLY);
+    stegfs_cache2_t *c = NULL;
+    if ((c = stegfs_cache2_exists(path, NULL)) && c->file)
+    {
+        c->file->pass = dir_get_pass(path);
+        if (!stegfs_file_read(c->file))
+            errno = EACCES;
+    }
 
-    free(file.path);
-    free(file.name);
-    free(file.pass);
-
-    return -EXIT_SUCCESS;
+    return -errno;
 }
 
 static int fuse_stegfs_flush(const char *path, struct fuse_file_info *info)
@@ -453,6 +450,8 @@ static int fuse_stegfs_release(const char *path, struct fuse_file_info *info)
         }
         free(c->file->data);
         c->file->data = NULL;
+        free(c->file->pass);
+        c->file->pass = NULL;
     }
 
     return -errno;
