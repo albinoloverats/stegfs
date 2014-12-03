@@ -25,6 +25,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <netinet/in.h>
 
 #include <mhash.h>
 #include <mcrypt.h>
@@ -192,6 +193,14 @@ static void superblock_info(stegfs_block_t *sb, char *cipher, char *mode, char *
         hash[i] = tolower(hash[i]);
     t.value = (byte_t *)hash;
     tlv_append(&tlv, t);
+
+    t.tag = TAG_BLOCKSIZE;
+    uint32_t blocksize = htonl(SIZE_BYTE_BLOCK);
+    t.length = sizeof blocksize;
+    t.value = malloc(sizeof blocksize);
+    memcpy(t.value, &blocksize, sizeof blocksize);
+    tlv_append(&tlv, t);
+    free(t.value);
 
     memcpy(sb->data, tlv_export(tlv), tlv_size(tlv));
 

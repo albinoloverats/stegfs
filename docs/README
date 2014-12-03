@@ -72,7 +72,7 @@ number of bytes (MB, GB, etc) which are used to house everything,
 including header information, about the files on the file system. Below
 this is the capacity available for actual file data ‐ 5/8 of a block is
 used for data (see below). Finally, the maximum usable space under ideal
-conditions where no files are compomised: each file is written 9 times
+conditions where no files are compomised: each file is written 8 times
 to minimise the loss, and maximise the chance of being able to recover
 it. Under normal working conditions it’s highly likely this value will
 never be achieved due to the Birthday Paradox.

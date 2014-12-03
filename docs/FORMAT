@@ -12,7 +12,7 @@ but the possibility of not being able to retrieve data eclipses this.)
 Using 64 bits to represent the block numbers allows up to 1.845e19
 blocks. This allows a theoretical maximum partition size of 2ZB, and a
 theoretical capacity of over 1.25ZB. Although the maximum file size will
-always be 1/9 of the overall capacity due to file replication.
+always be 1/8 of the overall capacity due to file replication.
 
 In practice, due to the limits of the open64() function used by the GNU
 C Library and the Linux kernel, the maximum usable limit stands as 8EB.
@@ -42,7 +42,7 @@ Block Layout
     |  [Nothing - 0xFF]                                              |  |
     +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+‐‐‐‐‐‐‐‐+
     | Data                                                       640 |           +‐ Serpent × 7
-    |  (Starting blocks + timestamp)                                 |           |
+    |  (Starting blocks × 8 + unused + timestamp)                    |           |
     |  [File system infomration]                                     |           |
     |                                                                |           |
     |                                                                |           |
@@ -65,6 +65,6 @@ Example/Exmplanation
 A 1GB file system has 8,388,608 blocks (8,388,607 are available for file
 data, as the first contains file system information). Each of these
 blocks can store 80 bytes of data, leading to 640MB of total capacity.
-As each file is duplicated multiple times (9×) the single largest file
+As each file is duplicated multiple times (8×) the single largest file
 size is 71MB--this is also the maximum available capacity if everything
 is stored in the / of the file system.
