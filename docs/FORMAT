@@ -36,44 +36,28 @@ if you were to fill it to capacity!
 Block Layout
 ------------
 
-     Chunk Name        Size (in bits)
-    +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+
-    | Directory/Path Checksum    128 |  |
-    |  [Nothing - 0xFF]              |  +‐ Tiger128
-    |                                |  |
-    |                                |  |
-    +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+‐‐‐‐‐‐‐‐+
-    | Data                       640 |           |
-    |  (Starting blocks + timestamp) |           |
-    |  [File system infomration]     |           |
-    |                                |           |
-    |                                |           |
-    |                                |           |
-    |                                |           |
-    |                                |           |
-    |                                |           |
-    |                                |           |
-    |                                |           |
-    |                                |           |
-    |                                |           |
-    |                                |           |
-    |                                |           |
-    |                                |           |
-    |                                |           |
-    |                                |           |
-    |                                |           +‐ Serpent (x7)
-    |                                |           |
-    +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+ ‐‐‐‐‐‐‐+
-    | Checksum                   192 |  |        |
-    |  [Hash of "stegfs" (extended   |  |        |
-    |                         UUID)] |  |        |
-    |                                |  +‐ Tiger |
-    |                                |  |        |
-    |                                |  |        |
-    +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+        |
-    | Next block                  64 |           |
-    |  (File size) [Total blocks]    |           |
-    +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐‐‐‐‐‐‐‐‐‐+
+     Chunk Name                                        Size (in bits)
+    +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+
+    | Directory/Path Checksum                                    128 |  +‐ Tiger128
+    |  [Nothing - 0xFF]                                              |  |
+    +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+‐‐‐‐‐‐‐‐+
+    | Data                                                       640 |           +‐ Serpent × 7
+    |  (Starting blocks + timestamp)                                 |           |
+    |  [File system infomration]                                     |           |
+    |                                                                |           |
+    |                                                                |           |
+    |                                                                |           |
+    |                                                                |           |
+    |                                                                |           |
+    |                                                                |           |
+    |                                                                |           |
+    +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+ ‐‐‐‐‐‐‐+
+    | Checksum                                                   192 |  +‐ Tiger |
+    |  [Hash of "stegfs" (extended UUID)]                            |  |        |
+    |                                                                |  |        |
+    +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+        |
+    | Next block (File size) [Total blocks]                       64 |           |
+    +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐‐‐‐‐‐‐‐‐‐+
 
 Example/Exmplanation
 --------------------
