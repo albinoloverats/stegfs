@@ -37,7 +37,7 @@
 
 #define DIRECTORY_ROOT "/"
 
-#ifdef __DEBUG__
+#ifdef USE_PROC
     #define DIRECTORY_PROC "proc"
     #define PATH_PROC DIRECTORY_ROOT DIRECTORY_PROC
 #endif

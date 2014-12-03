@@ -19,7 +19,7 @@ sfs:
 	-@echo "built ‘$(SOURCE)’ --> ‘$(STEGFS)’"
 
 debug:
-	 @$(CC) $(LIBS) $(CFLAGS) $(CPPFLAGS) -D__DEBUG__ $(SOURCE) $(COMMON) -o $(STEGFS)
+	 @$(CC) $(LIBS) $(CFLAGS) $(CPPFLAGS) -DUSE_PROC $(SOURCE) $(COMMON) -o $(STEGFS)
 	-@echo "built ‘$(SOURCE)’ --> ‘$(STEGFS)’"
 
 
