@@ -621,11 +621,8 @@ static MCRYPT cipher_init(const stegfs_file_t * const restrict file, uint8_t ivi
 static MHASH hash_init(void)
 {
     for (size_t i = 0; i < mhash_count(); i++)
-    {
-        if (mhash_get_hash_name_static(i) &&
-                !strcasecmp(file_system.hash, (char *)mhash_get_hash_name_static(i)))
+        if (mhash_get_hash_name_static(i) && !strcasecmp(file_system.hash, (char *)mhash_get_hash_name_static(i)))
             return mhash_init(i);
-    }
     return NULL;
 }
 
