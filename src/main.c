@@ -340,7 +340,9 @@ static int fuse_stegfs_read(const char *path, char *buf, size_t size, off_t offs
         return size;
     }
 
-    return -ENOENT;
+    errno = ENOENT;
+
+    return -errno;
 }
 
 static int fuse_stegfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *info)
@@ -409,6 +411,8 @@ static int fuse_stegfs_flush(const char *path, struct fuse_file_info *info)
 
 static int fuse_stegfs_truncate(const char *path, off_t offset)
 {
+    errno = EXIT_SUCCESS;
+
     struct stat s;
     fuse_stegfs_getattr(path, &s);
     char *buf = malloc(offset);
@@ -420,19 +424,25 @@ static int fuse_stegfs_truncate(const char *path, off_t offset)
 
     free(buf);
 
-    return -EXIT_SUCCESS;
+    return -errno;
 }
 
 static int fuse_stegfs_create(const char *path, mode_t mode, struct fuse_file_info *info)
 {
+    errno = EXIT_SUCCESS;
+
     stegfs_file_create(path, true);
-    return -EXIT_SUCCESS;
+
+    return -errno;
 }
 
 static int fuse_stegfs_mknod(const char *path, mode_t mode, dev_t rdev)
 {
+    errno = EXIT_SUCCESS;
+
     stegfs_file_create(path, false);
-    return -EXIT_SUCCESS;
+
+    return -errno;
 }
 
 static int fuse_stegfs_release(const char *path, struct fuse_file_info *info)
@@ -463,22 +473,26 @@ static int fuse_stegfs_release(const char *path, struct fuse_file_info *info)
 
 static int fuse_stegfs_readlink(const char *path, char *buf, size_t size)
 {
-    return -ENOTSUP;
+    errno = ENOTSUP;
+    return -errno;
 }
 
 static int fuse_stegfs_utime(const char *path, struct utimbuf *utime)
 {
-    return -ENOTSUP;
+    errno = ENOTSUP;
+    return -errno;
 }
 
 static int fuse_stegfs_chmod(const char *path, mode_t mode)
 {
-    return -ENOTSUP;
+    errno = ENOTSUP;
+    return -errno;
 }
 
 static int fuse_stegfs_chown(const char *path, uid_t uid, gid_t gid)
 {
-    return -ENOTSUP;
+    errno = ENOTSUP;
+    return -errno;
 }
 
 int main(int argc, char **argv)
