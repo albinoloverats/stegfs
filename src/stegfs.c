@@ -60,7 +60,7 @@ extern bool stegfs_init(const char * const restrict fs)
     file_system.cache2.ents = 0;
     file_system.cache2.child = NULL;
     file_system.cache2.file = NULL;
-#ifdef __DEBUG__
+#ifdef USE_PROC
     stegfs_cache2_add(PATH_PROC, NULL);
 #endif
 
@@ -183,11 +183,8 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
     int available_inodes = MAX_COPIES;
     int corrupt_copies = 0;
     for (int i = 0; i < MAX_COPIES; i++)
-    {
         for (int j = (sizeof(uint64_t) / sizeof(uint8_t) ); j >= 0; --j)
             file->inodes[i] = (file->inodes[i] << 0x08) | inodes[i + j];
-        file->inodes[i] %= file_system.size / SIZE_BYTE_BLOCK;
-    }
     /*
      * read file inode, pray for success, then see if we can get a
      * complete copy of the file
@@ -199,7 +196,7 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
         memset(&inode, 0x00, SIZE_BYTE_BLOCK);
         if (block_read(file->inodes[i], &inode, mc, file->path))
         {
-            file_system.used[file->inodes[i]] = true;
+            file_system.used[file->inodes[i] % (file_system.size / SIZE_BYTE_BLOCK)] = true;
             memcpy(&file->size, inode.next, sizeof file->size);
             file->size = ntohll(file->size);
             for (int i = 0; i <= MAX_COPIES; i++)
@@ -226,7 +223,7 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
                         memset(&block, 0x00, SIZE_BYTE_BLOCK);
                         if (block_read(file->blocks[i][j - 1], &block, nc, file->path))
                         {
-                            file_system.used[file->blocks[i][j - 1]] = true;
+                            file_system.used[file->blocks[i][j - 1] % (file_system.size / SIZE_BYTE_BLOCK)] = true;
                             memcpy(&val, block.next, sizeof file->blocks[i][j]);
                             file->blocks[i][j] = ntohll(val);
                         }
@@ -289,6 +286,7 @@ extern bool stegfs_file_read(stegfs_file_t *file)
              * failed
              */
             stegfs_block_t block;
+            memset(&block, 0x00, sizeof block);
             block_read(file->blocks[i][j], &block, mc, file->path);
             size_t l = sizeof block.data;
             if (l + k * sizeof block.data > file->size)
@@ -376,6 +374,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
         for (uint64_t j = 1, k = 0; j <= blocks; j++, k++)
         {
             stegfs_block_t block;
+            memset(&block, 0x00, sizeof block);
             size_t l = sizeof block.data;
             if (l + k * sizeof block.data > file->size)
                 l = l - ((l + k * sizeof block.data) - file->size);
@@ -393,6 +392,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
      * write file inode blocks
      */
     stegfs_block_t inode;
+    memset(&inode, 0x00, sizeof inode);
     uint64_t first[MAX_COPIES + 1] = { 0x0 };
     for (int i = 0; i < MAX_COPIES; i++)
         first[i] = htonll(file->blocks[i][1]);
@@ -404,7 +404,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
     {
         MCRYPT mc = cipher_init(file, i);
         if (block_write(file->inodes[i], inode, mc, file->path))
-            file_system.used[file->inodes[i]] = true;
+            file_system.used[file->inodes[i] % (file_system.size / SIZE_BYTE_BLOCK)] = true;
         else
             e = true;
         mcrypt_generic_deinit(mc);
@@ -442,7 +442,8 @@ rfc:
 static bool block_read(uint64_t bid, stegfs_block_t *block, MCRYPT mc, const char * const restrict path)
 {
     errno = EXIT_SUCCESS;
-    if (bid * SIZE_BYTE_BLOCK + SIZE_BYTE_BLOCK > file_system.size)
+    bid %= (file_system.size / SIZE_BYTE_BLOCK);
+    if (!bid || (bid * SIZE_BYTE_BLOCK + SIZE_BYTE_BLOCK > file_system.size))
     {
         errno = EINVAL;
         return false;
@@ -462,7 +463,7 @@ static bool block_read(uint64_t bid, stegfs_block_t *block, MCRYPT mc, const cha
     free(p);
     /* decrypt block */
 #ifndef __DEBUG__
-        uint8_t data[SIZE_BYTE_SERPENT * 7] = { 0x00 };
+        uint8_t data[SIZE_BYTE_SERPENT * (SIZE_BYTE_BLOCK - SIZE_BYTE_PATH) / SIZE_BYTE_SERPENT] = { 0x00 };
         memcpy(data, ((uint8_t *)block) + SIZE_BYTE_SERPENT, SIZE_BYTE_BLOCK - SIZE_BYTE_PATH);
         mdecrypt_generic(mc, data, sizeof data);
         memcpy(((uint8_t *)block) + SIZE_BYTE_SERPENT, data, SIZE_BYTE_BLOCK - SIZE_BYTE_PATH);
@@ -483,6 +484,7 @@ static bool block_read(uint64_t bid, stegfs_block_t *block, MCRYPT mc, const cha
 static bool block_write(uint64_t bid, stegfs_block_t block, MCRYPT mc, const char * const restrict path)
 {
     errno = EXIT_SUCCESS;
+    bid %= (file_system.size / SIZE_BYTE_BLOCK);
     if (!bid || (bid * SIZE_BYTE_BLOCK + SIZE_BYTE_BLOCK > file_system.size))
     {
         errno = EINVAL;
@@ -502,7 +504,7 @@ static bool block_write(uint64_t bid, stegfs_block_t block, MCRYPT mc, const cha
     free(p);
     /* encrypt the data */
 #ifndef __DEBUG__
-    uint8_t data[SIZE_BYTE_SERPENT * 7] = { 0x00 };
+    uint8_t data[SIZE_BYTE_SERPENT * (SIZE_BYTE_BLOCK - SIZE_BYTE_PATH) / SIZE_BYTE_SERPENT] = { 0x00 };
     memcpy(data, ((uint8_t *)&block) + SIZE_BYTE_SERPENT, SIZE_BYTE_BLOCK - SIZE_BYTE_PATH);
     mcrypt_generic(mc, data, sizeof data);
     memcpy(((uint8_t *)&block) + SIZE_BYTE_SERPENT, data, SIZE_BYTE_BLOCK - SIZE_BYTE_PATH);
@@ -512,6 +514,7 @@ static bool block_write(uint64_t bid, stegfs_block_t block, MCRYPT mc, const cha
 
 static void block_delete(uint64_t bid)
 {
+    bid %= (file_system.size / SIZE_BYTE_BLOCK);
     uint8_t block[SIZE_BYTE_BLOCK];
     for (int k = 0; k < SIZE_BYTE_BLOCK; k++)
         block[k] = (uint8_t)(lrand48() & 0xFF);
@@ -524,10 +527,9 @@ static void block_delete(uint64_t bid)
 
 static bool block_in_use(uint64_t bid, const char * const restrict path)
 {
+    bid %= (file_system.size / SIZE_BYTE_BLOCK);
     if (!bid)
         return true; /* superblock always in use */
-    if (bid * SIZE_BYTE_BLOCK + SIZE_BYTE_BLOCK > file_system.size)
-        return true;
     /*
      * check if the block is in the cache
      */
@@ -561,18 +563,25 @@ static bool block_in_use(uint64_t bid, const char * const restrict path)
     return false;
 }
 
+/*
+ * NB block_assign will return a block number in the range of 0 to UINT64_MAX
+ * so that when the value is stored in the file system it’s not mostly
+ * 0’s - we don’t want an attacked to know that most of some block of
+ * cipher text is 0’s - translation into the valid range is done as
+ * necessary by block_ functions
+ */
 static uint64_t block_assign(const char * const restrict path)
 {
     uint64_t block;
     uint64_t tries = 0;
     do
     {
-        block = (lrand48() << 32 | lrand48()) % ((file_system.size / SIZE_BYTE_BLOCK) - 1);
+        block = (lrand48() << 32 | lrand48());// % (file_system.size / SIZE_BYTE_BLOCK);
         if ((++tries) > file_system.size / SIZE_BYTE_BLOCK)
             return 0;
     }
     while (block_in_use(block, path));
-    file_system.used[block] = true;
+    file_system.used[block % (file_system.size / SIZE_BYTE_BLOCK)] = true;
     return block;
 }
 
@@ -840,5 +849,3 @@ extern void stegfs_cache2_remove(const char * const restrict path)
     ptr->name = NULL;
     return;
 }
-
-
