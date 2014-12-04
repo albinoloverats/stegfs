@@ -199,14 +199,13 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
         memset(&inode, 0x00, file_system.blocksize);
         if (block_read(file->inodes[i], &inode, mc, file->path))
         {
-            file_system.used[file->inodes[i] % (file_system.size / file_system.blocksize)] = true;
             memcpy(&file->size, inode.next, sizeof file->size);
-//            file->size = ntohll(file->size);
             if ((file->size = ntohll(file->size)) > file_system.size)
             {
                 available_inodes--;
                 continue;
             }
+            file_system.used[file->inodes[i] % (file_system.size / file_system.blocksize)] = true;
             for (int i = 0; i <= MAX_COPIES; i++)
             {
                 MCRYPT nc = cipher_init(file, i);
@@ -268,7 +267,14 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
         stegfs_cache2_add(NULL, file);
         return true;
     }
-    return false;
+    for (int i = 0; i < MAX_COPIES; i++)
+        if (file->blocks[i])
+        {
+            for (uint64_t j = 1; j < file->blocks[i][0]; j++)
+                file_system.used[file->blocks[i][j] % (file_system.size / file_system.blocksize)] = false;
+            free(file->blocks[i]);
+        }
+return false;
 }
 
 extern bool stegfs_file_read(stegfs_file_t *file)
@@ -332,6 +338,13 @@ extern bool stegfs_file_write(stegfs_file_t *file)
             for (uint64_t j = 1; j <= blocks; j++)
                 if (!(file->blocks[i][j] = block_assign(file->path)))
                 {
+                    /* failed to allocate space; free what we had claimed */
+                    for (int k = 0; k <= i; k++)
+                    {
+                        for (uint64_t l = 1; l <= j; l++)
+                            file_system.used[file->blocks[k][l] % (file_system.size / file_system.blocksize)] = false;
+                        free(file->blocks[k]);
+                    }
                     errno = ENOSPC;
                     return false;
                 }
@@ -339,24 +352,33 @@ extern bool stegfs_file_write(stegfs_file_t *file)
     file->size = z; /* stat can couse size to be reset to 0 */
 
     if (blocks > file->blocks[0][0]) /* need more blocks than we have */
+    {
         for (int i = 0; i < MAX_COPIES; i++)
         {
             file->blocks[i] = realloc(file->blocks[i], (blocks + 2) * sizeof blocks);
             for (uint64_t j = file->blocks[i][0]; j <= blocks; j++)
-                if (!file->blocks[i][j])
-                    if (!(file->blocks[i][j] = block_assign(file->path)))
-                    {
-                        errno = ENOSPC;
-                        return false;
-                    }
+                if (!(file->blocks[i][j] = block_assign(file->path)))
+                {
+                    /* failed to allocate space; free what we had claimed */
+                    for (int k = 0; k <= i; k++)
+                        for (uint64_t l = file->blocks[i][0]; l <= j; l++)
+                            file_system.used[file->blocks[k][l] % (file_system.size / file_system.blocksize)] = false;
+                    errno = ENOSPC;
+                    return false;
+                }
         }
+        for (int i = 0; i < MAX_COPIES; i++)
+            file->blocks[i][0] = blocks;
+    }
     else if (blocks < file->blocks[0][0]) /* have more blocks than we need */
         for (int i = 0; i < MAX_COPIES; i++)
         {
             for (uint64_t j = blocks + 1; j <= file->blocks[i][0]; j++)
                 block_delete(file->blocks[i][j]);
             file->blocks[i] = realloc(file->blocks[i], (blocks + 2) * sizeof blocks);
+            file->blocks[i][0] = blocks;
         }
+#if 0
     /*
      * note-to-self: from above, any of the blockchains could have a
      * string of 0’s (possibly in the middle if it’s been expanded) so
@@ -365,13 +387,15 @@ extern bool stegfs_file_write(stegfs_file_t *file)
     for (int i = 0; i < MAX_COPIES; i++)
     {
         for (uint64_t j = 1; j < file->blocks[i][0]; j++)
-            if (!(file->blocks[i][j] = block_assign(file->path)))
+            if (!file->blocks[i][j] && !(file->blocks[i][j] = block_assign(file->path)))
             {
+                stegfs_file_delete(file);
                 errno = ENOSPC;
                 return false;
             }
         file->blocks[i][blocks + 1] = 0x0;
     }
+#endif
     /*
      * write the data
      */
@@ -470,15 +494,15 @@ static bool block_read(uint64_t bid, stegfs_block_t *block, MCRYPT mc, const cha
         return false;
     }
     free(p);
-    /* decrypt block */
 #ifndef __DEBUG__
-        uint32_t sz = SIZE_BYTE_SERPENT * (file_system.blocksize - SIZE_BYTE_PATH) / SIZE_BYTE_SERPENT;
-        uint8_t *data = malloc(sz);
-        memset(data, 0x00, sz);
-        memcpy(data, ((uint8_t *)block) + SIZE_BYTE_SERPENT, file_system.blocksize - SIZE_BYTE_PATH);
-        mdecrypt_generic(mc, data, sizeof data);
-        memcpy(((uint8_t *)block) + SIZE_BYTE_SERPENT, data, file_system.blocksize - SIZE_BYTE_PATH);
-        free(data);
+    /* decrypt block */
+    uint32_t sz = SIZE_BYTE_SERPENT * (file_system.blocksize - SIZE_BYTE_PATH) / SIZE_BYTE_SERPENT;
+    uint8_t *data = malloc(sz);
+    memset(data, 0x00, sz);
+    memcpy(data, ((uint8_t *)block) + SIZE_BYTE_SERPENT, file_system.blocksize - SIZE_BYTE_PATH);
+    mdecrypt_generic(mc, data, sz);
+    memcpy(((uint8_t *)block) + SIZE_BYTE_SERPENT, data, file_system.blocksize - SIZE_BYTE_PATH);
+    free(data);
 #endif
     /* check data hash */
     hash = hash_init();
@@ -514,13 +538,13 @@ static bool block_write(uint64_t bid, stegfs_block_t block, MCRYPT mc, const cha
     p = mhash_end(hash);
     memcpy(block.hash, p, sizeof block.hash);
     free(p);
-    /* encrypt the data */
 #ifndef __DEBUG__
+    /* encrypt the data */
     uint32_t sz = SIZE_BYTE_SERPENT * (file_system.blocksize - SIZE_BYTE_PATH) / SIZE_BYTE_SERPENT;
     uint8_t *data = malloc(sz);
     memset(data, 0x00, sz);
     memcpy(data, ((uint8_t *)&block) + SIZE_BYTE_SERPENT, file_system.blocksize - SIZE_BYTE_PATH);
-    mcrypt_generic(mc, data, sizeof data);
+    mcrypt_generic(mc, data, sz);
     memcpy(((uint8_t *)&block) + SIZE_BYTE_SERPENT, data, file_system.blocksize - SIZE_BYTE_PATH);
     free(data);
 #endif
@@ -842,7 +866,14 @@ extern void stegfs_cache2_remove(const char * const restrict path)
             free(ptr->file->data);
         for (int i = 0; i < MAX_COPIES; i++)
             if (ptr->file->blocks[i])
+            {
+#if 0
+                for (uint64_t j = 1; j < file->blocks[i][0]; j++)
+                    if (file->blocks[i][j])
+                        file_system.used[file->blocks[i][j] % (file_system.size / file_system.blocksize)] = false;
+#endif
                 free(ptr->file->blocks[i]);
+            }
         free(ptr->file);
     }
     if (ptr->child)
