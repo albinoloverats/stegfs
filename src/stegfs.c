@@ -54,7 +54,6 @@ extern bool stegfs_init(const char * const restrict fs)
 {
     file_system.handle = open(fs, O_RDWR, S_IRUSR | S_IWUSR);
     file_system.size = lseek(file_system.handle, 0, SEEK_END);
-    file_system.used = calloc(file_system.size / SIZE_BYTE_BLOCK, sizeof(bool));
 
     file_system.cache2.name = strdup(DIRECTORY_ROOT);
     file_system.cache2.ents = 0;
@@ -70,8 +69,6 @@ extern bool stegfs_init(const char * const restrict fs)
     if (ntohll(block.hash[0]) != MAGIC_0 ||
         ntohll(block.hash[1]) != MAGIC_1 ||
         ntohll(block.hash[2]) != MAGIC_2)
-        return false;
-    if (ntohll(block.next[0]) != file_system.size / SIZE_BYTE_BLOCK)
         return false;
     TLV_HANDLE tlv = tlv_init();
     for (int i = 0, j = 0; i < TAG_MAX; i++)
@@ -92,7 +89,8 @@ extern bool stegfs_init(const char * const restrict fs)
         !tlv_has_tag(tlv, TAG_VERSION) ||
         !tlv_has_tag(tlv, TAG_CIPHER) ||
         !tlv_has_tag(tlv, TAG_HASH) ||
-        !tlv_has_tag(tlv, TAG_MODE))
+        !tlv_has_tag(tlv, TAG_MODE) ||
+        !tlv_has_tag(tlv, TAG_BLOCKSIZE))
         return false;
 
     if (strncmp((char *)tlv_value_of(tlv, TAG_STEGFS), STEGFS_NAME, strlen(STEGFS_NAME)))
@@ -102,6 +100,11 @@ extern bool stegfs_init(const char * const restrict fs)
     file_system.cipher = strndup((char *)tlv_value_of(tlv, TAG_CIPHER), tlv_size_of(tlv, TAG_CIPHER));
     file_system.hash = strndup((char *)tlv_value_of(tlv, TAG_HASH), tlv_size_of(tlv, TAG_HASH));
     file_system.mode = strndup((char *)tlv_value_of(tlv, TAG_MODE), tlv_size_of(tlv, TAG_MODE));
+    memcpy(&file_system.blocksize, tlv_value_of(tlv, TAG_BLOCKSIZE), tlv_size_of(tlv, TAG_BLOCKSIZE));
+    file_system.blocksize = ntohl(file_system.blocksize);
+    file_system.used = calloc(file_system.size / file_system.blocksize, sizeof(bool));
+    if (ntohll(block.next[0]) != file_system.size / file_system.blocksize)
+        return false;
 
     tlv_deinit(&tlv);
     seed_prng();
@@ -127,7 +130,7 @@ extern bool stegfs_file_will_fit(stegfs_file_t *file)
     lldiv_t d = lldiv(file->size, SIZE_BYTE_DATA);
     uint64_t blocks_needed = (d.quot + (d.rem ? 1 : 0)) * MAX_COPIES;
 
-    uint64_t blocks_total = (file_system.size / SIZE_BYTE_BLOCK) - 1;
+    uint64_t blocks_total = (file_system.size / file_system.blocksize) - 1;
     if (blocks_needed > blocks_total)
     {
         stegfs_file_delete(file);
@@ -135,7 +138,7 @@ extern bool stegfs_file_will_fit(stegfs_file_t *file)
         return false;
     }
     uint64_t blocks_used = 0;
-    for (uint64_t i = 0; i < file_system.size / SIZE_BYTE_BLOCK; i++)
+    for (uint64_t i = 0; i < file_system.size / file_system.blocksize; i++)
         if (file_system.used[i])
             blocks_used++;
     uint64_t blocks_available = blocks_total - blocks_used;
@@ -193,12 +196,17 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
     {
         MCRYPT mc = cipher_init(file, i);
         stegfs_block_t inode;
-        memset(&inode, 0x00, SIZE_BYTE_BLOCK);
+        memset(&inode, 0x00, file_system.blocksize);
         if (block_read(file->inodes[i], &inode, mc, file->path))
         {
-            file_system.used[file->inodes[i] % (file_system.size / SIZE_BYTE_BLOCK)] = true;
+            file_system.used[file->inodes[i] % (file_system.size / file_system.blocksize)] = true;
             memcpy(&file->size, inode.next, sizeof file->size);
-            file->size = ntohll(file->size);
+//            file->size = ntohll(file->size);
+            if ((file->size = ntohll(file->size)) > file_system.size)
+            {
+                available_inodes--;
+                continue;
+            }
             for (int i = 0; i <= MAX_COPIES; i++)
             {
                 MCRYPT nc = cipher_init(file, i);
@@ -220,10 +228,10 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
                     for (uint64_t j = 2 ; j <= blocks; j++)
                     {
                         stegfs_block_t block;
-                        memset(&block, 0x00, SIZE_BYTE_BLOCK);
+                        memset(&block, 0x00, file_system.blocksize);
                         if (block_read(file->blocks[i][j - 1], &block, nc, file->path))
                         {
-                            file_system.used[file->blocks[i][j - 1] % (file_system.size / SIZE_BYTE_BLOCK)] = true;
+                            file_system.used[file->blocks[i][j - 1] % (file_system.size / file_system.blocksize)] = true;
                             memcpy(&val, block.next, sizeof file->blocks[i][j]);
                             file->blocks[i][j] = ntohll(val);
                         }
@@ -393,10 +401,11 @@ extern bool stegfs_file_write(stegfs_file_t *file)
      */
     stegfs_block_t inode;
     memset(&inode, 0x00, sizeof inode);
-    uint64_t first[MAX_COPIES + 1] = { 0x0 };
+    uint64_t first[SIZE_LONG_DATA] = { 0x0 };
     for (int i = 0; i < MAX_COPIES; i++)
         first[i] = htonll(file->blocks[i][1]);
-    first[MAX_COPIES] = htonll(file->time);
+    first[MAX_COPIES] = 0x0000000000000000LL; /* (for now) */
+    first[SIZE_LONG_DATA - 1] = htonll(file->time);
     memcpy(inode.data, first, sizeof first);
     z = htonll(file->size);
     memcpy(inode.next, &z, sizeof file->size);
@@ -404,7 +413,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
     {
         MCRYPT mc = cipher_init(file, i);
         if (block_write(file->inodes[i], inode, mc, file->path))
-            file_system.used[file->inodes[i] % (file_system.size / SIZE_BYTE_BLOCK)] = true;
+            file_system.used[file->inodes[i] % (file_system.size / file_system.blocksize)] = true;
         else
             e = true;
         mcrypt_generic_deinit(mc);
@@ -442,13 +451,13 @@ rfc:
 static bool block_read(uint64_t bid, stegfs_block_t *block, MCRYPT mc, const char * const restrict path)
 {
     errno = EXIT_SUCCESS;
-    bid %= (file_system.size / SIZE_BYTE_BLOCK);
-    if (!bid || (bid * SIZE_BYTE_BLOCK + SIZE_BYTE_BLOCK > file_system.size))
+    bid %= (file_system.size / file_system.blocksize);
+    if (!bid || (bid * file_system.blocksize + file_system.blocksize > file_system.size))
     {
         errno = EINVAL;
         return false;
     }
-    ssize_t z = pread(file_system.handle, block, sizeof(stegfs_block_t), bid * SIZE_BYTE_BLOCK);
+    ssize_t z = pread(file_system.handle, block, sizeof(stegfs_block_t), bid * file_system.blocksize);
     if (z < 0)
         return false;
     /* check path hash */
@@ -463,10 +472,13 @@ static bool block_read(uint64_t bid, stegfs_block_t *block, MCRYPT mc, const cha
     free(p);
     /* decrypt block */
 #ifndef __DEBUG__
-        uint8_t data[SIZE_BYTE_SERPENT * (SIZE_BYTE_BLOCK - SIZE_BYTE_PATH) / SIZE_BYTE_SERPENT] = { 0x00 };
-        memcpy(data, ((uint8_t *)block) + SIZE_BYTE_SERPENT, SIZE_BYTE_BLOCK - SIZE_BYTE_PATH);
+        uint32_t sz = SIZE_BYTE_SERPENT * (file_system.blocksize - SIZE_BYTE_PATH) / SIZE_BYTE_SERPENT;
+        uint8_t *data = malloc(sz);
+        memset(data, 0x00, sz);
+        memcpy(data, ((uint8_t *)block) + SIZE_BYTE_SERPENT, file_system.blocksize - SIZE_BYTE_PATH);
         mdecrypt_generic(mc, data, sizeof data);
-        memcpy(((uint8_t *)block) + SIZE_BYTE_SERPENT, data, SIZE_BYTE_BLOCK - SIZE_BYTE_PATH);
+        memcpy(((uint8_t *)block) + SIZE_BYTE_SERPENT, data, file_system.blocksize - SIZE_BYTE_PATH);
+        free(data);
 #endif
     /* check data hash */
     hash = hash_init();
@@ -484,8 +496,8 @@ static bool block_read(uint64_t bid, stegfs_block_t *block, MCRYPT mc, const cha
 static bool block_write(uint64_t bid, stegfs_block_t block, MCRYPT mc, const char * const restrict path)
 {
     errno = EXIT_SUCCESS;
-    bid %= (file_system.size / SIZE_BYTE_BLOCK);
-    if (!bid || (bid * SIZE_BYTE_BLOCK + SIZE_BYTE_BLOCK > file_system.size))
+    bid %= (file_system.size / file_system.blocksize);
+    if (!bid || (bid * file_system.blocksize + file_system.blocksize > file_system.size))
     {
         errno = EINVAL;
         return false;
@@ -504,30 +516,33 @@ static bool block_write(uint64_t bid, stegfs_block_t block, MCRYPT mc, const cha
     free(p);
     /* encrypt the data */
 #ifndef __DEBUG__
-    uint8_t data[SIZE_BYTE_SERPENT * (SIZE_BYTE_BLOCK - SIZE_BYTE_PATH) / SIZE_BYTE_SERPENT] = { 0x00 };
-    memcpy(data, ((uint8_t *)&block) + SIZE_BYTE_SERPENT, SIZE_BYTE_BLOCK - SIZE_BYTE_PATH);
+    uint32_t sz = SIZE_BYTE_SERPENT * (file_system.blocksize - SIZE_BYTE_PATH) / SIZE_BYTE_SERPENT;
+    uint8_t *data = malloc(sz);
+    memset(data, 0x00, sz);
+    memcpy(data, ((uint8_t *)&block) + SIZE_BYTE_SERPENT, file_system.blocksize - SIZE_BYTE_PATH);
     mcrypt_generic(mc, data, sizeof data);
-    memcpy(((uint8_t *)&block) + SIZE_BYTE_SERPENT, data, SIZE_BYTE_BLOCK - SIZE_BYTE_PATH);
+    memcpy(((uint8_t *)&block) + SIZE_BYTE_SERPENT, data, file_system.blocksize - SIZE_BYTE_PATH);
+    free(data);
 #endif
-    return pwrite(file_system.handle, &block, sizeof block, bid * SIZE_BYTE_BLOCK) == sizeof block;
+    return pwrite(file_system.handle, &block, sizeof block, bid * file_system.blocksize) == sizeof block;
 }
 
 static void block_delete(uint64_t bid)
 {
-    bid %= (file_system.size / SIZE_BYTE_BLOCK);
-    uint8_t block[SIZE_BYTE_BLOCK];
-    for (int k = 0; k < SIZE_BYTE_BLOCK; k++)
+    bid %= (file_system.size / file_system.blocksize);
+    uint8_t block[file_system.blocksize];
+    for (uint32_t k = 0; k < file_system.blocksize; k++)
         block[k] = (uint8_t)(lrand48() & 0xFF);
-    if (!bid || (bid * SIZE_BYTE_BLOCK + SIZE_BYTE_BLOCK > file_system.size))
+    if (!bid || (bid * file_system.blocksize + file_system.blocksize > file_system.size))
         return;
-    pwrite(file_system.handle, block, sizeof block, bid * SIZE_BYTE_BLOCK);
+    pwrite(file_system.handle, block, sizeof block, bid * file_system.blocksize);
     file_system.used[bid] = false;
     return;
 }
 
 static bool block_in_use(uint64_t bid, const char * const restrict path)
 {
-    bid %= (file_system.size / SIZE_BYTE_BLOCK);
+    bid %= (file_system.size / file_system.blocksize);
     if (!bid)
         return true; /* superblock always in use */
     /*
@@ -552,7 +567,7 @@ static bool block_in_use(uint64_t bid, const char * const restrict path)
         mhash(hash, p, strlen(p));
         void *h = mhash_end(hash);
         stegfs_block_t block;
-        pread(file_system.handle, &block, sizeof block, bid * SIZE_BYTE_BLOCK);
+        pread(file_system.handle, &block, sizeof block, bid * file_system.blocksize);
         bool r = !memcmp(h, block.path, SIZE_BYTE_PATH);
         free(h);
         if (r)
@@ -576,12 +591,12 @@ static uint64_t block_assign(const char * const restrict path)
     uint64_t tries = 0;
     do
     {
-        block = (lrand48() << 32 | lrand48());// % (file_system.size / SIZE_BYTE_BLOCK);
-        if ((++tries) > file_system.size / SIZE_BYTE_BLOCK)
+        block = (lrand48() << 32 | lrand48());// % (file_system.size / file_system.blocksize);
+        if ((++tries) > file_system.size / file_system.blocksize)
             return 0;
     }
     while (block_in_use(block, path));
-    file_system.used[block % (file_system.size / SIZE_BYTE_BLOCK)] = true;
+    file_system.used[block % (file_system.size / file_system.blocksize)] = true;
     return block;
 }
 
