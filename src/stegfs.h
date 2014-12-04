@@ -32,41 +32,22 @@
 #define SIZE_BYTE_SERPENT   0x10                      /*    16 bytes -- 128 bits */
 #define SIZE_BYTE_TIGER     0x18                      /*    24 bytes -- 192 bits */
 
-#ifdef _LARGER_BLOCK_EXPERIMENT
-    /*
-     * this was/is an attempt to use a large block size, although I’m
-     * still not sure whether it’s necessary or worthwhile
-     */
-    #define SIZE_BYTE_BLOCK     0x0438                    /* 1,080 bytes -- full block */
-    #define SIZE_BYTE_PATH      SIZE_BYTE_TIGER           /*    24 bytes */
-    #define SIZE_BYTE_DATA      0x0400                    /* 1,024 bytes */
-    #define SIZE_BYTE_HASH      SIZE_BYTE_TIGER           /*    24 bytes */
-    #define SIZE_BYTE_NEXT      0x08                      /*     8 bytes */
+#define SIZE_BYTE_BLOCK     0x80                      /*   128 bytes -- full block */
+#define SIZE_BYTE_PATH     (SIZE_BYTE_TIGER * 2 / 3)  /*    16 bytes */
+#define SIZE_BYTE_DATA      0x50                      /*    80 bytes */
+#define SIZE_BYTE_HASH      SIZE_BYTE_TIGER           /*    24 bytes */
+#define SIZE_BYTE_NEXT      0x08                      /*     8 bytes */
 
-    /* size in 64 bit ints of parts of block */
-    #define SIZE_LONG_PATH 0x03
-    #define SIZE_LONG_DATA 0x80
-    #define SIZE_LONG_HASH 0x03
-    #define SIZE_LONG_NEXT 0x01
+//#define SIZE_BYTE_MISC (SIZE_BYTE_PATH + SIZE_BYTE_HASH + SIZE_BYTE_NEXT)
 
-    #define SYM_LENGTH 949
-    #define MAX_COPIES 8
-#else
-    #define SIZE_BYTE_BLOCK     0x80                      /*   128 bytes -- full block */
-    #define SIZE_BYTE_PATH     (SIZE_BYTE_TIGER * 2 / 3)  /*    16 bytes */
-    #define SIZE_BYTE_DATA      0x50                      /*    80 bytes */
-    #define SIZE_BYTE_HASH      SIZE_BYTE_TIGER           /*    24 bytes */
-    #define SIZE_BYTE_NEXT      0x08                      /*     8 bytes */
+/* size in 64 bit ints of parts of block */
+#define SIZE_LONG_PATH 0x02
+#define SIZE_LONG_DATA 0x0A
+#define SIZE_LONG_HASH 0x03
+#define SIZE_LONG_NEXT 0x01
 
-    /* size in 64 bit ints of parts of block */
-    #define SIZE_LONG_PATH 0x02
-    #define SIZE_LONG_DATA 0x0A
-    #define SIZE_LONG_HASH 0x03
-    #define SIZE_LONG_NEXT 0x01
-
-    #define SYM_LENGTH -1
-    #define MAX_COPIES 9
-#endif
+#define SYM_LENGTH -1
+#define MAX_COPIES 8
 
 
 #define SUPER_ID STEGFS_NAME " " STEGFS_VERSION
@@ -83,6 +64,7 @@ typedef enum
     TAG_CIPHER,
     TAG_HASH,
     TAG_MODE,
+    TAG_BLOCKSIZE,
     TAG_MAX
 }
 stegfs_tag_e;
@@ -125,13 +107,14 @@ stegfs_cache2_t;
  */
 typedef struct stegfs_t
 {
-    uint64_t        size;   /*!< Size of file system in bytes (not capacity) */
-    int64_t         handle; /*!< Handle to file system file/device */
+    uint64_t        size;      /*!< Size of file system in bytes (not capacity) */
+    int64_t         handle;    /*!< Handle to file system file/device */
     char           *cipher;
     char           *hash;
     char           *mode;
-    bool           *used;   /*!< Used block tracker */
-    stegfs_cache2_t cache2; /*!< File cache version 2 */
+    uint32_t        blocksize; /*!< File system block size; if it needs to be bigger than 4,294,967,295 we have issues */
+    bool           *used;      /*!< Used block tracker */
+    stegfs_cache2_t cache2;    /*!< File cache version 2 */
 }
 stegfs_t;
 
