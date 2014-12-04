@@ -273,6 +273,7 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
             for (uint64_t j = 1; j < file->blocks[i][0]; j++)
                 file_system.used[file->blocks[i][j] % (file_system.size / file_system.blocksize)] = false;
             free(file->blocks[i]);
+            file->blocks[i] = NULL;
         }
 return false;
 }
@@ -340,11 +341,13 @@ extern bool stegfs_file_write(stegfs_file_t *file)
                 {
                     /* failed to allocate space; free what we had claimed */
                     for (int k = 0; k <= i; k++)
-                    {
-                        for (uint64_t l = 1; l <= j; l++)
-                            file_system.used[file->blocks[k][l] % (file_system.size / file_system.blocksize)] = false;
-                        free(file->blocks[k]);
-                    }
+                        if (file->blocks[k])
+                        {
+                            for (uint64_t l = 1; l <= j; l++)
+                                file_system.used[file->blocks[k][l] % (file_system.size / file_system.blocksize)] = false;
+                            free(file->blocks[k]);
+                            file->blocks[k] = NULL;
+                        }
                     errno = ENOSPC;
                     return false;
                 }
@@ -361,7 +364,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
                 {
                     /* failed to allocate space; free what we had claimed */
                     for (int k = 0; k <= i; k++)
-                        for (uint64_t l = file->blocks[i][0]; l <= j; l++)
+                        for (uint64_t l = file->blocks[k][0]; l <= j; l++)
                             file_system.used[file->blocks[k][l] % (file_system.size / file_system.blocksize)] = false;
                     errno = ENOSPC;
                     return false;
@@ -873,6 +876,7 @@ extern void stegfs_cache2_remove(const char * const restrict path)
                         file_system.used[file->blocks[i][j] % (file_system.size / file_system.blocksize)] = false;
 #endif
                 free(ptr->file->blocks[i]);
+                ptr->file->blocks[i] = NULL;
             }
         free(ptr->file);
     }
