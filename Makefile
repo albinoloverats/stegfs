@@ -10,7 +10,8 @@ COMMON   = src/common/error.c src/common/tlv.c src/common/apple.c
 CFLAGS   = -Wall -Wextra -Werror -Wno-unused-parameter -std=gnu99 `pkg-config --cflags fuse` -pipe -O0 -ggdb -I/usr/local/include
 CPPFLAGS = -Isrc -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -DGIT_COMMIT=\"`git log | head -n1 | cut -f2 -d' '`\"
 
-LIBS     = -lmhash -lmcrypt -lpthread `pkg-config --libs fuse`
+# -lpthread
+LIBS     = -lmhash -lmcrypt  `pkg-config --libs fuse`
 
 all: sfs mkfs man
 
