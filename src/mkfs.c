@@ -227,7 +227,7 @@ int main(int argc, char **argv)
     if (argc <= 1)
         print_usage_help(argv[0]);
 
-    char *path = NULL;
+    char path[PATH_MAX] = "";
     uint64_t size = 0;
     bool force = false;
     bool recreate = false;
@@ -246,10 +246,18 @@ int main(int argc, char **argv)
         else if (!strcmp("-d", argv[i]))
             dry = true;
         else
-            path = argv[i];
+            realpath(argv[i], path);
+    }
+
+    if (!strlen(path))
+    {
+        fprintf(stderr, "missing file system target\n");
+        return EXIT_FAILURE;
     }
 
     int64_t fs = open_filesystem(path, &size, force, recreate, dry);
+
+    printf("\e[?25l"); /* hide cursor - mostly for actualy write loop */
 
     uint64_t blocks = size / SIZE_BYTE_BLOCK;
     if (dry)
@@ -271,21 +279,21 @@ int main(int argc, char **argv)
 
     printf("location     : %s\n", path);
     double z = size / MEGABYTE;
-    printf("blocks       : %'10ju\n", blocks);
+    printf("blocks       : %'26ju\n", blocks);
     char units[] = "MB";
     adjust_units(&z, units);
     sprintf(s1, "%f", z);
     s2 = strchr(s1, '.');
     l = s2 - s1;
-    printf("size         : %'10.*g %s\n", (l + 2), z, units);
+    printf("size         : %'26.*g %s\n", (l + 2), z, units);
     z = ((double)size / SIZE_BYTE_BLOCK * SIZE_BYTE_DATA) / MEGABYTE;
     strcpy(units, "MB");
     adjust_units(&z, units);
     sprintf(s1, "%f", z);
     s2 = strchr(s1, '.');
     l = s2 - s1;
-    printf("capacity     : %'10.*g %s\n", (l + 2), z, units);
-    printf("largest file : %'10.*g %s\n", (l + 2), z / MAX_COPIES , units);
+    printf("capacity     : %'26.*g %s\n", (l + 2), z, units);
+    printf("largest file : %'26.*g %s\n", (l + 2), z / MAX_COPIES , units);
 
     if (dry)
         return EXIT_SUCCESS;
@@ -297,13 +305,13 @@ int main(int argc, char **argv)
     lseek(fs, 0, SEEK_SET);
     for (uint64_t i = 0; i < size / MEGABYTE; i++)
     {
-        printf("\rwriting      : %'10.3f %%", PERCENT * i / (size / MEGABYTE));
+        printf("\rwriting      : %'26.3f %%", PERCENT * i / (size / MEGABYTE));
         mcrypt_generic(mc, rnd, sizeof rnd);
         for (int j = 0; j < MEGABYTE / SIZE_BYTE_BLOCK; j++)
             memcpy(rnd + j * SIZE_BYTE_BLOCK, stegfs_root_hash, sizeof stegfs_root_hash);
         write(fs, rnd, sizeof rnd);
     }
-    printf("\rwriting      : %'10.3f %%\n", PERCENT);
+    printf("\rwriting      : %'26.3f %%\n", PERCENT);
 
 superblock:
     printf("superblock   : ");
@@ -315,7 +323,7 @@ superblock:
     sb.hash[2] = htonll(MAGIC_2);
     sb.next[0] = htonll(blocks);
     pwrite(fs, &sb, sizeof sb, 0);
-    printf("done\n");
+    printf("done\n\e[?25h");
     close(fs);
 
     return EXIT_SUCCESS;
