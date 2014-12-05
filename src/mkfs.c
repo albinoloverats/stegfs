@@ -267,7 +267,6 @@ int main(int argc, char **argv)
 
     int64_t fs = open_filesystem(path, &size, force, recreate, dry);
 
-    printf("\e[?25l"); /* hide cursor - mostly for actualy write loop */
     rand_seed();
 
     uint64_t blocks = size / SIZE_BYTE_BLOCK;
@@ -315,13 +314,15 @@ int main(int argc, char **argv)
     rand_nonce(rnd, sizeof rnd);
     MCRYPT mc = crypto_init();
     lseek(fs, 0, SEEK_SET);
+    printf("\e[?25l"); /* hide cursor - mostly for actualy write loop */
     for (uint64_t i = 0; i < size / MEGABYTE; i++)
     {
         printf("\rwriting      : %'26.3f %%", PERCENT * i / (size / MEGABYTE));
         mcrypt_generic(mc, rnd, sizeof rnd);
         write(fs, rnd, sizeof rnd);
+        fdatasync(fs);
     }
-    printf("\rwriting      : %'26.3f %%\n", PERCENT);
+    printf("\e[?25h\rwriting      : %'26.3f %%\n", PERCENT);
 
 superblock:
     printf("superblock   : ");
@@ -333,8 +334,9 @@ superblock:
     sb.hash[2] = htonll(MAGIC_2);
     sb.next[0] = htonll(blocks);
     pwrite(fs, &sb, sizeof sb, 0);
-    printf("done\n\e[?25h");
+    fdatasync(fs);
     close(fs);
+    printf("done\n\e[?25h");
 
     return EXIT_SUCCESS;
 }

@@ -56,5 +56,8 @@ extern void rand_nonce(uint8_t *buffer, size_t length)
         buffer[i + 2] =  r % 0x000000FF;
         buffer[i + 3] = (r % 0x0000FF00) >>  8;
     }
-
+    /*
+     * TODO something if length isn’t a multiple of 4 (Duff’s device?)
+     */
+    return;
 }
