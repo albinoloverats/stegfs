@@ -65,7 +65,7 @@ static int64_t open_filesystem(const char * const restrict path, uint64_t *size,
         case S_IFIFO:
             die("unable to create file system on specified device \"%s\"", path);
         case S_IFREG:
-            if (!force && !recreate)
+            if (!force && !recreate && !dry)
                 die("file by that name already exists - use -f to force");
             /*
              * file does exist; use its current size as the desired capacity
