@@ -275,7 +275,7 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
             free(file->blocks[i]);
             file->blocks[i] = NULL;
         }
-return false;
+    return false;
 }
 
 extern bool stegfs_file_read(stegfs_file_t *file)
@@ -327,8 +327,14 @@ extern bool stegfs_file_write(stegfs_file_t *file)
     uint64_t z = file->size;
 
     if (!stegfs_file_stat(file))
+    {
         for (int i = 0; i < MAX_COPIES; i++)
         {
+            /*
+             * allocate inodes, mark as in use (inode locations are calculated
+             * in stegfs_file_stat)
+             */
+            file_system.used[file->inodes[i] % (file_system.size / file_system.blocksize)] = true;
             /*
              * note-to-self: allocate 2 more blocks than is necessary so
              * that block[0] indicates how many blocks there are (needed)
@@ -341,6 +347,8 @@ extern bool stegfs_file_write(stegfs_file_t *file)
                 {
                     /* failed to allocate space; free what we had claimed */
                     for (int k = 0; k <= i; k++)
+                    {
+                        file_system.used[file->inodes[i] % (file_system.size / file_system.blocksize)] = false;
                         if (file->blocks[k])
                         {
                             for (uint64_t l = 1; l <= j; l++)
@@ -348,10 +356,12 @@ extern bool stegfs_file_write(stegfs_file_t *file)
                             free(file->blocks[k]);
                             file->blocks[k] = NULL;
                         }
+                    }
                     errno = ENOSPC;
                     return false;
                 }
         }
+    }
     file->size = z; /* stat can couse size to be reset to 0 */
 
     if (blocks > file->blocks[0][0]) /* need more blocks than we have */
@@ -402,7 +412,6 @@ extern bool stegfs_file_write(stegfs_file_t *file)
     /*
      * write the data
      */
-    bool e = false;
     for (int i = 0; i < MAX_COPIES; i++)
     {
         MCRYPT mc = cipher_init(file, i);
@@ -418,7 +427,13 @@ extern bool stegfs_file_write(stegfs_file_t *file)
             z = htonll(file->blocks[i][j + 1]);
             memcpy(block.next, &z, sizeof block.next);
             if (!block_write(file->blocks[i][j], block, mc, file->path))
-                e = true;
+            {
+                /* see below (where inode blocks are written) */
+                for (int k = 0; k <= i; k++)
+                    for (uint64_t l = 1; l <= j; l++)
+                        block_delete(file->blocks[k][l]);
+                return false;
+            }
         }
         mcrypt_generic_deinit(mc);
         mcrypt_module_close(mc);
@@ -431,7 +446,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
     uint64_t first[SIZE_LONG_DATA] = { 0x0 };
     for (int i = 0; i < MAX_COPIES; i++)
         first[i] = htonll(file->blocks[i][1]);
-    first[MAX_COPIES] = 0x0000000000000000LL; /* (for now) */
+    first[MAX_COPIES] = 0x0000000000000000LL; /* TODO think of something to go here */
     first[SIZE_LONG_DATA - 1] = htonll(file->time);
     memcpy(inode.data, first, sizeof first);
     z = htonll(file->size);
@@ -439,16 +454,26 @@ extern bool stegfs_file_write(stegfs_file_t *file)
     for (int i = 0; i < MAX_COPIES; i++)
     {
         MCRYPT mc = cipher_init(file, i);
-        if (block_write(file->inodes[i], inode, mc, file->path))
-            file_system.used[file->inodes[i] % (file_system.size / file_system.blocksize)] = true;
-        else
-            e = true;
+        if (!block_write(file->inodes[i], inode, mc, file->path))
+        {
+            for (int j = 0; j <= i; j++)
+                /*
+                 * it’s likely that if a write failed above, it won’t work
+                 * here either, but at least the block will be marked as
+                 * available
+                 * (in fact if a call to write fails it’s likely all subsequent
+                 * write will fail too)
+                 */
+                block_delete(file->inodes[j]);
+            stegfs_file_delete(file);
+            return false;
+        }
         mcrypt_generic_deinit(mc);
         mcrypt_module_close(mc);
     }
-    if (!e)
-        stegfs_cache2_add(NULL, file);
-    return !e;
+
+    stegfs_cache2_add(NULL, file);
+    return true;
 }
 
 extern void stegfs_file_delete(stegfs_file_t *file)
