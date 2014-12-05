@@ -39,6 +39,7 @@
 
 #define RATIO 1024
 
+#if 0
 /*!
  * \brief  Hash of file system root
  *
@@ -51,6 +52,7 @@ static uint8_t stegfs_root_hash[] = { 0x60, 0xA6, 0x63, 0x2B, 0x77, 0xB6, 0xD5, 
                                       0x9A, 0x65, 0x59, 0x7B, 0x10, 0x3A, 0x97, 0x2D };/*, \
                                       0xE9, 0x78, 0x45, 0xCD, 0x43, 0x79, 0x5D, 0xF7 };*/
 
+#endif
 
 static int64_t open_filesystem(const char * const restrict path, uint64_t *size, bool force, bool recreate, bool dry)
 {
@@ -163,13 +165,11 @@ static MCRYPT crypto_init(void)
 {
     MCRYPT c = mcrypt_module_open(MCRYPT_SERPENT, NULL, MCRYPT_CBC, NULL);
     /* create the initial key for the encryption algorithm */
-    uint8_t key[SIZE_BYTE_TIGER] = { 0x00 };
-    for (unsigned i = 0; i < sizeof key; i++)
-        key[i] = (uint8_t)(lrand48() & 0xFF);
+    uint8_t key[SIZE_BYTE_TIGER];
+    rand_nonce(key, sizeof key);
     /* create the initial iv for the encryption algorithm */
-    uint8_t iv[SIZE_BYTE_SERPENT] = { 0x00 };
-    for (unsigned i = 0; i < sizeof iv; i++)
-        iv[i] = (uint8_t)(lrand48() & 0xFF);
+    uint8_t iv[SIZE_BYTE_SERPENT];
+    rand_nonce(iv, sizeof iv);
     /* done */
     mcrypt_generic_init(c, key, sizeof key, iv);
     return c;
@@ -312,16 +312,13 @@ int main(int argc, char **argv)
      * write “encrypted” blocks
      */
     uint8_t rnd[MEGABYTE];
+    rand_nonce(rnd, sizeof rnd);
     MCRYPT mc = crypto_init();
     lseek(fs, 0, SEEK_SET);
-    double dr = drand48();
     for (uint64_t i = 0; i < size / MEGABYTE; i++)
     {
         printf("\rwriting      : %'26.3f %%", PERCENT * i / (size / MEGABYTE));
         mcrypt_generic(mc, rnd, sizeof rnd);
-        for (int j = 0; j < MEGABYTE / SIZE_BYTE_BLOCK; j++)
-            if (dr < drand48())
-                memcpy(rnd + j * SIZE_BYTE_BLOCK, stegfs_root_hash, sizeof stegfs_root_hash);
         write(fs, rnd, sizeof rnd);
     }
     printf("\rwriting      : %'26.3f %%\n", PERCENT);

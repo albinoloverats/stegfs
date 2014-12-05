@@ -117,7 +117,7 @@ extern stegfs_t stegfs_info(void)
 
 extern bool stegfs_files_equal(stegfs_file_t a, stegfs_file_t b)
 {
-    if (!a.path || !b.path || strcmp(a.path, b.path))
+    if (!a.path || !b.path || !path_equals(a.path, b.path))
         return false;
     if (!a.name || !b.name || strcmp(a.name, b.name))
         return false;
@@ -489,7 +489,7 @@ extern void stegfs_file_delete(stegfs_file_t *file)
             block_delete(file->blocks[i][j]);
     }
 rfc:
-    asprintf(&p, "%s/%s", strcmp(file->path, DIRECTORY_ROOT) ? file->path : "", file->name);
+    asprintf(&p, "%s/%s", path_equals(file->path, DIRECTORY_ROOT) ? "" : file->path, file->name);
     stegfs_cache2_remove(p);
     free(p);
     return;
@@ -511,16 +511,22 @@ static bool block_read(uint64_t bid, stegfs_block_t *block, MCRYPT mc, const cha
     ssize_t z = pread(file_system.handle, block, sizeof(stegfs_block_t), bid * file_system.blocksize);
     if (z < 0)
         return false;
-    /* check path hash */
-    MHASH hash = hash_init();
-    mhash(hash, path, strlen(path));
-    void *p = mhash_end(hash);
-    if (memcmp(block->path, p, sizeof block->path))
+    MHASH hash;
+    void *p;
+    /* ignore path check in root */
+    if (!path_equals(path, DIRECTORY_ROOT))
     {
+        /* check path hash */
+        hash = hash_init();
+        mhash(hash, path, strlen(path));
+        p = mhash_end(hash);
+        if (memcmp(block->path, p, sizeof block->path))
+        {
+            free(p);
+            return false;
+        }
         free(p);
-        return false;
     }
-    free(p);
 #ifndef __DEBUG__
     /* decrypt block */
     uint32_t sz = SIZE_BYTE_SERPENT * (file_system.blocksize - SIZE_BYTE_PATH) / SIZE_BYTE_SERPENT;
@@ -553,18 +559,23 @@ static bool block_write(uint64_t bid, stegfs_block_t block, MCRYPT mc, const cha
         errno = EINVAL;
         return false;
     }
-    /* compute path hash */
-    MHASH hash = hash_init();
-    mhash(hash, path, strlen(path));
-    void *p = mhash_end(hash);
-    memcpy(block.path, p, sizeof block.path);
-    free(p);
-    /* compute data hash */
-    hash = hash_init();
-    mhash(hash, block.data, sizeof block.data);
-    p = mhash_end(hash);
-    memcpy(block.hash, p, sizeof block.hash);
-    free(p);
+    if (path_equals(path, DIRECTORY_ROOT))
+        rand_nonce((uint8_t *)&block.path, SIZE_BYTE_PATH);
+    else
+    {
+        /* compute path hash */
+        MHASH hash = hash_init();
+        mhash(hash, path, strlen(path));
+        void *p = mhash_end(hash);
+        memcpy(block.path, p, sizeof block.path);
+        free(p);
+        /* compute data hash */
+        hash = hash_init();
+        mhash(hash, block.data, sizeof block.data);
+        p = mhash_end(hash);
+        memcpy(block.hash, p, sizeof block.hash);
+        free(p);
+    }
 #ifndef __DEBUG__
     /* encrypt the data */
     uint32_t sz = SIZE_BYTE_SERPENT * (file_system.blocksize - SIZE_BYTE_PATH) / SIZE_BYTE_SERPENT;
@@ -581,14 +592,14 @@ static bool block_write(uint64_t bid, stegfs_block_t block, MCRYPT mc, const cha
 static void block_delete(uint64_t bid)
 {
     bid %= (file_system.size / file_system.blocksize);
-    uint8_t block[file_system.blocksize];
+    uint8_t *block = malloc(file_system.blocksize);
     /* keep the same path as before */
     pread(file_system.handle, block, SIZE_BYTE_BLOCK, bid * file_system.blocksize);
-    for (uint32_t k = SIZE_BYTE_PATH; k < file_system.blocksize; k++)
-        block[k] = (uint8_t)(lrand48() & 0xFF);
+    rand_nonce(block, file_system.blocksize);
     if (!bid || (bid * file_system.blocksize + file_system.blocksize > file_system.size))
         return;
     pwrite(file_system.handle, block, sizeof block, bid * file_system.blocksize);
+    free(block);
     file_system.used[bid] = false;
     return;
 }
@@ -709,7 +720,7 @@ extern void stegfs_cache2_add(const char * const restrict path, stegfs_file_t *f
     if (path)
         p = strdup(path);
     else
-        asprintf(&p, "%s/%s", strcmp(file->path, DIRECTORY_ROOT) ? file->path : "", file->name);
+        asprintf(&p, "%s/%s", path_equals(file->path, DIRECTORY_ROOT) ? "" : file->path, file->name);
     if ((ptr = stegfs_cache2_exists(p, NULL)))
         goto c2a3; /* already in cache */
     ptr = &(file_system.cache2);

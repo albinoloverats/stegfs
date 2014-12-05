@@ -17,11 +17,16 @@
  *
  */
 
+#include <inttypes.h>
+#include <stdbool.h>
+
 #include <sys/time.h>
 #include <mhash.h>
 
 #include "common/common.h"
 #include "common/rand.h"
+
+static bool seed = false;
 
 extern void rand_seed(void)
 {
@@ -35,5 +40,21 @@ extern void rand_seed(void)
     memcpy(s, ph, sizeof s * sizeof s[0]);
     free(ph);
     seed48(s);
+    seed = true;
     return;
+}
+
+extern void rand_nonce(uint8_t *buffer, size_t length)
+{
+    if (!seed)
+        rand_seed();
+    for (size_t i = 0; i < length - sizeof(uint32_t); i += 4)
+    {
+        uint32_t r = lrand48();
+        buffer[i] =     (r % 0x00FF0000) >> 16;
+        buffer[i + 1] = (r % 0xFF000000) >> 24;
+        buffer[i + 2] =  r % 0x000000FF;
+        buffer[i + 3] = (r % 0x0000FF00) >>  8;
+    }
+
 }
