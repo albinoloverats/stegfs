@@ -33,14 +33,24 @@
 #include "common/common.h"
 #include "common/error.h"
 #include "common/tlv.h"
+#include "common/rand.h"
 
 #include "stegfs.h"
 
 #define RATIO 1024
 
+/*!
+ * \brief  Hash of file system root
+ *
+ * All paths are hashed so that files deeper down the tree can identify
+ * those nearer the root and try not to overwrite them. All files in the
+ * root have this hash, as do unused blocks. Basically if a block has
+ * this hash it could be a file in the root, unused, or already deleted.
+ */
 static uint8_t stegfs_root_hash[] = { 0x60, 0xA6, 0x63, 0x2B, 0x77, 0xB6, 0xD5, 0x78, \
                                       0x9A, 0x65, 0x59, 0x7B, 0x10, 0x3A, 0x97, 0x2D };/*, \
                                       0xE9, 0x78, 0x45, 0xCD, 0x43, 0x79, 0x5D, 0xF7 };*/
+
 
 static int64_t open_filesystem(const char * const restrict path, uint64_t *size, bool force, bool recreate, bool dry)
 {
@@ -227,7 +237,7 @@ int main(int argc, char **argv)
     if (argc <= 1)
         print_usage_help(argv[0]);
 
-    char path[PATH_MAX] = "";
+    char path[PATH_MAX + 1] = "";
     uint64_t size = 0;
     bool force = false;
     bool recreate = false;
@@ -258,6 +268,7 @@ int main(int argc, char **argv)
     int64_t fs = open_filesystem(path, &size, force, recreate, dry);
 
     printf("\e[?25l"); /* hide cursor - mostly for actualy write loop */
+    rand_seed();
 
     uint64_t blocks = size / SIZE_BYTE_BLOCK;
     if (dry)
@@ -303,12 +314,14 @@ int main(int argc, char **argv)
     uint8_t rnd[MEGABYTE];
     MCRYPT mc = crypto_init();
     lseek(fs, 0, SEEK_SET);
+    double dr = drand48();
     for (uint64_t i = 0; i < size / MEGABYTE; i++)
     {
         printf("\rwriting      : %'26.3f %%", PERCENT * i / (size / MEGABYTE));
         mcrypt_generic(mc, rnd, sizeof rnd);
         for (int j = 0; j < MEGABYTE / SIZE_BYTE_BLOCK; j++)
-            memcpy(rnd + j * SIZE_BYTE_BLOCK, stegfs_root_hash, sizeof stegfs_root_hash);
+            if (dr < drand48())
+                memcpy(rnd + j * SIZE_BYTE_BLOCK, stegfs_root_hash, sizeof stegfs_root_hash);
         write(fs, rnd, sizeof rnd);
     }
     printf("\rwriting      : %'26.3f %%\n", PERCENT);

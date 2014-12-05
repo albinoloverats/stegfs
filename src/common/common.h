@@ -106,8 +106,6 @@
 #define GIGABYTE             1073741824 /*!< Bytes in a gigabyte */
 #define TERABYTE          1099511627776 /*!< Bytes in a terabyte */
 
-#define RANDOM_SEED_SIZE 3 /*!< Size of random seed value in bytes */
-
 typedef unsigned char byte_t; /*!< A byte is just 8 bits, no signedness or an other fancy stuff ;-) */
 
 #endif /* _COMMON_H_ */

@@ -22,7 +22,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
-#include <sys/time.h>
 #include <netinet/in.h>
 
 #include <mcrypt.h>
@@ -30,6 +29,7 @@
 
 #include "common/common.h"
 #include "common/tlv.h"
+#include "common/rand.h"
 
 #include "stegfs.h"
 #include "dir.h"
@@ -44,7 +44,6 @@ static uint64_t block_assign(const char * const restrict);
 
 static MCRYPT cipher_init(const stegfs_file_t * const restrict, uint8_t);
 static MHASH hash_init(void);
-static void seed_prng(void);
 
 
 static stegfs_t file_system;
@@ -107,7 +106,7 @@ extern bool stegfs_init(const char * const restrict fs)
         return false;
 
     tlv_deinit(&tlv);
-    seed_prng();
+    rand_seed();
     return true;
 }
 
@@ -583,7 +582,9 @@ static void block_delete(uint64_t bid)
 {
     bid %= (file_system.size / file_system.blocksize);
     uint8_t block[file_system.blocksize];
-    for (uint32_t k = 0; k < file_system.blocksize; k++)
+    /* keep the same path as before */
+    pread(file_system.handle, block, SIZE_BYTE_BLOCK, bid * file_system.blocksize);
+    for (uint32_t k = SIZE_BYTE_PATH; k < file_system.blocksize; k++)
         block[k] = (uint8_t)(lrand48() & 0xFF);
     if (!bid || (bid * file_system.blocksize + file_system.blocksize > file_system.size))
         return;
@@ -691,21 +692,6 @@ static MHASH hash_init(void)
         if (mhash_get_hash_name_static(i) && !strcasecmp(file_system.hash, (char *)mhash_get_hash_name_static(i)))
             return mhash_init(i);
     return NULL;
-}
-
-static void seed_prng(void)
-{
-    struct timeval now;
-    gettimeofday(&now, NULL);
-    uint64_t t = now.tv_sec * MILLION + now.tv_usec;
-    uint16_t s[RANDOM_SEED_SIZE] = { 0x0 };
-    MHASH h = hash_init();
-    mhash(h, &t, sizeof(uint64_t));
-    uint8_t * const restrict ph = mhash_end(h);
-    memcpy(s, ph, RANDOM_SEED_SIZE * sizeof(uint16_t));
-    free(ph);
-    seed48(s);
-    return;
 }
 
 /*
