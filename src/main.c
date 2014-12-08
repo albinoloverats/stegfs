@@ -39,8 +39,9 @@
 
 #include <mhash.h>
 
+#include "common/dir.h"
+
 #include "help.h"
-#include "dir.h"
 #include "stegfs.h"
 
 
@@ -137,7 +138,7 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
     stbuf->st_size    = 0;
     stbuf->st_blksize = 0;
 
-    if (path_equals(DIRECTORY_ROOT, path))
+    if (path_equals(DIR_SEPARATOR_STRING, path))
     {
         stbuf->st_mode  = S_IFDIR | 0700;
         stbuf->st_nlink = 2;
@@ -287,7 +288,7 @@ static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t fill
 
     stegfs_t file_system = stegfs_info();
 
-    if (path_equals(DIRECTORY_ROOT, path))
+    if (path_equals(DIR_SEPARATOR_STRING, path))
     {
         for (uint64_t i = 0; i < file_system.cache2.ents; i++)
             if (file_system.cache2.child[i]->name)

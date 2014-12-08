@@ -30,9 +30,9 @@
 #include "common/common.h"
 #include "common/tlv.h"
 #include "common/rand.h"
+#include "common/dir.h"
 
 #include "stegfs.h"
-#include "dir.h"
 
 
 static bool block_read(uint64_t, stegfs_block_t *, MCRYPT mc, const char * const restrict);
@@ -54,7 +54,7 @@ extern bool stegfs_init(const char * const restrict fs)
     file_system.handle = open(fs, O_RDWR, S_IRUSR | S_IWUSR);
     file_system.size = lseek(file_system.handle, 0, SEEK_END);
 
-    file_system.cache2.name = strdup(DIRECTORY_ROOT);
+    file_system.cache2.name = strdup(DIR_SEPARATOR_STRING);
     file_system.cache2.ents = 0;
     file_system.cache2.child = NULL;
     file_system.cache2.file = NULL;
@@ -489,7 +489,7 @@ extern void stegfs_file_delete(stegfs_file_t *file)
             block_delete(file->blocks[i][j]);
     }
 rfc:
-    asprintf(&p, "%s/%s", path_equals(file->path, DIRECTORY_ROOT) ? "" : file->path, file->name);
+    asprintf(&p, "%s/%s", path_equals(file->path, DIR_SEPARATOR_STRING) ? "" : file->path, file->name);
     stegfs_cache2_remove(p);
     free(p);
     return;
@@ -514,7 +514,7 @@ static bool block_read(uint64_t bid, stegfs_block_t *block, MCRYPT mc, const cha
     MHASH hash;
     void *p;
     /* ignore path check in root */
-    if (!path_equals(path, DIRECTORY_ROOT))
+    if (!path_equals(path, DIR_SEPARATOR_STRING))
     {
         /* check path hash */
         hash = hash_init();
@@ -559,7 +559,7 @@ static bool block_write(uint64_t bid, stegfs_block_t block, MCRYPT mc, const cha
         errno = EINVAL;
         return false;
     }
-    if (path_equals(path, DIRECTORY_ROOT))
+    if (path_equals(path, DIR_SEPARATOR_STRING))
         rand_nonce((uint8_t *)&block.path, SIZE_BYTE_PATH);
     else
     {
@@ -720,7 +720,7 @@ extern void stegfs_cache2_add(const char * const restrict path, stegfs_file_t *f
     if (path)
         p = strdup(path);
     else
-        asprintf(&p, "%s/%s", path_equals(file->path, DIRECTORY_ROOT) ? "" : file->path, file->name);
+        asprintf(&p, "%s/%s", path_equals(file->path, DIR_SEPARATOR_STRING) ? "" : file->path, file->name);
     if ((ptr = stegfs_cache2_exists(p, NULL)))
         goto c2a3; /* already in cache */
     ptr = &(file_system.cache2);

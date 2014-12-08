@@ -3,9 +3,9 @@
 STEGFS   = stegfs
 MKFS	 = mkstegfs
 
-SOURCE   = src/main.c src/dir.c src/stegfs.c src/help.c
+SOURCE   = src/main.c src/stegfs.c src/help.c
 MKSRC    = src/mkfs.c
-COMMON   = src/common/error.c src/common/tlv.c src/common/apple.c src/common/rand.c
+COMMON   = src/common/error.c src/common/tlv.c src/common/dir.c  src/common/rand.c src/common/non-gnu.c
 
 CFLAGS   = -Wall -Wextra -Werror -Wno-unused-parameter -std=gnu99 `pkg-config --cflags fuse` -pipe -O0 -ggdb -I/usr/local/include
 CPPFLAGS = -Isrc -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -DGIT_COMMIT=\"`git log | head -n1 | cut -f2 -d' '`\"

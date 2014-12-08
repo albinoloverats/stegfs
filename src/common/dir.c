@@ -1,6 +1,6 @@
 /*
  * stegfs ~ a steganographic file system for unix-like systems
- * Copyright © 2007-2014, albinoloverats ~ Software Development
+ * Copyright © 2007-2015, albinoloverats ~ Software Development
  * email: stegfs@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -21,16 +21,22 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "common/apple.h"
+#if defined(__APPLE__) || defined(_WIN32)
+    #include "non-gnu.h"
+    #ifdef _WIN32
+        #include "win32_ext.h"
+    #endif
+#endif
 
 #include "dir.h"
 
 extern char *dir_get_name(const char * const restrict path)
 {
-    char *file = strrchr(path, '/') + 1;
-    char *pass = strrchr(path, ':');
+    char *file = strrchr(path, DIR_SEPARATOR_CHAR);
     if (!file)
-        file = (char *)path;
+        return strdup(path);
+    file++;
+    char *pass = strrchr(path, ':');
     if (!pass)
         pass = strchr(file, '\0');
     return strndup(file, pass - file);
@@ -40,7 +46,7 @@ extern uint16_t dir_get_deep(const char * const restrict path)
 {
     uint16_t d = 0;
     char *ptr = (char *)path;
-    while ((ptr = strchr(ptr, '/')))
+    while ((ptr = strchr(ptr, DIR_SEPARATOR_CHAR)))
     {
         d++;
         ptr++;
@@ -51,16 +57,16 @@ extern uint16_t dir_get_deep(const char * const restrict path)
 extern char *dir_get_part(const char * const restrict path, const uint16_t index)
 {
     if (!index)
-        return strdup(DIRECTORY_ROOT);
+        return strdup(DIR_SEPARATOR_STRING);
     char *ptr = (char *)path;
     for (uint16_t i = 0; i < index; i++)
     {
-        ptr = strchr(ptr, '/');
+        ptr = strchr(ptr, DIR_SEPARATOR_CHAR);
         if (!ptr)
             break;
         ptr++;
     }
-    return strndup(ptr, strchrnul(ptr, '/') - ptr);
+    return strndup(ptr, strchrnul(ptr, DIR_SEPARATOR_CHAR) - ptr);
 }
 
 extern char *dir_get_pass(const char * const restrict path)
@@ -72,9 +78,12 @@ extern char *dir_get_pass(const char * const restrict path)
 
 extern char *dir_get_path(const char * const restrict path)
 {
-    char *p = strndup(path, strrchr(path, '/') - path);
+    char *s = strrchr(path, DIR_SEPARATOR_CHAR);
+    if (!s)
+        return strdup("");
+    char *p = strndup(path, s - path);
     if (strlen(p))
         return p;
     free(p);
-    return strdup(DIRECTORY_ROOT);
+    return strdup(DIR_SEPARATOR_STRING);
 }

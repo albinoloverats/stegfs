@@ -18,13 +18,13 @@
  *
  */
 
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(_WIN32)
 
-#ifndef _APPLE_EXT_H_
-#define _APPLE_EXT_H_
+#ifndef _NON_GNU_EXT_H_
+#define _NON_GNU_EXT_H_
 
 extern char *strchrnul(const char *string, int c);
 
-#endif /* _APPLE_EXT_H_ */
+#endif /* _NON_GNU_EXT_H_ */
 
 #endif

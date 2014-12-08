@@ -56,6 +56,10 @@
 #define MAGIC_1  0x33BE2B298B76F2ACLL
 #define MAGIC_2  0xC903284D7C593AF6LL
 
+#ifdef USE_PROC
+    #define PATH_PROC DIR_SEPARATOR_STRING "proc"
+#endif
+
 
 typedef enum
 {

@@ -1,6 +1,6 @@
 /*
  * stegfs ~ a steganographic file system for unix-like systems
- * Copyright © 2007-2014, albinoloverats ~ Software Development
+ * Copyright © 2007-2015, albinoloverats ~ Software Development
  * email: stegfs@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -24,7 +24,7 @@
 /*!
  * \file    dir.h
  * \author  albinoloverats ~ Software Development
- * \date    2009-2014
+ * \date    2009-2015
  * \brief   Directory parsing functions
  * \note    These functions all return newly allocated strings
  *
@@ -35,11 +35,12 @@
 
 #include <inttypes.h>
 
-#define DIRECTORY_ROOT "/"
-
-#ifdef USE_PROC
-    #define DIRECTORY_PROC "proc"
-    #define PATH_PROC DIRECTORY_ROOT DIRECTORY_PROC
+#ifndef _WIN32
+    #define DIR_SEPARATOR_STRING "/"
+    #define DIR_SEPARATOR_CHAR '/'
+#else
+    #define DIR_SEPARATOR_STRING "\\"
+    #define DIR_SEPARATOR_CHAR '\\'
 #endif
 
 #define path_equals(X, Y)       (X && Y && !strcmp(X, Y))
