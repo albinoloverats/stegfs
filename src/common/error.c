@@ -1,6 +1,6 @@
 /*
  * Common code for error reporting
- * Copyright © 2009-2014, albinoloverats ~ Software Development
+ * Copyright © 2009-2015, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -82,7 +82,7 @@ extern void die(const char * const restrict s, ...)
 #endif
     }
     /*
-     * TODO if running a GUI don't necessarily exit without alerting the
+     * TODO if running a GUI don’t necessarily exit without alerting the
      * user first (Users seem to dislike applications just quitting for
      * no apparent reason)
      */

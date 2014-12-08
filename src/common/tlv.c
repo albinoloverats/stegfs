@@ -1,6 +1,6 @@
 /*
  * Common code for dealing with tag, length, value arrays
- * Copyright © 2009-2014, albinoloverats ~ Software Development
+ * Copyright © 2009-2015, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify

@@ -1,5 +1,5 @@
 /*
- * Copyright © 2005-2014, albinoloverats ~ Software Development
+ * Copyright © 2005-2015, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -23,8 +23,8 @@
 /*!
  * \file    common.h
  * \author  albinoloverats ~ Software Development
- * \date    2009-2014
- * \brief   Mostly common macros, useful when dealing with different OS's
+ * \date    2009-2015
+ * \brief   Mostly common macros, useful when dealing with different OS’s
  *
  * Various macros which help with the transition from one OS to another.
  * There were originally part of the main common library until it was
@@ -75,7 +75,7 @@
 //#if !defined _WIN32 && !defined __CYGWIN__ && !defined __APPLE__
 //    #define _(s) gettext(s) /*!< Allow use of _() to refer to gettext() */
 //#else
-    #define _(s) s /*!< Don't yet support translations on MS Windows or Apple OS X */
+    #define _(s) s /*!< Don’t yet support translations on MS Windows or Apple OS X */
 //#endif
 
 #define CONCAT(A, B) CONCAT2(A, B) /*!< Function overloading argument concatenation (part 1) */

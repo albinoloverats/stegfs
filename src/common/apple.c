@@ -1,6 +1,6 @@
 /*
  * Common code which is typically missing on MS Windows
- * Copyright © 2005-2014, albinoloverats ~ Software Development
+ * Copyright © 2005-2015, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -125,10 +125,10 @@ char *strchrnul(const char *s, int c_in)
            we could close this loophole by putting the fourth hole
            at bit 32!
 
-           So it ignores everything except 128's, when they're aligned
+           So it ignores everything except 128’s, when they’re aligned
            properly.
 
-           3) But wait!  Aren't we looking for C as well as zero?
+           3) But wait!  Aren’t we looking for C as well as zero?
            Good point.  So what we do is XOR LONGWORD with a longword,
            each of whose bytes is C.  This turns each byte that is C
            into a zero.  */
