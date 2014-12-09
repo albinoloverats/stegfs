@@ -124,7 +124,7 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
     errno = EXIT_SUCCESS;
 
     stegfs_t file_system = stegfs_info();
-    char *f = dir_get_name(path); /* used to check for symlink */
+    char *f = dir_get_name(path, PASSWORD_SEPARATOR); /* used to check for symlink */
     /* common attributes for root/files/directories */
     stbuf->st_dev     = (dev_t)MAGIC_0;
     stbuf->st_ino     = 0;
@@ -138,7 +138,7 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
     stbuf->st_size    = 0;
     stbuf->st_blksize = 0;
 
-    if (path_equals(DIR_SEPARATOR_STRING, path))
+    if (path_equals(DIR_SEPARATOR, path))
     {
         stbuf->st_mode  = S_IFDIR | 0700;
         stbuf->st_nlink = 2;
@@ -193,7 +193,7 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
             stegfs_file_t file;
             memset(&file, 0x00, sizeof file);
             file.path = dir_get_path(path);
-            file.name = dir_get_name(path);
+            file.name = dir_get_name(path, PASSWORD_SEPARATOR);
             file.pass = dir_get_pass(path);
             if (stegfs_file_stat(&file))
             {
@@ -288,7 +288,7 @@ static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t fill
 
     stegfs_t file_system = stegfs_info();
 
-    if (path_equals(DIR_SEPARATOR_STRING, path))
+    if (path_equals(DIR_SEPARATOR, path))
     {
         for (uint64_t i = 0; i < file_system.cache2.ents; i++)
             if (file_system.cache2.child[i]->name)
@@ -326,7 +326,7 @@ static int fuse_stegfs_unlink(const char *path)
     stegfs_file_t file;
     memset(&file, 0x00, sizeof file);
     file.path = dir_get_path(path);
-    file.name = dir_get_name(path);
+    file.name = dir_get_name(path, PASSWORD_SEPARATOR);
     file.pass = dir_get_pass(path);
 
     stegfs_file_delete(&file);

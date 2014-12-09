@@ -35,25 +35,36 @@
 
 #include <inttypes.h>
 
+#include "common.h"
+
 #ifndef _WIN32
-    #define DIR_SEPARATOR_STRING "/"
+    #define DIR_SEPARATOR "/"
     #define DIR_SEPARATOR_CHAR '/'
 #else
-    #define DIR_SEPARATOR_STRING "\\"
+    #define DIR_SEPARATOR "\\"
     #define DIR_SEPARATOR_CHAR '\\'
 #endif
+#define EXT_SEPARATOR_CHAR '.'
 
 #define path_equals(X, Y)       (X && Y && !strcmp(X, Y))
 #define path_starts_with(X, Y)  (X && Y && !strncmp(X, Y, strlen(X)))
 
+#define DIR_GET_NAME_ARGS_COUNT(...) DIR_GET_NAME_ARGS_COUNT2(__VA_ARGS__, 2, 1)
+#define DIR_GET_NAME_ARGS_COUNT2(_1, _2, _, ...) _
+
+#define dir_get_name_1(A)     dir_get_name_aux(A, EXT_SEPARATOR_CHAR)
+#define dir_get_name_2(A, B)  dir_get_name_aux(A, B)
+#define dir_get_name(...) CONCAT(dir_get_name_, DIR_GET_NAME_ARGS_COUNT(__VA_ARGS__))(__VA_ARGS__)
+
 /*!
  * \brief         Extract the name part of the /path/file:password
- * \param[in]  p  Path: /path/file:password
+ * \param[in]  p  Path: /path/file.extension
+ * \param[in]  e  Extension to ommit
  * \return        Newly allocated string: name
  *
  * Working backwards, cut off the password and leading directories
  */
-extern char *dir_get_name(const char * const restrict p) __attribute__((nonnull(1)));
+extern char *dir_get_name_aux(const char * const p, const char e) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Determine how deep down the hierarchy path goes
@@ -62,7 +73,7 @@ extern char *dir_get_name(const char * const restrict p) __attribute__((nonnull(
  *
  * Count the number of parent directories the given path includes
  */
-extern uint16_t dir_get_deep(const char * const restrict p) __attribute__((nonnull(1)));
+extern uint16_t dir_get_deep(const char * const p) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Extract the numbered part of the /path/file:password
@@ -73,7 +84,7 @@ extern uint16_t dir_get_deep(const char * const restrict p) __attribute__((nonnu
  * Work down the given path and return a copy of the directory name at the
  * given index in the hierarchy
  */
-extern char *dir_get_part(const char * const restrict p, const uint16_t x) __attribute__((nonnull(1)));
+extern char *dir_get_part(const char * const p, const uint16_t x) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Extract the password part of the /path/file:password

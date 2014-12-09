@@ -54,7 +54,7 @@ extern bool stegfs_init(const char * const restrict fs)
     file_system.handle = open(fs, O_RDWR, S_IRUSR | S_IWUSR);
     file_system.size = lseek(file_system.handle, 0, SEEK_END);
 
-    file_system.cache2.name = strdup(DIR_SEPARATOR_STRING);
+    file_system.cache2.name = strdup(DIR_SEPARATOR);
     file_system.cache2.ents = 0;
     file_system.cache2.child = NULL;
     file_system.cache2.file = NULL;
@@ -156,7 +156,7 @@ extern void stegfs_file_create(const char * const restrict path, bool write)
     stegfs_file_t file;
     memset(&file, 0x00, sizeof file);
     file.path = dir_get_path(path);
-    file.name = dir_get_name(path);
+    file.name = dir_get_name(path, PASSWORD_SEPARATOR);
     file.pass = dir_get_pass(path);
     file.write = write;
     file.time = time(NULL);
@@ -489,7 +489,7 @@ extern void stegfs_file_delete(stegfs_file_t *file)
             block_delete(file->blocks[i][j]);
     }
 rfc:
-    asprintf(&p, "%s/%s", path_equals(file->path, DIR_SEPARATOR_STRING) ? "" : file->path, file->name);
+    asprintf(&p, "%s/%s", path_equals(file->path, DIR_SEPARATOR) ? "" : file->path, file->name);
     stegfs_cache2_remove(p);
     free(p);
     return;
@@ -514,7 +514,7 @@ static bool block_read(uint64_t bid, stegfs_block_t *block, MCRYPT mc, const cha
     MHASH hash;
     void *p;
     /* ignore path check in root */
-    if (!path_equals(path, DIR_SEPARATOR_STRING))
+    if (!path_equals(path, DIR_SEPARATOR))
     {
         /* check path hash */
         hash = hash_init();
@@ -559,7 +559,7 @@ static bool block_write(uint64_t bid, stegfs_block_t block, MCRYPT mc, const cha
         errno = EINVAL;
         return false;
     }
-    if (path_equals(path, DIR_SEPARATOR_STRING))
+    if (path_equals(path, DIR_SEPARATOR))
         rand_nonce((uint8_t *)&block.path, SIZE_BYTE_PATH);
     else
     {
@@ -720,11 +720,11 @@ extern void stegfs_cache2_add(const char * const restrict path, stegfs_file_t *f
     if (path)
         p = strdup(path);
     else
-        asprintf(&p, "%s/%s", path_equals(file->path, DIR_SEPARATOR_STRING) ? "" : file->path, file->name);
+        asprintf(&p, "%s/%s", path_equals(file->path, DIR_SEPARATOR) ? "" : file->path, file->name);
     if ((ptr = stegfs_cache2_exists(p, NULL)))
         goto c2a3; /* already in cache */
     ptr = &(file_system.cache2);
-    char *name = dir_get_name(p);
+    char *name = dir_get_name(p, PASSWORD_SEPARATOR);
     uint16_t d = dir_get_deep(p);
     for (uint16_t i = 1; i < d; i++)
     {
@@ -825,7 +825,7 @@ c2a3:
 extern stegfs_cache2_t *stegfs_cache2_exists(const char * const restrict path, stegfs_cache2_t *entry)
 {
     stegfs_cache2_t *ptr = &(file_system.cache2);
-    char *name = dir_get_name(path);
+    char *name = dir_get_name(path, PASSWORD_SEPARATOR);
     uint16_t d = dir_get_deep(path);
     for (uint16_t i = 1; i < d; i++)
     {
@@ -855,7 +855,7 @@ extern stegfs_cache2_t *stegfs_cache2_exists(const char * const restrict path, s
 extern void stegfs_cache2_remove(const char * const restrict path)
 {
     stegfs_cache2_t *ptr = &(file_system.cache2);
-    char *name = dir_get_name(path);
+    char *name = dir_get_name(path, PASSWORD_SEPARATOR);
     uint16_t d = dir_get_deep(path);
     for (uint16_t i = 1; i < d; i++)
     {
