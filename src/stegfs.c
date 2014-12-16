@@ -520,7 +520,7 @@ static bool block_read(uint64_t bid, stegfs_block_t *block, MCRYPT mc, const cha
         hash = hash_init();
         mhash(hash, path, strlen(path));
         p = mhash_end(hash);
-        if (memcmp(block->path, p, sizeof block->path))
+        if (memcmp(block->path, p, SIZE_BYTE_PATH))
         {
             free(p);
             return false;
@@ -532,16 +532,16 @@ static bool block_read(uint64_t bid, stegfs_block_t *block, MCRYPT mc, const cha
     uint32_t sz = SIZE_BYTE_SERPENT * (file_system.blocksize - SIZE_BYTE_PATH) / SIZE_BYTE_SERPENT;
     uint8_t *data = malloc(sz);
     memset(data, 0x00, sz);
-    memcpy(data, ((uint8_t *)block) + SIZE_BYTE_SERPENT, file_system.blocksize - SIZE_BYTE_PATH);
+    memcpy(data, ((uint8_t *)block) + SIZE_BYTE_PATH, file_system.blocksize - SIZE_BYTE_PATH);
     mdecrypt_generic(mc, data, sz);
-    memcpy(((uint8_t *)block) + SIZE_BYTE_SERPENT, data, file_system.blocksize - SIZE_BYTE_PATH);
+    memcpy(((uint8_t *)block) + SIZE_BYTE_PATH, data, file_system.blocksize - SIZE_BYTE_PATH);
     free(data);
 #endif
     /* check data hash */
     hash = hash_init();
     mhash(hash, block->data, sizeof block->data);
     p = mhash_end(hash);
-    if (memcmp(block->hash, p, sizeof block->hash))
+    if (memcmp(block->hash, p, SIZE_BYTE_HASH))
     {
         free(p);
         return false;
@@ -567,23 +567,23 @@ static bool block_write(uint64_t bid, stegfs_block_t block, MCRYPT mc, const cha
         MHASH hash = hash_init();
         mhash(hash, path, strlen(path));
         void *p = mhash_end(hash);
-        memcpy(block.path, p, sizeof block.path);
-        free(p);
-        /* compute data hash */
-        hash = hash_init();
-        mhash(hash, block.data, sizeof block.data);
-        p = mhash_end(hash);
-        memcpy(block.hash, p, sizeof block.hash);
+        memcpy(block.path, p, SIZE_BYTE_PATH);
         free(p);
     }
+    /* compute data hash */
+    MHASH hash = hash_init();
+    mhash(hash, block.data, sizeof block.data);
+    void *p = mhash_end(hash);
+    memcpy(block.hash, p, SIZE_BYTE_HASH);
+    free(p);
 #ifndef __DEBUG__
     /* encrypt the data */
     uint32_t sz = SIZE_BYTE_SERPENT * (file_system.blocksize - SIZE_BYTE_PATH) / SIZE_BYTE_SERPENT;
     uint8_t *data = malloc(sz);
     memset(data, 0x00, sz);
-    memcpy(data, ((uint8_t *)&block) + SIZE_BYTE_SERPENT, file_system.blocksize - SIZE_BYTE_PATH);
+    memcpy(data, ((uint8_t *)&block) + SIZE_BYTE_PATH, file_system.blocksize - SIZE_BYTE_PATH);
     mcrypt_generic(mc, data, sz);
-    memcpy(((uint8_t *)&block) + SIZE_BYTE_SERPENT, data, file_system.blocksize - SIZE_BYTE_PATH);
+    memcpy(((uint8_t *)&block) + SIZE_BYTE_PATH, data, file_system.blocksize - SIZE_BYTE_PATH);
     free(data);
 #endif
     return pwrite(file_system.handle, &block, sizeof block, bid * file_system.blocksize) == sizeof block;
