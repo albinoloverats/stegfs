@@ -1,6 +1,6 @@
 /*
  * stegfs ~ a steganographic file system for unix-like systems
- * Copyright © 2007-2014, albinoloverats ~ Software Development
+ * Copyright © 2007-2015, albinoloverats ~ Software Development
  * email: stegfs@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -26,7 +26,7 @@
 #include <time.h>
 
 #define STEGFS_NAME    "stegfs"
-#define STEGFS_VERSION "2015.00"
+#define STEGFS_VERSION "2015.01"
 
 /* size (in bytes) for various blocks of data */
 #define SIZE_BYTE_SERPENT   0x10                      /*    16 bytes -- 128 bits */
