@@ -594,11 +594,11 @@ static void block_delete(uint64_t bid)
     bid %= (file_system.size / file_system.blocksize);
     uint8_t *block = malloc(file_system.blocksize);
     /* keep the same path as before */
-    pread(file_system.handle, block, SIZE_BYTE_BLOCK, bid * file_system.blocksize);
+    pread(file_system.handle, block, file_system.blocksize, bid * file_system.blocksize);
     rand_nonce(block, file_system.blocksize);
     if (!bid || (bid * file_system.blocksize + file_system.blocksize > file_system.size))
         return;
-    pwrite(file_system.handle, block, sizeof block, bid * file_system.blocksize);
+    pwrite(file_system.handle, block, file_system.blocksize, bid * file_system.blocksize);
     free(block);
     file_system.used[bid] = false;
     return;
