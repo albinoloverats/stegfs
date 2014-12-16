@@ -44,7 +44,6 @@
     #define DIR_SEPARATOR "\\"
     #define DIR_SEPARATOR_CHAR '\\'
 #endif
-#define EXT_SEPARATOR_CHAR '.'
 
 #define path_equals(X, Y)       (X && Y && !strcmp(X, Y))
 #define path_starts_with(X, Y)  (X && Y && !strncmp(X, Y, strlen(X)))
@@ -52,7 +51,7 @@
 #define DIR_GET_NAME_ARGS_COUNT(...) DIR_GET_NAME_ARGS_COUNT2(__VA_ARGS__, 2, 1)
 #define DIR_GET_NAME_ARGS_COUNT2(_1, _2, _, ...) _
 
-#define dir_get_name_1(A)     dir_get_name_aux(A, EXT_SEPARATOR_CHAR)
+#define dir_get_name_1(A)     dir_get_name_aux(A, '\0')
 #define dir_get_name_2(A, B)  dir_get_name_aux(A, B)
 #define dir_get_name(...) CONCAT(dir_get_name_, DIR_GET_NAME_ARGS_COUNT(__VA_ARGS__))(__VA_ARGS__)
 
