@@ -32,11 +32,21 @@
 #include <stdint.h>
 #include <ctype.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include "error.h"
 
 #ifdef _WIN32
     #include "common/win32_ext.h"
+#endif
+
+#ifdef BUILD_GUI
+static void error_gui_alert(const char * const restrict);
+
+static GtkWidget *error_gui_window;
+static GtkWidget *error_gui_message;
+#else
+    #define error_gui_alert(X) (void)(X)
 #endif
 
 extern void die(const char * const restrict s, ...)
@@ -50,12 +60,14 @@ extern void die(const char * const restrict s, ...)
 #ifndef _WIN32
         vasprintf(&d, s, ap);
         fprintf(stderr, "%s", d);
+        error_gui_alert(d);
 #else
         uint8_t l = 0xFF;
         d = calloc(l, sizeof( uint8_t ));
         if (d)
             vsnprintf(d, l - 1, s, ap);
-        fprintf(stderr, d);
+        fprintf(stderr, "%s", d);
+        error_gui_alert(d);
         if (d)
             free(d);
 #endif
@@ -81,10 +93,31 @@ extern void die(const char * const restrict s, ...)
         }
 #endif
     }
-    /*
-     * TODO if running a GUI don’t necessarily exit without alerting the
-     * user first (Users seem to dislike applications just quitting for
-     * no apparent reason)
-     */
     exit(ex);
 }
+
+#ifdef BUILD_GUI
+extern void error_gui_init(GtkWidget *w, GtkWidget *m)
+{
+    error_gui_window = w;
+    error_gui_message = m;
+}
+
+extern void *error_gui_close(void *w, void *d)
+{
+    (void)w;
+    (void)d;
+    gtk_widget_hide(error_gui_window);
+    return NULL;
+}
+
+static void error_gui_alert(const char * const restrict msg)
+{
+    if (error_gui_window)
+    {
+        gtk_label_set_text((GtkLabel *)error_gui_message, msg);
+        gtk_dialog_run((GtkDialog *)error_gui_window);
+    }
+    return;
+}
+#endif

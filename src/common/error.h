@@ -31,6 +31,10 @@
  * likely due to out of memory or similar.
  */
 
+#ifdef BUILD_GUI
+    #include <gtk/gtk.h>
+#endif
+
 #define BACKTRACE_BUFFER_LIMIT 1024 /*!< Maximum number of elements in the backtrace buffer */
 
 /*!
@@ -41,5 +45,11 @@
  * errors which cannot be recovered from.
  */
 extern void die(const char * const restrict s, ...) __attribute__((noreturn, nonnull(1), format(printf, 1, 2)));
+
+#ifdef BUILD_GUI
+extern void error_gui_init(GtkWidget *w, GtkWidget *m) __attribute__((nonnull(1), nonnull(2)));
+
+extern void *error_gui_close(void *, void *);
+#endif
 
 #endif /* _COMMON_ERROR_H_ */
