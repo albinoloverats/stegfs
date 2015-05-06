@@ -18,6 +18,7 @@
  *
  */
 
+#include <errno.h>
 #include <stdio.h>
 #include <inttypes.h>
 #include <stdbool.h>
@@ -25,6 +26,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
 #include <netinet/in.h>
 
 #include <mhash.h>
@@ -66,7 +68,7 @@ static int64_t open_filesystem(const char * const restrict path, uint64_t *size,
             /*
              * use a device as the file system
              */
-            if ((fs = open(path, O_WRONLY | F_WRLCK, S_IRUSR | S_IWUSR)) < 0)
+            if ((fs = open(path, O_RDWR /*| F_WRLCK*/, S_IRUSR | S_IWUSR)) < 0)
                 die("could not open the block device");
             *size = lseek(fs, 0, SEEK_END);
             break;
@@ -83,7 +85,7 @@ static int64_t open_filesystem(const char * const restrict path, uint64_t *size,
              * file does exist; use its current size as the desired capacity
              * (unless the user has specified a new size)
              */
-            if ((fs = open(path, O_WRONLY | F_WRLCK, S_IRUSR | S_IWUSR)) < 0)
+            if ((fs = open(path, O_RDWR /*| F_WRLCK*/, S_IRUSR | S_IWUSR)) < 0)
                 die("could not open file system %s", path);
             {
                 uint64_t z = lseek(fs, 0, SEEK_END);
@@ -97,7 +99,7 @@ static int64_t open_filesystem(const char * const restrict path, uint64_t *size,
             /*
              * file doesn't exist - good, lets create it...
              */
-            if (!dry && (fs = open(path, O_WRONLY | F_WRLCK | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR)) < 0)
+            if (!dry && (fs = open(path, O_RDWR /*| F_WRLCK*/ | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR)) < 0)
                 die("could not open file system %s", path);
         break;
     }
@@ -270,10 +272,19 @@ int main(int argc, char **argv)
     rand_seed();
 
     uint64_t blocks = size / SIZE_BYTE_BLOCK;
+    void *mm = NULL;
     if (dry)
         printf("dry run      : file system not modified\n");
     else
+    {
         ftruncate(fs, size);
+        if ((mm = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fs, 0)) == MAP_FAILED)
+        {
+            perror(NULL);
+            return errno;
+        }
+
+    }
 
     if (recreate && !dry)
         goto superblock;
@@ -313,14 +324,13 @@ int main(int argc, char **argv)
     uint8_t rnd[MEGABYTE];
     rand_nonce(rnd, sizeof rnd);
     MCRYPT mc = crypto_init();
-    lseek(fs, 0, SEEK_SET);
     printf("\e[?25l"); /* hide cursor - mostly for actualy write loop */
     for (uint64_t i = 0; i < size / MEGABYTE; i++)
     {
         printf("\rwriting      : %'26.3f %%", PERCENT * i / (size / MEGABYTE));
         mcrypt_generic(mc, rnd, sizeof rnd);
-        write(fs, rnd, sizeof rnd);
-        fdatasync(fs);
+        memcpy(mm + (i * sizeof rnd), rnd, sizeof rnd);
+        msync(mm + (i + sizeof rnd), sizeof rnd, MS_SYNC);
     }
     printf("\e[?25h\rwriting      : %'26.3f %%\n", PERCENT);
 
@@ -333,8 +343,9 @@ superblock:
     sb.hash[1] = htonll(MAGIC_1);
     sb.hash[2] = htonll(MAGIC_2);
     sb.next[0] = htonll(blocks);
-    pwrite(fs, &sb, sizeof sb, 0);
-    fdatasync(fs);
+    memcpy(mm, &sb, sizeof sb);
+    msync(mm, sizeof sb, MS_SYNC);
+    munmap(mm, size);
     close(fs);
     printf("done\n\e[?25h");
 

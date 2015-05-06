@@ -562,12 +562,15 @@ int main(int argc, char **argv)
         fprintf(stderr, "Missing file system and/or mount point!\n");
         show_usage();
     }
+    free(mp);
 
+    errno = EXIT_SUCCESS;
     if (!h && !stegfs_init(fs))
     {
-        fprintf(stderr, "Could not initialise file system!\n");
-        return EXIT_FAILURE;
+        perror("Could not initialise file system!");
+        return errno;
     }
+    free(fs);
 
 #ifdef __DEBUG__
     if (!d)
@@ -576,6 +579,5 @@ int main(int argc, char **argv)
         argc++;
     }
 #endif
-
     return fuse_main(argc, argv, &fuse_stegfs_functions, NULL);
 }

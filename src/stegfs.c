@@ -22,6 +22,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
 #include <netinet/in.h>
 
 #include <mcrypt.h>
@@ -51,8 +52,11 @@ static stegfs_t file_system;
 
 extern bool stegfs_init(const char * const restrict fs)
 {
-    file_system.handle = open(fs, O_RDWR, S_IRUSR | S_IWUSR);
+    if ((file_system.handle = open(fs, O_RDWR, S_IRUSR | S_IWUSR)) < 0)
+        return false;
     file_system.size = lseek(file_system.handle, 0, SEEK_END);
+    if ((file_system.memory = mmap(NULL, file_system.size, PROT_READ | PROT_WRITE, MAP_SHARED, file_system.handle, 0)) == MAP_FAILED)
+        return false;
 
     file_system.cache2.name = strdup(DIR_SEPARATOR);
     file_system.cache2.ents = 0;
@@ -63,8 +67,12 @@ extern bool stegfs_init(const char * const restrict fs)
 #endif
 
     stegfs_block_t block;
+#ifdef USE_MMAP
+    memcpy(&block, file_system.memory, sizeof block);
+#else
     if (!pread(file_system.handle, &block, sizeof block, 0))
         return false;
+#endif
     if (ntohll(block.hash[0]) != MAGIC_0 ||
         ntohll(block.hash[1]) != MAGIC_1 ||
         ntohll(block.hash[2]) != MAGIC_2)
@@ -109,6 +117,26 @@ extern bool stegfs_init(const char * const restrict fs)
     rand_seed();
     return true;
 }
+
+#if 0
+extern void stegfs_deinit(void)
+{
+    msync(file_system.memory, file_system.size,  MS_SYNC);
+    munmap(file_system.memory, file_system.size);
+    close(file_system.handle);
+
+    free(file_system.cipher);
+    free(file_system.hash);
+    free(file_system.mode);
+
+    free(file_system.used);
+
+    stegfs_cache2_remove(DIR_SEPARATOR);
+    free(file_system.cache2.name);
+
+    return;
+}
+#endif
 
 extern stegfs_t stegfs_info(void)
 {
@@ -508,9 +536,13 @@ static bool block_read(uint64_t bid, stegfs_block_t *block, MCRYPT mc, const cha
         errno = EINVAL;
         return false;
     }
+#ifdef USE_MMAP
+    memcpy(block, file_system.memory + (bid * file_system.blocksize), sizeof(stegfs_block_t));
+#else
     ssize_t z = pread(file_system.handle, block, sizeof(stegfs_block_t), bid * file_system.blocksize);
     if (z < 0)
         return false;
+#endif
     MHASH hash;
     void *p;
     /* ignore path check in root */
@@ -547,7 +579,11 @@ static bool block_read(uint64_t bid, stegfs_block_t *block, MCRYPT mc, const cha
         return false;
     }
     free(p);
+#ifdef USE_MMAP
+    return true;
+#else
     return z == sizeof(stegfs_block_t);
+#endif
 }
 
 static bool block_write(uint64_t bid, stegfs_block_t block, MCRYPT mc, const char * const restrict path)
@@ -586,7 +622,13 @@ static bool block_write(uint64_t bid, stegfs_block_t block, MCRYPT mc, const cha
     memcpy(((uint8_t *)&block) + SIZE_BYTE_PATH, data, file_system.blocksize - SIZE_BYTE_PATH);
     free(data);
 #endif
+#ifdef USE_MMAP
+    memcpy(file_system.memory + (bid * file_system.blocksize), &block, sizeof block);
+    msync(file_system.memory + (bid * file_system.blocksize), sizeof block, MS_SYNC);
+    return true;
+#else
     return pwrite(file_system.handle, &block, sizeof block, bid * file_system.blocksize) == sizeof block;
+#endif
 }
 
 static void block_delete(uint64_t bid)
@@ -815,6 +857,8 @@ c2a3:
         }
     }
     free(p);
+    if (name)
+        free(name);
     return;
 }
 
@@ -840,15 +884,19 @@ extern stegfs_cache2_t *stegfs_cache2_exists(const char * const restrict path, s
             }
         free(e);
         if (!found)
-            return NULL;
+            goto done;
     }
     for (uint64_t i = 0; i < ptr->ents; i++)
         if (ptr->child[i]->name && !strcmp(ptr->child[i]->name, name))
         {
+            free(name);
             if (entry)
                 memcpy(entry, ptr->child[i], sizeof(stegfs_cache2_t));
             return ptr->child[i];
         }
+done:
+    if (name)
+        free(name);
     return NULL;
 }
 
@@ -870,7 +918,7 @@ extern void stegfs_cache2_remove(const char * const restrict path)
             }
         free(e);
         if (!found)
-            return;
+            goto done;
     }
     bool found = false;
     for (uint64_t i = 0; i < ptr->ents; i++)
@@ -881,7 +929,7 @@ extern void stegfs_cache2_remove(const char * const restrict path)
             break;
         }
     if (!found)
-        return;
+        goto done;
     if (ptr->file)
     {
         free(ptr->file->path);
@@ -916,5 +964,8 @@ extern void stegfs_cache2_remove(const char * const restrict path)
     }
     free(ptr->name);
     ptr->name = NULL;
+done:
+    if (name)
+        free(name);
     return;
 }

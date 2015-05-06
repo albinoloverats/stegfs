@@ -113,8 +113,9 @@ stegfs_cache2_t;
  */
 typedef struct stegfs_t
 {
-    uint64_t        size;      /*!< Size of file system in bytes (not capacity) */
     int64_t         handle;    /*!< Handle to file system file/device */
+    uint64_t        size;      /*!< Size of file system in bytes (not capacity) */
+    void           *memory;    /*<! mmap pointer */
     char           *cipher;
     char           *hash;
     char           *mode;
@@ -146,6 +147,15 @@ stegfs_block_t;
  * making note whether to cache file details
  */
 extern bool stegfs_init(const char * const restrict fs) __attribute__((nonnull(1)));
+
+#if 0
+/*
+ * \brief         Deinitialise the file system
+ *
+ * Unmount the file system, sync all data, clear all memory
+ */
+extern void stegfs_deinit(void);
+#endif
 
 /*!
  * \brief                Retrieve information about the file system
