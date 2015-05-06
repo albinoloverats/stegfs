@@ -268,9 +268,6 @@ int main(int argc, char **argv)
     }
 
     int64_t fs = open_filesystem(path, &size, force, recreate, dry);
-
-    rand_seed();
-
     uint64_t blocks = size / SIZE_BYTE_BLOCK;
     void *mm = NULL;
     if (dry)
@@ -283,7 +280,6 @@ int main(int argc, char **argv)
             perror(NULL);
             return errno;
         }
-
     }
 
     if (recreate && !dry)
@@ -322,6 +318,7 @@ int main(int argc, char **argv)
      * write “encrypted” blocks
      */
     uint8_t rnd[MEGABYTE];
+    rand_seed();
     rand_nonce(rnd, sizeof rnd);
     MCRYPT mc = crypto_init();
     printf("\e[?25l"); /* hide cursor - mostly for actualy write loop */

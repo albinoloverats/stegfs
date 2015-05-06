@@ -73,6 +73,15 @@ extern bool stegfs_init(const char * const restrict fs)
     if (!pread(file_system.handle, &block, sizeof block, 0))
         return false;
 #endif
+    /* quick check for previous version; account for all byte orders */
+    if ((block.hash[0] == MAGIC_0      || htonll(block.hash[0]) == MAGIC_0) &&
+        (block.hash[1] == MAGIC_1      || htonll(block.hash[1]) == MAGIC_1) &&
+        (block.hash[2] == MAGIC_201001 || htonll(block.hash[2]) == MAGIC_201001))
+    {
+        errno = MAGIC_201001;
+        return false;
+    }
+
     if (ntohll(block.hash[0]) != MAGIC_0 ||
         ntohll(block.hash[1]) != MAGIC_1 ||
         ntohll(block.hash[2]) != MAGIC_2)

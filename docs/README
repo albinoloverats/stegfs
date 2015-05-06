@@ -7,11 +7,17 @@ Changes
 * Complete rewrite **NOT BACKWARDS COMPATIBLE**
   - Stores block locations (and other vales) as big endian
   - Change key/IV processing
+  - If you see the error message “Previous version of stegfs!” download
+    version 2010.01 and recover your data, before creating a new stegfs
+	and transferring your data to it
 * Remove multi-threaded capability (we’ll bring it back soon)
 * Files are:
   - Read when they’re opened
   - Written when they’re closed
-  - Cached until the file system is unmounted
+  - Cached until the file system is unmounted; if could be argued that
+    keeping file contents in memory is dangerous but if you’ve mounted
+	the file system and accessed files then this is where an attacker is
+	likely to strike
 * Directories:
   - Still not stored
   - Are cached while mounted
