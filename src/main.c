@@ -546,7 +546,7 @@ int main(int argc, char **argv)
                  * is needed to overcome this) so until that time, we’ll
                  * force that condition here
                  */
-                asprintf(&argv[i], "-s");
+                argv[i] = "-s";
                 break;
             case S_IFDIR:
                 mp = strdup(argv[i]);
@@ -567,7 +567,7 @@ int main(int argc, char **argv)
     errno = EXIT_SUCCESS;
     if (!h && !stegfs_init(fs))
     {
-        if (errno == MAGIC_201001)
+        if (errno == (int)MAGIC_201001)
             fprintf(stderr, "Previous version of stegfs!\n");
         else
             perror("Could not initialise file system!");

@@ -78,7 +78,7 @@ extern bool stegfs_init(const char * const restrict fs)
         (block.hash[1] == MAGIC_1      || htonll(block.hash[1]) == MAGIC_1) &&
         (block.hash[2] == MAGIC_201001 || htonll(block.hash[2]) == MAGIC_201001))
     {
-        errno = MAGIC_201001;
+        errno = (int)MAGIC_201001;
         return false;
     }
 
