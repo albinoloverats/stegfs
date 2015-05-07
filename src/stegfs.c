@@ -54,6 +54,7 @@ extern bool stegfs_init(const char * const restrict fs)
 {
     if ((file_system.handle = open(fs, O_RDWR, S_IRUSR | S_IWUSR)) < 0)
         return false;
+    lockf(file_system.handle, F_LOCK, 0);
     file_system.size = lseek(file_system.handle, 0, SEEK_END);
     if ((file_system.memory = mmap(NULL, file_system.size, PROT_READ | PROT_WRITE, MAP_SHARED, file_system.handle, 0)) == MAP_FAILED)
         return false;

@@ -274,6 +274,7 @@ int main(int argc, char **argv)
         printf("dry run      : file system not modified\n");
     else
     {
+        lockf(fs, F_LOCK, 0);
         ftruncate(fs, size);
         if ((mm = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fs, 0)) == MAP_FAILED)
         {
