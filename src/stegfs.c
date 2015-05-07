@@ -49,7 +49,6 @@ static MHASH hash_init(void);
 
 static stegfs_t file_system;
 
-
 extern bool stegfs_init(const char * const restrict fs)
 {
     if ((file_system.handle = open(fs, O_RDWR, S_IRUSR | S_IWUSR)) < 0)
@@ -75,11 +74,11 @@ extern bool stegfs_init(const char * const restrict fs)
         return false;
 #endif
     /* quick check for previous version; account for all byte orders */
-    if ((block.hash[0] == MAGIC_0      || htonll(block.hash[0]) == MAGIC_0) &&
-        (block.hash[1] == MAGIC_1      || htonll(block.hash[1]) == MAGIC_1) &&
-        (block.hash[2] == MAGIC_201001 || htonll(block.hash[2]) == MAGIC_201001))
+    if ((block.hash[0] == MAGIC_201001_0 || htonll(block.hash[0]) == MAGIC_201001_0) &&
+        (block.hash[1] == MAGIC_201001_1 || htonll(block.hash[1]) == MAGIC_201001_1) &&
+        (block.hash[2] == MAGIC_201001_2 || htonll(block.hash[2]) == MAGIC_201001_2))
     {
-        errno = (int)MAGIC_201001;
+        errno = (int)MAGIC_201001_0;
         return false;
     }
 
@@ -571,11 +570,11 @@ static bool block_read(uint64_t bid, stegfs_block_t *block, MCRYPT mc, const cha
     }
 #ifndef __DEBUG__
     /* decrypt block */
-    uint32_t sz = file_system.blocksize - SIZE_BYTE_PATH;
+    uint32_t sz = file_system.blocksize - sizeof block->path;
     uint8_t *data = calloc(sz, sizeof(uint8_t));
-    memcpy(data, ((uint8_t *)block) + SIZE_BYTE_PATH, sz);
+    memcpy(data, ((uint8_t *)block) + sizeof block->path + sizeof block->padding, sz);
     mdecrypt_generic(mc, data, sz);
-    memcpy(((uint8_t *)block) + SIZE_BYTE_PATH, data, sz);
+    memcpy(((uint8_t *)block) + sizeof block->path + sizeof block->padding, data, sz);
     free(data);
 #endif
     /* check data hash */
@@ -605,7 +604,7 @@ static bool block_write(uint64_t bid, stegfs_block_t block, MCRYPT mc, const cha
         return false;
     }
     if (path_equals(path, DIR_SEPARATOR))
-        rand_nonce((uint8_t *)&block.path, SIZE_BYTE_PATH);
+        rand_nonce((uint8_t *)&block.path, sizeof block.path);
     else
     {
         /* compute path hash */
@@ -615,6 +614,7 @@ static bool block_write(uint64_t bid, stegfs_block_t block, MCRYPT mc, const cha
         memcpy(block.path, p, sizeof block.path);
         free(p);
     }
+    block.padding = htonll(padding);
     /* compute data hash */
     MHASH hash = hash_init();
     mhash(hash, block.data, sizeof block.data);
@@ -623,11 +623,11 @@ static bool block_write(uint64_t bid, stegfs_block_t block, MCRYPT mc, const cha
     free(p);
 #ifndef __DEBUG__
     /* encrypt the data */
-    uint32_t sz = file_system.blocksize - SIZE_BYTE_PATH;
+    uint32_t sz = file_system.blocksize - sizeof block.path;
     uint8_t *data = calloc(sz, sizeof(uint8_t));
-    memcpy(data, ((uint8_t *)&block) + SIZE_BYTE_PATH, sz);
+    memcpy(data, ((uint8_t *)&block) + sizeof block.path + sizeof block.padding, sz);
     mcrypt_generic(mc, data, sz);
-    memcpy(((uint8_t *)&block) + SIZE_BYTE_PATH, data, sz);
+    memcpy(((uint8_t *)&block) + sizeof block.path + sizeof block.padding, data, sz);
     free(data);
 #endif
 #ifdef USE_MMAP

@@ -297,7 +297,7 @@ int main(int argc, char **argv)
 
     printf("location     : %s\n", path);
     double z = size / MEGABYTE;
-    printf("blocks       : %'26ju\n", blocks);
+    printf("blocks       : %'26" PRIu64 "\n", blocks);
     char units[] = "MB";
     adjust_units(&z, units);
     sprintf(s1, "%f", z);
@@ -325,17 +325,27 @@ int main(int argc, char **argv)
     printf("\e[?25l"); /* hide cursor - mostly for actualy write loop */
     for (uint64_t i = 0; i < size / MEGABYTE; i++)
     {
-        printf("\rwriting      : %'26.3f %%", PERCENT * i / (size / MEGABYTE));
+        printf("\r1st pass     : %'26.3f %%", PERCENT * i / (size / MEGABYTE));
         mcrypt_generic(mc, rnd, sizeof rnd);
         memcpy(mm + (i * sizeof rnd), rnd, sizeof rnd);
-        msync(mm + (i + sizeof rnd), sizeof rnd, MS_SYNC);
+        msync(mm + (i * sizeof rnd), sizeof rnd, MS_ASYNC);
     }
-    printf("\e[?25h\rwriting      : %'26.3f %%\n", PERCENT);
+    printf("\r1st pass     : %'26.3f %%\n", PERCENT);
+
+    uint64_t p = htonll(padding);
+    for (uint64_t i = 0; i < blocks; i++)
+    {
+        printf("\r2nd pass     : %'26.3f %%", PERCENT * i / blocks);
+        memcpy(mm + (i * SIZE_BYTE_BLOCK) + SIZE_BYTE_PATH, &p, sizeof p);
+        msync(mm + (i * SIZE_BYTE_BLOCK) + SIZE_BYTE_PATH, sizeof p, MS_ASYNC);
+    }
+    printf("\e[?25h\r2nd pass     : %'26.3f %%\n", PERCENT);
 
 superblock:
     printf("superblock   : ");
     stegfs_block_t sb;
     memset(sb.path, 0xFF, sizeof sb.path);
+    sb.padding = htonll(padding);
     superblock_info(&sb, MCRYPT_SERPENT, MCRYPT_CBC, (char *)mhash_get_hash_name(MHASH_TIGER));
     sb.hash[0] = htonll(MAGIC_0);
     sb.hash[1] = htonll(MAGIC_1);

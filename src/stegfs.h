@@ -26,25 +26,45 @@
 #include <time.h>
 
 #define STEGFS_NAME    "stegfs"
-#define STEGFS_VERSION "2015.01"
+#define STEGFS_VERSION "2015.XX"
 
 /* size (in bytes) for various blocks of data */
 #define SIZE_BYTE_SERPENT   0x10                      /*    16 bytes -- 128 bits */
 #define SIZE_BYTE_TIGER     0x18                      /*    24 bytes -- 192 bits */
 
-#define SIZE_BYTE_BLOCK     0x80                      /*   128 bytes -- full block */
-#define SIZE_BYTE_PATH     (SIZE_BYTE_TIGER * 2 / 3)  /*    16 bytes */
-#define SIZE_BYTE_DATA      0x50                      /*    80 bytes */
-#define SIZE_BYTE_HASH      SIZE_BYTE_TIGER           /*    24 bytes */
-#define SIZE_BYTE_NEXT      0x08                      /*     8 bytes */
+#ifdef __STEGFS_OLD__
 
-//#define SIZE_BYTE_MISC (SIZE_BYTE_PATH + SIZE_BYTE_HASH + SIZE_BYTE_NEXT)
+    #define SIZE_BYTE_BLOCK     0x80                      /*   128 bytes -- full block */
+    #define SIZE_BYTE_PATH     (SIZE_BYTE_TIGER * 2 / 3)  /*    16 bytes */
+    #define SIZE_BYTE_DATA      0x50                      /*    80 bytes */
+    #define SIZE_BYTE_HASH      SIZE_BYTE_TIGER           /*    24 bytes */
+    #define SIZE_BYTE_NEXT      0x08                      /*     8 bytes */
 
-/* size in 64 bit ints of parts of block */
-#define SIZE_LONG_PATH 0x02
-#define SIZE_LONG_DATA 0x0A
-#define SIZE_LONG_HASH 0x03
-#define SIZE_LONG_NEXT 0x01
+    //#define SIZE_BYTE_MISC (SIZE_BYTE_PATH + SIZE_BYTE_HASH + SIZE_BYTE_NEXT)
+
+    /* size in 64 bit ints of parts of block */
+    #define SIZE_LONG_PATH 0x02
+    #define SIZE_LONG_DATA 0x0A
+    #define SIZE_LONG_HASH 0x03
+    #define SIZE_LONG_NEXT 0x01
+
+#else
+
+    #define SIZE_BYTE_BLOCK 0x0400          /*!< 1024 bytes */
+    #define SIZE_BYTE_PATH  SIZE_BYTE_TIGER /*!<   24 bytes */
+    /* padding */
+    #define SIZE_BYTE_DATA  0x03C0          /*!<  960 bytes */
+    #define SIZE_BYTE_HASH  SIZE_BYTE_TIGER /*!<   24 bytes */
+    #define SIZE_BYTE_NEXT  0x0008          /*!<    8 bytes */
+
+    /* size in 64 bit ints of parts of block */
+    #define SIZE_LONG_PATH  0x03
+    /* padding */
+    #define SIZE_LONG_DATA  0x80
+    #define SIZE_LONG_HASH  0x03
+    #define SIZE_LONG_NEXT  0x01
+
+#endif
 
 #define SYM_LENGTH -1
 #define MAX_COPIES 8
@@ -52,11 +72,15 @@
 
 #define SUPER_ID STEGFS_NAME " " STEGFS_VERSION
 
-#define MAGIC_0  0xA157AFA602CC9D1BLL
-#define MAGIC_1  0x33BE2B298B76F2ACLL
-#define MAGIC_2  0x1436CE8858B92E81LL
+#define MAGIC_0 0x4BB7FC78338B1058LL
+#define MAGIC_1 0x9F46D6FB0815766CLL
+#define MAGIC_2 0x8B4FDA5D7825D30DLL
 
-#define MAGIC_201001 0xC903284D7C593AF6LL
+#define MAGIC_201001_0 0xA157AFA602CC9D1BLL
+#define MAGIC_201001_1 0x33BE2B298B76F2ACLL
+#define MAGIC_201001_2 0xC903284D7C593AF6LL
+
+static const uint64_t padding = 0x51584E6F62475635LL;
 
 #ifdef USE_PROC
     #define PATH_PROC DIR_SEPARATOR "proc"
@@ -117,7 +141,7 @@ typedef struct stegfs_t
 {
     int64_t         handle;    /*!< Handle to file system file/device */
     uint64_t        size;      /*!< Size of file system in bytes (not capacity) */
-    void           *memory;    /*<! mmap pointer */
+    void           *memory;    /*!< mmap pointer */
     char           *cipher;
     char           *hash;
     char           *mode;
@@ -135,6 +159,7 @@ stegfs_t;
 typedef struct stegfs_block_t
 {
     uint64_t path[SIZE_LONG_PATH]; /*!< Hash of block path    */
+    uint64_t padding;
     uint8_t  data[SIZE_BYTE_DATA]; /*!< Block data            */
     uint64_t hash[SIZE_LONG_HASH]; /*!< Hash of block data    */
     uint64_t next[SIZE_LONG_NEXT]; /*!< Address of next block */

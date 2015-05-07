@@ -567,7 +567,7 @@ int main(int argc, char **argv)
     errno = EXIT_SUCCESS;
     if (!h && !stegfs_init(fs))
     {
-        if (errno == (int)MAGIC_201001)
+        if (errno == (int)MAGIC_201001_0)
             fprintf(stderr, "Previous version of stegfs!\n");
         else
             perror("Could not initialise file system!");
