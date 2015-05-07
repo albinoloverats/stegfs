@@ -458,7 +458,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
             size_t l = sizeof block.data;
             if (l + k * sizeof block.data > file->size)
                 l = l - ((l + k * sizeof block.data) - file->size);
-            memset(block.data, 0x00, SIZE_BYTE_DATA);
+            memset(block.data, 0x00, sizeof block.data);
             memcpy(block.data, file->data + k * sizeof block.data, l);
             z = htonll(file->blocks[i][j + 1]);
             memcpy(block.next, &z, sizeof block.next);
@@ -561,7 +561,7 @@ static bool block_read(uint64_t bid, stegfs_block_t *block, MCRYPT mc, const cha
         hash = hash_init();
         mhash(hash, path, strlen(path));
         p = mhash_end(hash);
-        if (memcmp(block->path, p, SIZE_BYTE_PATH))
+        if (memcmp(block->path, p, sizeof block->path))
         {
             free(p);
             return false;
@@ -570,19 +570,18 @@ static bool block_read(uint64_t bid, stegfs_block_t *block, MCRYPT mc, const cha
     }
 #ifndef __DEBUG__
     /* decrypt block */
-    uint32_t sz = SIZE_BYTE_SERPENT * (file_system.blocksize - SIZE_BYTE_PATH) / SIZE_BYTE_SERPENT;
-    uint8_t *data = malloc(sz);
-    memset(data, 0x00, sz);
-    memcpy(data, ((uint8_t *)block) + SIZE_BYTE_PATH, file_system.blocksize - SIZE_BYTE_PATH);
+    uint32_t sz = file_system.blocksize - SIZE_BYTE_PATH;
+    uint8_t *data = calloc(sz, sizeof(uint8_t));
+    memcpy(data, ((uint8_t *)block) + SIZE_BYTE_PATH, sz);
     mdecrypt_generic(mc, data, sz);
-    memcpy(((uint8_t *)block) + SIZE_BYTE_PATH, data, file_system.blocksize - SIZE_BYTE_PATH);
+    memcpy(((uint8_t *)block) + SIZE_BYTE_PATH, data, sz);
     free(data);
 #endif
     /* check data hash */
     hash = hash_init();
     mhash(hash, block->data, sizeof block->data);
     p = mhash_end(hash);
-    if (memcmp(block->hash, p, SIZE_BYTE_HASH))
+    if (memcmp(block->hash, p, sizeof block->hash))
     {
         free(p);
         return false;
@@ -612,23 +611,22 @@ static bool block_write(uint64_t bid, stegfs_block_t block, MCRYPT mc, const cha
         MHASH hash = hash_init();
         mhash(hash, path, strlen(path));
         void *p = mhash_end(hash);
-        memcpy(block.path, p, SIZE_BYTE_PATH);
+        memcpy(block.path, p, sizeof block.path);
         free(p);
     }
     /* compute data hash */
     MHASH hash = hash_init();
     mhash(hash, block.data, sizeof block.data);
     void *p = mhash_end(hash);
-    memcpy(block.hash, p, SIZE_BYTE_HASH);
+    memcpy(block.hash, p, sizeof block.hash);
     free(p);
 #ifndef __DEBUG__
     /* encrypt the data */
-    uint32_t sz = SIZE_BYTE_SERPENT * (file_system.blocksize - SIZE_BYTE_PATH) / SIZE_BYTE_SERPENT;
-    uint8_t *data = malloc(sz);
-    memset(data, 0x00, sz);
-    memcpy(data, ((uint8_t *)&block) + SIZE_BYTE_PATH, file_system.blocksize - SIZE_BYTE_PATH);
+    uint32_t sz = file_system.blocksize - SIZE_BYTE_PATH;
+    uint8_t *data = calloc(sz, sizeof(uint8_t));
+    memcpy(data, ((uint8_t *)&block) + SIZE_BYTE_PATH, sz);
     mcrypt_generic(mc, data, sz);
-    memcpy(((uint8_t *)&block) + SIZE_BYTE_PATH, data, file_system.blocksize - SIZE_BYTE_PATH);
+    memcpy(((uint8_t *)&block) + SIZE_BYTE_PATH, data, sz);
     free(data);
 #endif
 #ifdef USE_MMAP
@@ -683,7 +681,7 @@ static bool block_in_use(uint64_t bid, const char * const restrict path)
         void *h = mhash_end(hash);
         stegfs_block_t block;
         pread(file_system.handle, &block, sizeof block, bid * file_system.blocksize);
-        bool r = !memcmp(h, block.path, SIZE_BYTE_PATH);
+        bool r = !memcmp(h, block.path, sizeof block.path);
         free(h);
         if (r)
             return true;
@@ -728,7 +726,7 @@ static MCRYPT cipher_init(const stegfs_file_t * const restrict file, uint8_t ivi
     else
         mhash(hash, "", strlen(""));
     void *h = mhash_end(hash);
-    memcpy(key, h, SIZE_BYTE_TIGER);
+    memcpy(key, h, sizeof key);
     free(h);
     /* create the initial iv for the encryption algorithm */
     uint8_t ivs[SIZE_BYTE_SERPENT] = { 0x00 };
@@ -741,7 +739,7 @@ static MCRYPT cipher_init(const stegfs_file_t * const restrict file, uint8_t ivi
     mhash(hash, file->path, strlen(file->path));
     mhash(hash, &ivi, sizeof ivi);
     h = mhash_end(hash);
-    memcpy(ivs, h, SIZE_BYTE_SERPENT);
+    memcpy(ivs, h, sizeof ivs);
     free(h);
     /* done */
     mcrypt_generic_init(c, key, sizeof key, ivs);
@@ -803,8 +801,7 @@ extern void stegfs_cache2_add(const char * const restrict path, stegfs_file_t *f
             ptr->child = realloc(ptr->child, (k + 1) * sizeof(stegfs_cache2_t *));
             ptr->ents++;
 c2a1:
-            ptr->child[k] = malloc(sizeof(stegfs_cache2_t));
-            memset(ptr->child[k], 0x00, sizeof(stegfs_cache2_t));
+            ptr->child[k] = calloc(sizeof(stegfs_cache2_t), sizeof(uint8_t));
             ptr->child[k]->name = strdup(e);
             ptr = ptr->child[k];
         }
@@ -821,18 +818,14 @@ c2a1:
     ptr->child = realloc(ptr->child, (j + 1) * sizeof(stegfs_cache2_t *));
     ptr->ents++;
 c2a2:
-    ptr->child[j] = malloc(sizeof(stegfs_cache2_t));
-    memset(ptr->child[j], 0x00, sizeof(stegfs_cache2_t));
+    ptr->child[j] = calloc(sizeof(stegfs_cache2_t), sizeof(uint8_t));
     ptr = ptr->child[j];
     ptr->name = name;
 c2a3:
     if (file && file != ptr->file)
     {
         if (!ptr->file)
-        {
-            ptr->file = malloc(sizeof(stegfs_file_t));
-            memset(ptr->file, 0x00, sizeof(stegfs_file_t));
-        }
+            ptr->file = calloc(sizeof(stegfs_file_t), sizeof(uint8_t));
         /* set path and name */
         asprintf(&ptr->file->path, "%s", file->path);
         asprintf(&ptr->file->name, "%s", file->name);
@@ -866,8 +859,8 @@ c2a3:
         }
     }
     free(p);
-    if (name)
-        free(name);
+//    if (name)
+//        free(name);
     return;
 }
 
