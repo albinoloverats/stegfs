@@ -60,7 +60,7 @@
     /* size in 64 bit ints of parts of block */
     #define SIZE_LONG_PATH  0x03
     /* padding */
-    #define SIZE_LONG_DATA  0x80
+    #define SIZE_LONG_DATA  0x78
     #define SIZE_LONG_HASH  0x03
     #define SIZE_LONG_NEXT  0x01
 
