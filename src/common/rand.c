@@ -37,7 +37,7 @@ extern void rand_seed(void)
     MHASH h = mhash_init(MHASH_TIGER);
     mhash(h, &t, sizeof t);
     uint8_t * const restrict ph = mhash_end(h);
-    memcpy(s, ph, sizeof s * sizeof s[0]);
+    memcpy(s, ph, sizeof s);
     free(ph);
     seed48(s);
     seed = true;
