@@ -58,13 +58,13 @@ Total block size = 1KB = 8,192 bits = 960 file data bytes + metadata
     | [Nothing - 0xFF]                                               |  +‐ Tiger
     |                                                                |  |
     +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+
-    | Padding                                               8   (64) |
+    | Padding/Unused                                        8   (64) |
     +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+‐‐‐‐‐‐‐‐+
-    | Data                                                960 (7680) |           |
-    | (First block of each copy - 8 × 64 bits = 512 bits)            |           |
+    | Data                                               960 (7,680) |           |
+    | (First block of each copy - 8 × 64 bits = 512 bits¹)           |           |
     | [File system infomration]                                      |           |
     |                                                                |           +‐ Serpent × 62
-    |                                                                |           |
+    | ¹ Followed by modification time (64 bits)                      |           |
     |                                                                |           |
     |                                                                |           |
     |                                                                |           |

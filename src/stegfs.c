@@ -236,47 +236,43 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
                 continue;
             }
             file_system.used[file->inodes[i] % (file_system.size / file_system.blocksize)] = true;
-            for (int i = 0; i <= MAX_COPIES; i++)
+
+            uint64_t first[SIZE_LONG_DATA] = { 0x0 };
+            memcpy(first, inode.data, sizeof first);
+            file->time = htonll(first[MAX_COPIES]);
+            for (int i = 0; i < MAX_COPIES; i++)
             {
                 MCRYPT nc = cipher_init(file, i);
-                uint64_t val;
-                memcpy(&val, inode.data + i * sizeof val, sizeof val);
-                val = ntohll(val);
-                if (i < MAX_COPIES)
+                lldiv_t d = lldiv(file->size, SIZE_BYTE_DATA);
+                uint64_t blocks = d.quot + (d.rem ? 1 : 0);
+                file->blocks[i] = realloc(file->blocks[i], (blocks + 2) * sizeof blocks);
+                memset(file->blocks[i], 0x00, blocks * sizeof blocks);
+                file->blocks[i][0] = blocks;
+                file->blocks[i][1] = htonll(first[i]);
+                /*
+                 * travsers file block tree; whilst the whole block
+                 * is read, the actual file data is discarded
+                 */
+                for (uint64_t j = 2 ; j <= blocks; j++)
                 {
-                    lldiv_t d = lldiv(file->size, SIZE_BYTE_DATA);
-                    uint64_t blocks = d.quot + (d.rem ? 1 : 0);
-                    file->blocks[i] = realloc(file->blocks[i], (blocks + 2) * sizeof blocks);
-                    memset(file->blocks[i], 0x00, blocks * sizeof blocks);
-                    file->blocks[i][0] = blocks;
-                    file->blocks[i][1] = val;
-                    /*
-                     * travsers file block tree; whilst the whole block
-                     * is read, the actual file data is discarded
-                     */
-                    for (uint64_t j = 2 ; j <= blocks; j++)
+                    stegfs_block_t block;
+                    memset(&block, 0x00, file_system.blocksize);
+                    if (block_read(file->blocks[i][j - 1], &block, nc, file->path))
                     {
-                        stegfs_block_t block;
-                        memset(&block, 0x00, file_system.blocksize);
-                        if (block_read(file->blocks[i][j - 1], &block, nc, file->path))
-                        {
-                            file_system.used[file->blocks[i][j - 1] % (file_system.size / file_system.blocksize)] = true;
-                            file->blocks[i][j] = ntohll(block.next);
-                        }
-                        else
-                        {
-                            /*
-                             * note-to-self: because of the memset above, all
-                             * incomplete blockchains will have trailing 0’s,
-                             * this comes in handy when saving (and debugging)...
-                             */
-                            corrupt_copies++;
-                            break;
-                        }
+                        file_system.used[file->blocks[i][j - 1] % (file_system.size / file_system.blocksize)] = true;
+                        file->blocks[i][j] = ntohll(block.next);
+                    }
+                    else
+                    {
+                        /*
+                         * note-to-self: because of the memset above, all
+                         * incomplete blockchains will have trailing 0’s,
+                         * this comes in handy when saving (and debugging)
+                         */
+                        corrupt_copies++;
+                        break;
                     }
                 }
-                else
-                    file->time = val;
                 mcrypt_generic_deinit(nc);
                 mcrypt_module_close(nc);
             }
@@ -480,8 +476,10 @@ extern bool stegfs_file_write(stegfs_file_t *file)
     uint64_t first[SIZE_LONG_DATA] = { 0x0 };
     for (int i = 0; i < MAX_COPIES; i++)
         first[i] = htonll(file->blocks[i][1]);
-    first[MAX_COPIES] = 0x0000000000000000LL; /* TODO think of something to go here */
-    first[SIZE_LONG_DATA - 1] = htonll(file->time);
+    first[MAX_COPIES] = htonll(file->time);
+    /*
+     * TODO think of something to go at the tail end of the header block
+     */
     rand_nonce(inode.data, sizeof inode.data);
     memcpy(inode.data, first, sizeof first);
     inode.next = htonll(file->size);
