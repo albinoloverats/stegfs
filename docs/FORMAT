@@ -57,16 +57,16 @@ Total block size = 1KB = 8,192 bits = 960 file data bytes + metadata
     | Padding                                               8   (64) |
     +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+‐‐‐‐‐‐‐‐+
     | Data                                                960 (7680) |           |
-    | (Timestamp + file type¹ + file size + start of data)           |           |
+    | (First block of each copy - 8 × 64 bits = 512 bits)            |           |
     | [File system infomration]                                      |           |
     |                                                                |           +‐ Serpent × 62
-    | TODO:                                                          |           |
-    | ¹File type is represented as the sum of 8 bits (LUHN-ish), 0   |           |
-    | indicates a regular file and 1 a symbolic link.                |           |
     |                                                                |           |
-    | Symlinks will contain path in length+value where lenth is a 16 |           |
-    | bit integer (instead of 64). (Maximum symlink path length is   |           |
-    | 949 bytes.)                                                    |           |
+    |                                                                |           |
+    |                                                                |           |
+    |                                                                |           |
+    |                                                                |           |
+    |                                                                |           |
+    |                                                                |           |
     |                                                                |           |
     |                                                                |           |
     |                                                                |           |
@@ -181,5 +181,5 @@ Total block size = 1KB = 8,192 bits = 960 file data bytes + metadata
     | [Hash of "stegfs-2015.XX"]                                     |  +‐ Tiger |
     |                                                                |  |        |
     +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+        |
-    | Next block [Total blocks]                             8   (64) |           |
+    | Next block (File size) [Total blocks]                 8   (64) |           |
     +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐‐‐‐‐‐‐‐‐‐+

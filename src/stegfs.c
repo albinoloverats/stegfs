@@ -119,7 +119,7 @@ extern bool stegfs_init(const char * const restrict fs)
     memcpy(&file_system.blocksize, tlv_value_of(tlv, TAG_BLOCKSIZE), tlv_size_of(tlv, TAG_BLOCKSIZE));
     file_system.blocksize = ntohl(file_system.blocksize);
     file_system.used = calloc(file_system.size / file_system.blocksize, sizeof(bool));
-    if (ntohll(block.next[0]) != file_system.size / file_system.blocksize)
+    if (ntohll(block.next) != file_system.size / file_system.blocksize)
         return false;
 
     tlv_deinit(&tlv);
@@ -235,8 +235,7 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
         memset(&inode, 0x00, file_system.blocksize);
         if (block_read(file->inodes[i], &inode, mc, file->path))
         {
-            memcpy(&file->size, inode.next, sizeof file->size);
-            if ((file->size = ntohll(file->size)) > file_system.size)
+            if ((file->size = ntohll(inode.next)) > file_system.size)
             {
                 available_inodes--;
                 continue;
@@ -267,8 +266,7 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
                         if (block_read(file->blocks[i][j - 1], &block, nc, file->path))
                         {
                             file_system.used[file->blocks[i][j - 1] % (file_system.size / file_system.blocksize)] = true;
-                            memcpy(&val, block.next, sizeof file->blocks[i][j]);
-                            file->blocks[i][j] = ntohll(val);
+                            file->blocks[i][j] = ntohll(block.next);
                         }
                         else
                         {
@@ -460,8 +458,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
                 l = l - ((l + k * sizeof block.data) - file->size);
             memset(block.data, 0x00, sizeof block.data);
             memcpy(block.data, file->data + k * sizeof block.data, l);
-            z = htonll(file->blocks[i][j + 1]);
-            memcpy(block.next, &z, sizeof block.next);
+            block.next = htonll(file->blocks[i][j + 1]);
             if (!block_write(file->blocks[i][j], block, mc, file->path))
             {
                 /* see below (where inode blocks are written) */
@@ -474,6 +471,12 @@ extern bool stegfs_file_write(stegfs_file_t *file)
         mcrypt_generic_deinit(mc);
         mcrypt_module_close(mc);
     }
+
+    /*
+     * TODO redo the first block of data; start writing data in the
+     * header block
+     */
+
     /*
      * write file inode blocks
      */
@@ -485,8 +488,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
     first[MAX_COPIES] = 0x0000000000000000LL; /* TODO think of something to go here */
     first[SIZE_LONG_DATA - 1] = htonll(file->time);
     memcpy(inode.data, first, sizeof first);
-    z = htonll(file->size);
-    memcpy(inode.next, &z, sizeof file->size);
+    inode.next = htonll(file->size);
     for (int i = 0; i < MAX_COPIES; i++)
     {
         MCRYPT mc = cipher_init(file, i);

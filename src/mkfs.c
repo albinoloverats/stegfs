@@ -350,7 +350,7 @@ superblock:
     sb.hash[0] = htonll(MAGIC_0);
     sb.hash[1] = htonll(MAGIC_1);
     sb.hash[2] = htonll(MAGIC_2);
-    sb.next[0] = htonll(blocks);
+    sb.next = htonll(blocks);
     memcpy(mm, &sb, sizeof sb);
     msync(mm, sizeof sb, MS_SYNC);
     munmap(mm, size);
