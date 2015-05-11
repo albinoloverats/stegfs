@@ -48,6 +48,7 @@
         /* next block (not defined) */
 
 
+#define SYM_LENGTH -1
 #define MAX_COPIES 8
 
 #define SUPER_ID STEGFS_NAME " " STEGFS_VERSION

@@ -268,7 +268,7 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
                             /*
                              * note-to-self: because of the memset above, all
                              * incomplete blockchains will have trailing 0’s,
-                             * this comes in handy when saving...
+                             * this comes in handy when saving (and debugging)...
                              */
                             corrupt_copies++;
                             break;
@@ -451,7 +451,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
             size_t l = sizeof block.data;
             if (l + k * sizeof block.data > file->size)
                 l = l - ((l + k * sizeof block.data) - file->size);
-            memset(block.data, 0x00, sizeof block.data);
+            rand_nonce(block.data, sizeof block.data);
             memcpy(block.data, file->data + k * sizeof block.data, l);
             block.next = htonll(file->blocks[i][j + 1]);
             if (!block_write(file->blocks[i][j], block, mc, file->path))
@@ -482,6 +482,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
         first[i] = htonll(file->blocks[i][1]);
     first[MAX_COPIES] = 0x0000000000000000LL; /* TODO think of something to go here */
     first[SIZE_LONG_DATA - 1] = htonll(file->time);
+    rand_nonce(inode.data, sizeof inode.data);
     memcpy(inode.data, first, sizeof first);
     inode.next = htonll(file->size);
     for (int i = 0; i < MAX_COPIES; i++)
