@@ -8,7 +8,7 @@ MKSRC    = src/mkfs.c
 COMMON   = src/common/error.c src/common/tlv.c src/common/dir.c  src/common/rand.c src/common/non-gnu.c
 
 CFLAGS   = -Wall -Wextra -Werror -Wno-unused-parameter -std=gnu99 `pkg-config --cflags fuse` -pipe -O0 -ggdb -I/usr/local/include
-CPPFLAGS = -Isrc -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -DUSE_MMAP -DGIT_COMMIT=\"`git log | head -n1 | cut -f2 -d' '`\"
+CPPFLAGS = -Isrc -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -DGIT_COMMIT=\"`git log | head -n1 | cut -f2 -d' '`\"
 
 # -lpthread
 LIBS     = -lmhash -lmcrypt  `pkg-config --libs fuse`

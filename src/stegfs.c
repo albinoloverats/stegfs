@@ -67,12 +67,7 @@ extern bool stegfs_init(const char * const restrict fs)
 #endif
 
     stegfs_block_t block;
-#ifdef USE_MMAP
     memcpy(&block, file_system.memory, sizeof block);
-#else
-    if (!pread(file_system.handle, &block, sizeof block, 0))
-        return false;
-#endif
     /* quick check for previous version; account for all byte orders */
     if ((block.hash[0] == MAGIC_201001_0 || htonll(block.hash[0]) == MAGIC_201001_0) &&
         (block.hash[1] == MAGIC_201001_1 || htonll(block.hash[1]) == MAGIC_201001_1) &&
@@ -547,13 +542,7 @@ static bool block_read(uint64_t bid, stegfs_block_t *block, MCRYPT mc, const cha
         errno = EINVAL;
         return false;
     }
-#ifdef USE_MMAP
     memcpy(block, file_system.memory + (bid * file_system.blocksize), sizeof(stegfs_block_t));
-#else
-    ssize_t z = pread(file_system.handle, block, sizeof(stegfs_block_t), bid * file_system.blocksize);
-    if (z < 0)
-        return false;
-#endif
     MHASH hash;
     void *p;
     /* ignore path check in root */
@@ -589,11 +578,7 @@ static bool block_read(uint64_t bid, stegfs_block_t *block, MCRYPT mc, const cha
         return false;
     }
     free(p);
-#ifdef USE_MMAP
     return true;
-#else
-    return z == sizeof(stegfs_block_t);
-#endif
 }
 
 static bool block_write(uint64_t bid, stegfs_block_t block, MCRYPT mc, const char * const restrict path)
@@ -632,13 +617,9 @@ static bool block_write(uint64_t bid, stegfs_block_t block, MCRYPT mc, const cha
     memcpy(((uint8_t *)&block) + sizeof block.path + sizeof block.padding, data, sz);
     free(data);
 #endif
-#ifdef USE_MMAP
     memcpy(file_system.memory + (bid * file_system.blocksize), &block, sizeof block);
     msync(file_system.memory + (bid * file_system.blocksize), sizeof block, MS_SYNC);
     return true;
-#else
-    return pwrite(file_system.handle, &block, sizeof block, bid * file_system.blocksize) == sizeof block;
-#endif
 }
 
 static void block_delete(uint64_t bid)

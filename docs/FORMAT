@@ -1,18 +1,19 @@
 Technical Data
 ==============
 
-Units used here (and through-out stegfs) are in powers of 2 - think 1024
-not 1000.
+Units used here (and through-out stegfs) are in powers of 2---so think
+mulitples of 1,024 not 1,000.
 
-Each file system block is 128 bytes, with 80 being used for actual data,
-with the rest being used to verify the integrity of the data, and point
-to the location of the next block. (Yes this makes it VERY inefficient,
-but the possibility of not being able to retrieve data eclipses this.)
+Each file system block is 1,024 bytes, with 960 being used for actual
+data, with the rest being used to verify the integrity of the data, and
+point to the location of the next block. (Yes this makes it VERY
+inefficient, but the possibility of not being able to retrieve data
+eclipses this.)
 
 Using 64 bits to represent the block numbers allows up to 1.845e19
-blocks. This allows a theoretical maximum partition size of 2ZB, and a
-theoretical capacity of over 1.25ZB. Although the maximum file size will
-always be 1/8 of the overall capacity due to file replication.
+blocks. This allows a theoretical maximum partition size of 16ZB, and a
+theoretical capacity of 15ZB. Although the maximum file size will always
+be 1/8 of the overall capacity due to file replication.
 
 In practice, due to the limits of the open64() function used by the GNU
 C Library and the Linux kernel, the maximum usable limit stands as 8EB.
@@ -25,6 +26,9 @@ might not seem like much but if you were to have a 1TB stegfs partition
 it would need at least 8GB of RAM to even start, and in excess of 16GB
 if you were to fill it to capacity!
 
+Cipher Details
+--------------
+
 * Serpent:
   - 128‐bit block
   - 192‐bit key
@@ -36,12 +40,12 @@ if you were to fill it to capacity!
 Example/Exmplanation
 --------------------
 
-A 1GB file system has 8,388,608 blocks (8,388,607 are available for file
+A 1GB file system has 1,048,576 blocks (1,048,575 are available for file
 data, as the first contains file system information). Each of these
-blocks can store 80 bytes of data, leading to 640MB of total capacity.
+blocks can store 960 bytes of data, leading to 960MB of total capacity.
 As each file is duplicated multiple times (8×) the single largest file
-size is 71MB--this is also the maximum available capacity if everything
-is stored in the / of the file system.
+size is 120MB---which is also the maximum available capacity if
+everything is stored in the / of the file system.
 
 Block Layout
 ------------
