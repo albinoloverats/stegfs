@@ -40,6 +40,9 @@
 #define SIZE_BYTE_HASH  SIZE_BYTE_TIGER /*!<   24 bytes */
         /* next block (not defined) */
 
+#define SIZE_BYTE_HEAD  0x0200          /*!<  512 bytes (data in header block) */
+#define OFFT_BYTE_HEAD  (SIZE_BYTE_DATA-SIZE_BYTE_HEAD)
+
 /* size in 64 bit ints of parts of block */
 #define SIZE_LONG_PATH  0x03
         /* padding (not defined) */
@@ -138,6 +141,7 @@ typedef struct stegfs_data_head_t
     uint64_t block_first[MAX_COPIES];
     uint64_t time_modification;
     /* TODO what other file metadata could be stored... */
+    uint8_t data[SIZE_BYTE_HEAD];
 }
 stegfs_data_head_t;
 #endif
