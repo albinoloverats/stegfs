@@ -132,6 +132,16 @@ typedef struct stegfs_t
 }
 stegfs_t;
 
+#if 0
+typedef struct stegfs_data_head_t
+{
+    uint64_t block_first[MAX_COPIES];
+    uint64_t time_modification;
+    /* TODO what other file metadata could be stored... */
+}
+stegfs_data_head_t;
+#endif
+
 /*!
  * \brief  Structure for each file system block
  *
@@ -141,7 +151,7 @@ typedef struct stegfs_block_t
 {
     uint64_t path[SIZE_LONG_PATH]; /*!< Hash of block path    */
     uint64_t padding;
-    uint8_t  data[SIZE_BYTE_DATA]; /*!< Block data            */
+    uint8_t  data[SIZE_BYTE_DATA]; /*!< Block data (960 bytes or 120 64-bit words */
     uint64_t hash[SIZE_LONG_HASH]; /*!< Hash of block data    */
     uint64_t next;                 /*!< Address of next block */
 }

@@ -140,7 +140,7 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
 
     if (path_equals(DIR_SEPARATOR, path))
     {
-        stbuf->st_mode  = S_IFDIR | 0700;
+        stbuf->st_mode  = S_IFDIR | S_IRWXU;
         stbuf->st_nlink = 2;
         for (uint64_t i = 0; i < file_system.cache2.ents; i++)
             if (file_system.cache2.child[i] && !file_system.cache2.child[i]->file)
@@ -149,12 +149,12 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
 #ifdef USE_PROC
     else if (path_equals(PATH_PROC, path))
         /* if path == /proc */
-        stbuf->st_mode = S_IFDIR | 0500;
+        stbuf->st_mode = S_IFDIR | S_IRUSR | S_IXUSR;
     else if (path_starts_with(PATH_PROC, path))
     {
         /*
          * if we’re looking at files in /proc treat them as blocks (as
-         * that’s hat we’re representing)
+         * that’s what we’re representing)
          */
         stbuf->st_mode  = S_IFBLK;
         stbuf->st_nlink = 1;
@@ -174,14 +174,15 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
                         stbuf->st_ino = (ino_t)(c.file->inodes[i] % (file_system.size / SIZE_BYTE_BLOCK));
                         break;
                     }
-                stbuf->st_mode  = S_IFREG | 0600;
+                /* It makes little sense (right now) to set this to anything else */
+                stbuf->st_mode  = S_IFREG | S_IRUSR | S_IWUSR;
                 stbuf->st_ctime = c.file->time;
                 stbuf->st_mtime = c.file->time;
                 stbuf->st_size  = c.file->size;
             }
             else
             {
-                stbuf->st_mode  = S_IFDIR | 0700;
+                stbuf->st_mode  = S_IFDIR | S_IRWXU;
                 stbuf->st_nlink = 2;
                 for (uint64_t i = 0; i < c.ents; i++)
                     if (c.child[i] && !c.child[i]->file)
@@ -203,7 +204,7 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
                         stbuf->st_ino = (ino_t)(file.inodes[i] % (file_system.size / SIZE_BYTE_BLOCK));
                         break;
                     }
-                stbuf->st_mode  = S_IFREG | 0600;
+                stbuf->st_mode  = S_IFREG | S_IRUSR | S_IWUSR;
                 stbuf->st_ctime = file.time;
                 stbuf->st_mtime = file.time;
                 stbuf->st_size  = file.size;
