@@ -174,7 +174,7 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
                         stbuf->st_ino = (ino_t)(c.file->inodes[i] % (file_system.size / SIZE_BYTE_BLOCK));
                         break;
                     }
-                /* It makes little sense (right now) to set this to anything else */
+                /* it makes little sense (right now) to set this to anything else */
                 stbuf->st_mode  = S_IFREG | S_IRUSR | S_IWUSR;
                 stbuf->st_ctime = c.file->time;
                 stbuf->st_mtime = c.file->time;
@@ -253,10 +253,7 @@ static int fuse_stegfs_rmdir(const char *path)
 
 #ifdef USE_PROC
     if (path_equals(path, PATH_PROC))
-    {
-        errno = EBUSY;
-        return -errno;
-    }
+        return errno = EBUSY, -errno;
 #endif
 
     stegfs_cache2_t *c = NULL;
@@ -352,9 +349,7 @@ static int fuse_stegfs_read(const char *path, char *buf, size_t size, off_t offs
         return size;
     }
 
-    errno = ENOENT;
-
-    return -errno;
+    return errno = ENOENT, -errno;
 }
 
 static int fuse_stegfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *info)
@@ -373,10 +368,7 @@ static int fuse_stegfs_write(const char *path, const char *buf, size_t size, off
             if (!stegfs_file_will_fit(c->file))
                 return -errno;
             if (!c->file->write)
-            {
-                errno = EBADF;
-                return -errno;
-            }
+                return errno = EBADF, -errno;
             c->file->size = c->file->size > size + offset ? c->file->size : size + offset;
             c->file->data = realloc(c->file->data, c->file->size);
             c->file->time = time(NULL);
@@ -391,7 +383,7 @@ static int fuse_stegfs_write(const char *path, const char *buf, size_t size, off
         stegfs_file_create(path, true);
     }
 
-    return -EIO;
+    return errno = EIO, -errno;
 }
 
 static int fuse_stegfs_open(const char *path, struct fuse_file_info *info)
@@ -485,26 +477,22 @@ static int fuse_stegfs_release(const char *path, struct fuse_file_info *info)
 
 static int fuse_stegfs_readlink(const char *path, char *buf, size_t size)
 {
-    errno = ENOTSUP;
-    return -errno;
+    return errno = ENOTSUP, -errno;
 }
 
 static int fuse_stegfs_utime(const char *path, struct utimbuf *utime)
 {
-    errno = ENOTSUP;
-    return -errno;
+    return errno = ENOTSUP, -errno;
 }
 
 static int fuse_stegfs_chmod(const char *path, mode_t mode)
 {
-    errno = ENOTSUP;
-    return -errno;
+    return errno = ENOTSUP, -errno;
 }
 
 static int fuse_stegfs_chown(const char *path, uid_t uid, gid_t gid)
 {
-    errno = ENOTSUP;
-    return -errno;
+    return errno = ENOTSUP, -errno;
 }
 
 int main(int argc, char **argv)

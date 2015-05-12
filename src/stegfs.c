@@ -72,10 +72,7 @@ extern bool stegfs_init(const char * const restrict fs)
     if ((block.hash[0] == MAGIC_201001_0 || htonll(block.hash[0]) == MAGIC_201001_0) &&
         (block.hash[1] == MAGIC_201001_1 || htonll(block.hash[1]) == MAGIC_201001_1) &&
         (block.hash[2] == MAGIC_201001_2 || htonll(block.hash[2]) == MAGIC_201001_2))
-    {
-        errno = (int)MAGIC_201001_0;
-        return false;
-    }
+        return errno = (int)MAGIC_201001_0, false;
 
     if (ntohll(block.hash[0]) != MAGIC_0 ||
         ntohll(block.hash[1]) != MAGIC_1 ||
@@ -165,8 +162,7 @@ extern bool stegfs_file_will_fit(stegfs_file_t *file)
     if (blocks_needed > blocks_total)
     {
         stegfs_file_delete(file);
-        errno = EFBIG; /* file would not fit in the file system */
-        return false;
+        return errno = EFBIG, false; /* file would not fit in the file system */
     }
     uint64_t blocks_used = 0;
     for (uint64_t i = 0; i < file_system.size / file_system.blocksize; i++)
@@ -176,11 +172,9 @@ extern bool stegfs_file_will_fit(stegfs_file_t *file)
     if (blocks_needed > blocks_available)
     {
         stegfs_file_delete(file);
-        errno = ENOSPC; /* file won’t fit in remaining space */
-        return false;
+        return errno = ENOSPC, false; /* file won’t fit in remaining space */
     }
-    errno = EXIT_SUCCESS;
-    return true;
+    return errno = EXIT_SUCCESS, true;
 }
 
 extern void stegfs_file_create(const char * const restrict path, bool write)
@@ -382,8 +376,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
                             file->blocks[k] = NULL;
                         }
                     }
-                    errno = ENOSPC;
-                    return false;
+                    return errno = ENOSPC, false;
                 }
         }
     }
@@ -401,8 +394,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
                     for (int k = 0; k <= i; k++)
                         for (uint64_t l = file->blocks[k][0]; l <= j; l++)
                             file_system.used[file->blocks[k][l] % (file_system.size / file_system.blocksize)] = false;
-                    errno = ENOSPC;
-                    return false;
+                    return errno = ENOSPC, false;
                 }
         }
         for (int i = 0; i < MAX_COPIES; i++)
@@ -428,8 +420,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
             if (!file->blocks[i][j] && !(file->blocks[i][j] = block_assign(file->path)))
             {
                 stegfs_file_delete(file);
-                errno = ENOSPC;
-                return false;
+                return errno = ENOSPC, false;
             }
         file->blocks[i][blocks + 1] = 0x0;
     }
@@ -537,10 +528,7 @@ static bool block_read(uint64_t bid, stegfs_block_t *block, MCRYPT mc, const cha
     errno = EXIT_SUCCESS;
     bid %= (file_system.size / file_system.blocksize);
     if (!bid || (bid * file_system.blocksize + file_system.blocksize > file_system.size))
-    {
-        errno = EINVAL;
-        return false;
-    }
+        return errno = EINVAL, false;
     memcpy(block, file_system.memory + (bid * file_system.blocksize), sizeof(stegfs_block_t));
     MHASH hash;
     void *p;
@@ -585,10 +573,7 @@ static bool block_write(uint64_t bid, stegfs_block_t block, MCRYPT mc, const cha
     errno = EXIT_SUCCESS;
     bid %= (file_system.size / file_system.blocksize);
     if (!bid || (bid * file_system.blocksize + file_system.blocksize > file_system.size))
-    {
-        errno = EINVAL;
-        return false;
-    }
+        return errno = EINVAL, false;
     if (path_equals(path, DIR_SEPARATOR))
         rand_nonce((uint8_t *)&block.path, sizeof block.path);
     else
