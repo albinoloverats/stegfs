@@ -135,17 +135,6 @@ typedef struct stegfs_t
 }
 stegfs_t;
 
-#if 0
-typedef struct stegfs_data_head_t
-{
-    uint64_t block_first[MAX_COPIES];
-    uint64_t time_modification;
-    /* TODO what other file metadata could be stored... */
-    uint8_t data[SIZE_BYTE_HEAD];
-}
-stegfs_data_head_t;
-#endif
-
 /*!
  * \brief  Structure for each file system block
  *
@@ -169,15 +158,6 @@ stegfs_block_t;
  * making note whether to cache file details
  */
 extern bool stegfs_init(const char * const restrict fs) __attribute__((nonnull(1)));
-
-#if 0
-/*
- * \brief         Deinitialise the file system
- *
- * Unmount the file system, sync all data, clear all memory
- */
-extern void stegfs_deinit(void);
-#endif
 
 /*!
  * \brief                Retrieve information about the file system

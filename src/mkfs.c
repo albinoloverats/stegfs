@@ -41,21 +41,6 @@
 
 #define RATIO 1024
 
-#if 0
-/*!
- * \brief  Hash of file system root
- *
- * All paths are hashed so that files deeper down the tree can identify
- * those nearer the root and try not to overwrite them. All files in the
- * root have this hash, as do unused blocks. Basically if a block has
- * this hash it could be a file in the root, unused, or already deleted.
- */
-static uint8_t stegfs_root_hash[] = { 0x60, 0xA6, 0x63, 0x2B, 0x77, 0xB6, 0xD5, 0x78, \
-                                      0x9A, 0x65, 0x59, 0x7B, 0x10, 0x3A, 0x97, 0x2D };/*, \
-                                      0xE9, 0x78, 0x45, 0xCD, 0x43, 0x79, 0x5D, 0xF7 };*/
-
-#endif
-
 static int64_t open_filesystem(const char * const restrict path, uint64_t *size, bool force, bool recreate, bool dry)
 {
     int64_t fs = 0x0;

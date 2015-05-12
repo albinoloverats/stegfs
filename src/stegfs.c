@@ -119,26 +119,6 @@ extern bool stegfs_init(const char * const restrict fs)
     return true;
 }
 
-#if 0
-extern void stegfs_deinit(void)
-{
-    msync(file_system.memory, file_system.size,  MS_SYNC);
-    munmap(file_system.memory, file_system.size);
-    close(file_system.handle);
-
-    free(file_system.cipher);
-    free(file_system.hash);
-    free(file_system.mode);
-
-    free(file_system.used);
-
-    stegfs_cache2_remove(DIR_SEPARATOR);
-    free(file_system.cache2.name);
-
-    return;
-}
-#endif
-
 extern stegfs_t stegfs_info(void)
 {
     return file_system;
@@ -307,8 +287,7 @@ extern bool stegfs_file_read(stegfs_file_t *file)
      * read the start of the file data
      */
     file->data = realloc(file->data, file->size);
-    bool c = false;
-    for (int i = 0; i < MAX_COPIES; i++)
+    for (int i = 0, c = 0; i < MAX_COPIES && !c; i++)
     {
         MCRYPT mc = cipher_init(file, i);
         stegfs_block_t inode;
@@ -316,18 +295,15 @@ extern bool stegfs_file_read(stegfs_file_t *file)
         if (block_read(file->inodes[i], &inode, mc, file->path))
         {
             memcpy(file->data, inode.data + OFFT_BYTE_HEAD, SIZE_BYTE_HEAD);
-            c = true;
+            c = 1;
         }
         mcrypt_generic_deinit(mc);
         mcrypt_module_close(mc);
-        if (c)
-            break;
     }
     /*
      * and then the rest of it
      */
-    int corrupt_copies = 0;
-    for (int i = 0; i < MAX_COPIES; i++)
+    for (int i = 0, corrupt_copies = 0; i < MAX_COPIES; i++)
     {
         lldiv_t d = lldiv(file->size - SIZE_BYTE_HEAD, SIZE_BYTE_DATA);
         uint64_t blocks = d.quot + (d.rem ? 1 : 0);
@@ -441,23 +417,6 @@ extern bool stegfs_file_write(stegfs_file_t *file)
             file->blocks[i] = realloc(file->blocks[i], (blocks + 2) * sizeof blocks);
             file->blocks[i][0] = blocks;
         }
-#if 0
-    /*
-     * note-to-self: from above, any of the blockchains could have a
-     * string of 0’s (possibly in the middle if it’s been expanded) so
-     * we need to reassign those now
-     */
-    for (int i = 0; i < MAX_COPIES; i++)
-    {
-        for (uint64_t j = 1; j < file->blocks[i][0]; j++)
-            if (!file->blocks[i][j] && !(file->blocks[i][j] = block_assign(file->path)))
-            {
-                stegfs_file_delete(file);
-                return errno = ENOSPC, false;
-            }
-        file->blocks[i][blocks + 1] = 0x0;
-    }
-#endif
     /*
      * write the data
      */
@@ -772,8 +731,7 @@ extern void stegfs_cache2_add(const char * const restrict path, stegfs_file_t *f
         goto c2a3; /* already in cache */
     ptr = &(file_system.cache2);
     char *name = dir_get_name(p, PASSWORD_SEPARATOR);
-    uint16_t d = dir_get_deep(p);
-    for (uint16_t i = 1; i < d; i++)
+    for (uint16_t i = 1; i < dir_get_deep(p); i++)
     {
         char *e = dir_get_part(p, i);
         bool found = false;
@@ -870,8 +828,7 @@ extern stegfs_cache2_t *stegfs_cache2_exists(const char * const restrict path, s
 {
     stegfs_cache2_t *ptr = &(file_system.cache2);
     char *name = dir_get_name(path, PASSWORD_SEPARATOR);
-    uint16_t d = dir_get_deep(path);
-    for (uint16_t i = 1; i < d; i++)
+    for (uint16_t i = 1; i < dir_get_deep(path); i++)
     {
         bool found = false;
         char *e = dir_get_part(path, i);
@@ -904,8 +861,7 @@ extern void stegfs_cache2_remove(const char * const restrict path)
 {
     stegfs_cache2_t *ptr = &(file_system.cache2);
     char *name = dir_get_name(path, PASSWORD_SEPARATOR);
-    uint16_t d = dir_get_deep(path);
-    for (uint16_t i = 1; i < d; i++)
+    for (uint16_t i = 1; i < dir_get_deep(path); i++)
     {
         bool found = false;
         char *e = dir_get_part(path, i);
@@ -940,11 +896,6 @@ extern void stegfs_cache2_remove(const char * const restrict path)
         for (int i = 0; i < MAX_COPIES; i++)
             if (ptr->file->blocks[i])
             {
-#if 0
-                for (uint64_t j = 1; j < file->blocks[i][0]; j++)
-                    if (file->blocks[i][j])
-                        file_system.used[file->blocks[i][j] % (file_system.size / file_system.blocksize)] = false;
-#endif
                 free(ptr->file->blocks[i]);
                 ptr->file->blocks[i] = NULL;
             }
