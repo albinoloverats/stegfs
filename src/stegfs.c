@@ -224,7 +224,8 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
                 file->blocks[i] = realloc(file->blocks[i], (blocks + 2) * sizeof blocks);
                 memset(file->blocks[i], 0x00, blocks * sizeof blocks);
                 file->blocks[i][0] = blocks;
-                file->blocks[i][1] = htonll(first[i]);
+                if (blocks)
+                    file->blocks[i][1] = htonll(first[i]);
                 /*
                  * travsers file block tree; whilst the whole block
                  * is read, the actual file data is discarded
@@ -366,7 +367,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
             /*
              * note-to-self: allocate 2 more blocks than is necessary so
              * that block[0] indicates how many blocks there are (needed)
-             * and block[last] is kept 0x00 as a overrun guard
+             * and block[last] is kept 0x00 as an “end of chain” guard
              */
             file->blocks[i] = calloc(blocks + 2, sizeof blocks);
             file->blocks[i][0] = blocks;
@@ -390,7 +391,6 @@ extern bool stegfs_file_write(stegfs_file_t *file)
         }
     }
     file->size = z; /* stat can couse size to be reset to 0 */
-
     if (blocks > file->blocks[0][0]) /* need more blocks than we have */
     {
         for (int i = 0; i < MAX_COPIES; i++)
@@ -447,15 +447,17 @@ extern bool stegfs_file_write(stegfs_file_t *file)
         mcrypt_generic_deinit(mc);
         mcrypt_module_close(mc);
     }
-
     /*
      * write file inode blocks
      */
     stegfs_block_t inode;
     memset(&inode, 0x00, sizeof inode);
     uint64_t first[SIZE_LONG_DATA] = { 0x0 };
-    for (int i = 0; i < MAX_COPIES; i++)
-        first[i] = htonll(file->blocks[i][1]);
+    if (blocks)
+        for (int i = 0; i < MAX_COPIES; i++)
+            first[i] = htonll(file->blocks[i][1]);
+    else
+        rand_nonce((void*)first, sizeof first);
     first[MAX_COPIES] = htonll(file->time);
     rand_nonce(inode.data, sizeof inode.data);
     memcpy(inode.data, first, sizeof first);
