@@ -85,7 +85,7 @@ When creating a stegfs file system, the size of the file created (or the
 size of the partition on which it will be created) is shown; this is the
 number of bytes (MB, GB, etc) which are used to house everything,
 including header information, about the files on the file system. Below
-this is the capacity available for actual file data---roughly 93% of a
+this is the capacity available for actual file data---roughly 95% of a
 block is used for data. Finally, the maximum usable space under ideal
 conditions where no files are compromised: each file is written 8 times
 to minimise the loss, and maximise the chance of being able to recover

@@ -16,9 +16,10 @@ be 1/8 of the overall capacity due to file replication.
 
 In practice, due to the limits of the open64() function used by the GNU
 C Library and the Linux kernel, the maximum usable limit stands as 8EB.
-This gives approximately 9 thousand billion (long scale) blocks,
-equalling over 8PB available storage space. (Other limits may exist on
-other systems.)
+(This is because both GNU and Linux use signed 64 bit integers, whereas
+stegfs uses unsigned 64 bit integers). This allows up to approximately 9
+thousand billion (long scale) blocks, giving over 8PB available storage
+space. (Other limits may exist on other systems.)
 
 RAM requirements for stegfs are a little on the high side too: it will
 use between 0.8% and just over 1.6% of the total file system size. This
