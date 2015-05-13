@@ -44,20 +44,21 @@ extern void rand_seed(void)
     return;
 }
 
-extern void rand_nonce(uint8_t *buffer, size_t length)
+extern void rand_nonce(void *buffer, size_t length)
 {
     if (!seed)
         rand_seed();
-    for (size_t i = 0; i < length - sizeof(uint32_t); i += 4)
+    uint8_t *buf = buffer;
+    uint32_t r = (uint32_t)lrand48();
+    size_t i = (length + 3) / 4;
+    switch (length % 4)
     {
-        uint32_t r = lrand48();
-        buffer[i] =     (r % 0x00FF0000) >> 16;
-        buffer[i + 1] = (r % 0xFF000000) >> 24;
-        buffer[i + 2] =  r % 0x000000FF;
-        buffer[i + 3] = (r % 0x0000FF00) >>  8;
+        case 0: do { *buf++ = (r & 0x00FF0000) >> 16;
+        case 3:      *buf++ = (r & 0xFF000000) >> 24;
+        case 2:      *buf++ =  r & 0x000000FF;
+        case 1:      *buf++ = (r & 0x0000FF00) >>  8;
+                     r = (uint32_t)lrand48();
+                } while (--i > 0);
     }
-    /*
-     * TODO something if length isn’t a multiple of 4 (Duff’s device?)
-     */
     return;
 }

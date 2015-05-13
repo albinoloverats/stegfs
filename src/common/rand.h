@@ -24,6 +24,6 @@
 
 extern void rand_seed(void);
 
-extern void rand_nonce(uint8_t *, size_t);
+extern void rand_nonce(void *, size_t);
 
 #endif

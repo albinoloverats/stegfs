@@ -462,7 +462,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
         for (int i = 0; i < MAX_COPIES; i++)
             first[i] = htonll(file->blocks[i][1]);
     else
-        rand_nonce((void*)first, sizeof first);
+        rand_nonce((void *)first, sizeof first);
     first[MAX_COPIES] = htonll(file->time);
     rand_nonce(inode.data, sizeof inode.data);
     memcpy(inode.data, first, sizeof first);
@@ -572,7 +572,7 @@ static bool block_write(uint64_t bid, stegfs_block_t block, MCRYPT mc, const cha
     if (!bid || (bid * file_system.blocksize + file_system.blocksize > file_system.size))
         return errno = EINVAL, false;
     if (path_equals(path, DIR_SEPARATOR))
-        rand_nonce((uint8_t *)&block.path, sizeof block.path);
+        rand_nonce((void *)block.path, sizeof block.path);
     else
     {
         /* compute path hash */
