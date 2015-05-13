@@ -59,6 +59,10 @@ static int fuse_stegfs_write(const char *, const char *, size_t, off_t , struct 
 static int fuse_stegfs_open(const char *, struct fuse_file_info *);
 static int fuse_stegfs_release(const char *, struct fuse_file_info *);
 static int fuse_stegfs_truncate(const char *, off_t);
+static int fuse_stegfs_ftruncate(const char *, off_t, struct fuse_file_info *);
+#ifdef STEGFS_FALLOCATE
+static int fuse_stegfs_fallocate(const char *, int, off_t, off_t, struct fuse_file_info *);
+#endif
 static int fuse_stegfs_create(const char *, mode_t, struct fuse_file_info *);
 static int fuse_stegfs_mknod(const char *, mode_t, dev_t);
 static void fuse_stegfs_destroy(void *);
@@ -84,6 +88,10 @@ static struct fuse_operations fuse_stegfs_functions =
     .open      = fuse_stegfs_open,
     .release   = fuse_stegfs_release,
     .truncate  = fuse_stegfs_truncate,
+    .ftruncate = fuse_stegfs_ftruncate,
+#ifdef STEGFS_FALLOCATE
+    .fallocate = fuse_stegfs_fallocate,
+#endif
     .create    = fuse_stegfs_create,
     .mknod     = fuse_stegfs_mknod,
     .destroy   = fuse_stegfs_destroy,
@@ -100,6 +108,8 @@ static struct fuse_operations fuse_stegfs_functions =
 static int fuse_stegfs_statfs(const char *path, struct statvfs *stvbuf)
 {
     errno = EXIT_SUCCESS;
+
+    (void)path;
 
     stegfs_t file_system = stegfs_info();
 
@@ -244,6 +254,8 @@ static int fuse_stegfs_mkdir(const char *path, mode_t mode)
 {
     errno = EXIT_SUCCESS;
 
+    (void)mode;
+
     stegfs_cache2_add(path, NULL);
 
     return -errno;
@@ -282,6 +294,9 @@ static int fuse_stegfs_rmdir(const char *path)
 static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *info)
 {
     errno = EXIT_SUCCESS;
+
+    (void)offset;
+    (void)info;
 
     filler(buf,  ".", NULL, 0);
     filler(buf, "..", NULL, 0);
@@ -342,6 +357,8 @@ static int fuse_stegfs_read(const char *path, char *buf, size_t size, off_t offs
 {
     errno = EXIT_SUCCESS;
 
+    (void)info;
+
     stegfs_cache2_t *c = NULL;
     if ((c = stegfs_cache2_exists(path, NULL)) && c->file)
     {
@@ -357,6 +374,8 @@ static int fuse_stegfs_read(const char *path, char *buf, size_t size, off_t offs
 static int fuse_stegfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *info)
 {
     errno = EXIT_SUCCESS;
+
+    (void)info;
 
     /*
      * if the file is cached (has been read/written to already) then
@@ -377,6 +396,8 @@ static int fuse_stegfs_write(const char *path, const char *buf, size_t size, off
             memcpy(c->file->data + offset, buf, size);
             return size;
         }
+        else if (c && !c->file)
+            return errno = EISDIR, -errno;
         /*
          * the file wasn’t found, so create it and try again, it should
          * then fail if the file cannot fit, as at this point all that’s
@@ -391,6 +412,8 @@ static int fuse_stegfs_write(const char *path, const char *buf, size_t size, off
 static int fuse_stegfs_open(const char *path, struct fuse_file_info *info)
 {
     errno = EXIT_SUCCESS;
+
+    (void)info;
 
     stegfs_cache2_t *c = NULL;
     if ((c = stegfs_cache2_exists(path, NULL)) && c->file)
@@ -407,6 +430,8 @@ static int fuse_stegfs_flush(const char *path, struct fuse_file_info *info)
 {
     errno = EXIT_SUCCESS;
 
+    (void)info;
+
     stegfs_cache2_t *c = NULL;
     if ((c = stegfs_cache2_exists(path, NULL)) && c->file)
         if (stegfs_file_will_fit(c->file))
@@ -419,23 +444,99 @@ static int fuse_stegfs_truncate(const char *path, off_t offset)
 {
     errno = EXIT_SUCCESS;
 
-    struct stat s;
-    fuse_stegfs_getattr(path, &s);
-    char *buf = malloc(offset);
-    memset(buf, 0x00, offset);
-
-    fuse_stegfs_read(path, buf, offset, 0, NULL);
-    fuse_stegfs_unlink(path);
-    fuse_stegfs_write(path, buf, offset, 0, NULL);
-
-    free(buf);
-
-    return -errno;
+    return fuse_stegfs_ftruncate(path, offset, NULL);
 }
+
+static int fuse_stegfs_ftruncate(const char *path, off_t offset, struct fuse_file_info *info)
+{
+    errno = EXIT_SUCCESS;
+
+    stegfs_cache2_t *c = NULL;
+    while (true)
+    {
+        if ((c = stegfs_cache2_exists(path, NULL)) && c->file)
+        {
+            char *buf = calloc(offset, sizeof(uint8_t));
+            fuse_stegfs_read(path, buf, offset, 0, info);
+            fuse_stegfs_unlink(path);
+            fuse_stegfs_write(path, buf, offset, 0, info);
+            free(buf);
+            return -errno;
+        }
+        else if (c && !c->file)
+            return errno = EISDIR, -errno;
+        else
+            stegfs_file_create(path, true);
+    }
+
+    return errno = EIO, -errno;
+
+}
+
+#ifdef STEGFS_FALLOCATE
+static int fuse_stegfs_fallocate(const char *path, int mode, off_t offset, off_t length, struct fuse_file_info *info)
+{
+    errno = EXIT_SUCCESS;
+
+    stegfs_cache2_t *c = NULL;
+    while (true)
+    {
+        if ((c = stegfs_cache2_exists(path, NULL)) && c->file)
+        {
+            uint64_t sz = offset + length;
+            switch (mode)
+            {
+                case -1:                        /* emmulate truncate */
+                    break;
+
+                case 0:                         /* make bigger (not smaller) */
+                    if (sz < c->file->size)
+                        sz = c->file->size;
+                    break;
+
+                case FALLOC_FL_KEEP_SIZE:       /* no size change */
+                case FALLOC_FL_PUNCH_HOLE:
+                    return errno = EOPNOTSUPP, -errno;
+
+                case FALLOC_FL_COLLAPSE_RANGE:  /* remove data from middle */
+                    if (sz > c->file->size)
+                        return errno = EINVAL, -errno;
+                case FALLOC_FL_ZERO_RANGE:      /* does nothing here, but zeros later */
+                    break;
+            }
+            char *buf = calloc(sz, sizeof(uint8_t));
+            fuse_stegfs_read(path, buf, sz, 0, info);
+            fuse_stegfs_unlink(path);
+            switch (mode)
+            {
+                case FALLOC_FL_COLLAPSE_RANGE:
+                    memmove(buf + offset, buf + offset + length, sz - offset - length);
+                    sz -= offset - length;
+                    break;
+                case FALLOC_FL_ZERO_RANGE:
+                    memset(buf + offset, 0x00, length);
+                    break;
+            }
+            fuse_stegfs_write(path, buf, sz, 0, info);
+            free(buf);
+            return -errno;
+        }
+        else if (c && !c->file)
+            return errno = EISDIR, -errno;
+        else
+            stegfs_file_create(path, true);
+    }
+
+    return errno = EIO, -errno;
+}
+#endif
 
 static int fuse_stegfs_create(const char *path, mode_t mode, struct fuse_file_info *info)
 {
     errno = EXIT_SUCCESS;
+
+    (void)mode;
+    (void)info;
 
     stegfs_file_create(path, true);
 
@@ -446,6 +547,9 @@ static int fuse_stegfs_mknod(const char *path, mode_t mode, dev_t rdev)
 {
     errno = EXIT_SUCCESS;
 
+    (void)mode;
+    (void)rdev;
+
     stegfs_file_create(path, false);
 
     return -errno;
@@ -454,6 +558,8 @@ static int fuse_stegfs_mknod(const char *path, mode_t mode, dev_t rdev)
 static int fuse_stegfs_release(const char *path, struct fuse_file_info *info)
 {
     errno = EXIT_SUCCESS;
+
+    (void)info;
 
     stegfs_cache2_t *c = NULL;
     if ((c = stegfs_cache2_exists(path, NULL)) && c->file)
@@ -486,21 +592,35 @@ static void fuse_stegfs_destroy(void *ptr)
 
 static int fuse_stegfs_readlink(const char *path, char *buf, size_t size)
 {
+    (void)path;
+    (void)buf;
+    (void)size;
+
     return errno = ENOTSUP, -errno;
 }
 
 static int fuse_stegfs_utime(const char *path, struct utimbuf *utime)
 {
+    (void)path;
+    (void) utime;
+
     return errno = ENOTSUP, -errno;
 }
 
 static int fuse_stegfs_chmod(const char *path, mode_t mode)
 {
+    (void)path;
+    (void)mode;
+
     return errno = ENOTSUP, -errno;
 }
 
 static int fuse_stegfs_chown(const char *path, uid_t uid, gid_t gid)
 {
+    (void)path;
+    (void)uid;
+    (void)gid;
+
     return errno = ENOTSUP, -errno;
 }
 
