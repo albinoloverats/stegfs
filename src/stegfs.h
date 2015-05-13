@@ -166,6 +166,13 @@ extern bool stegfs_init(const char * const restrict fs) __attribute__((nonnull(1
  */
 extern stegfs_t stegfs_info(void);
 
+/*
+ * \brief         Deinitialise the file system
+ *
+ * Unmount the file system, sync all data, clear all memory
+ */
+extern void stegfs_deinit(void);
+
 extern bool stegfs_files_equal(stegfs_file_t, stegfs_file_t);
 extern bool stegfs_file_will_fit(stegfs_file_t *);
 

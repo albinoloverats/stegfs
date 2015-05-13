@@ -124,6 +124,24 @@ extern bool stegfs_init(const char * const restrict fs)
     return true;
 }
 
+extern void stegfs_deinit(void)
+{
+    msync(file_system.memory, file_system.size,  MS_SYNC);
+    munmap(file_system.memory, file_system.size);
+    close(file_system.handle);
+
+    free(file_system.cipher);
+    free(file_system.hash);
+    free(file_system.mode);
+
+    free(file_system.used);
+
+    stegfs_cache2_remove(DIR_SEPARATOR);
+    free(file_system.cache2.name);
+
+    return;
+}
+
 extern stegfs_t stegfs_info(void)
 {
     return file_system;
@@ -140,7 +158,8 @@ extern bool stegfs_files_equal(stegfs_file_t a, stegfs_file_t b)
 
 extern bool stegfs_file_will_fit(stegfs_file_t *file)
 {
-    lldiv_t d = lldiv(file->size - (file->size < SIZE_BYTE_HEAD ? file->size :SIZE_BYTE_HEAD), SIZE_BYTE_DATA);
+    stegfs_block_t block;
+    lldiv_t d = lldiv(file->size - (file->size < (sizeof block.data - file_system.head_offset) ? file->size : (sizeof block.data - file_system.head_offset)), SIZE_BYTE_DATA);
     uint64_t blocks_needed = (d.quot + (d.rem ? 1 : 0)) * MAX_COPIES;
 
     uint64_t blocks_total = (file_system.size / file_system.blocksize) - 1;
@@ -224,7 +243,7 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
             for (int i = 0; i < MAX_COPIES; i++)
             {
                 MCRYPT nc = cipher_init(file, i);
-                lldiv_t d = lldiv(file->size - (file->size < SIZE_BYTE_HEAD ? file->size :SIZE_BYTE_HEAD), SIZE_BYTE_DATA);
+                lldiv_t d = lldiv(file->size - (file->size < (sizeof inode.data - file_system.head_offset) ? file->size : (sizeof inode.data - file_system.head_offset)), SIZE_BYTE_DATA);
                 uint64_t blocks = d.quot + (d.rem ? 1 : 0);
                 file->blocks[i] = realloc(file->blocks[i], (blocks + 2) * sizeof blocks);
                 memset(file->blocks[i], 0x00, blocks * sizeof blocks);
@@ -300,7 +319,7 @@ extern bool stegfs_file_read(stegfs_file_t *file)
         memset(&inode, 0x00, sizeof inode);
         if (block_read(file->inodes[i], &inode, mc, file->path))
         {
-            memcpy(file->data, inode.data + file_system.head_offset, file->size < SIZE_BYTE_HEAD ? file->size : SIZE_BYTE_HEAD);
+            memcpy(file->data, inode.data + file_system.head_offset, file->size < (sizeof inode.data - file_system.head_offset) ? file->size : (sizeof inode.data - file_system.head_offset));
             c = 1;
         }
         mcrypt_generic_deinit(mc);
@@ -309,9 +328,10 @@ extern bool stegfs_file_read(stegfs_file_t *file)
     /*
      * and then the rest of it
      */
+    stegfs_block_t block;
     for (int i = 0, corrupt_copies = 0; i < MAX_COPIES; i++)
     {
-        lldiv_t d = lldiv(file->size - (file->size < SIZE_BYTE_HEAD ? file->size :SIZE_BYTE_HEAD), SIZE_BYTE_DATA);
+        lldiv_t d = lldiv(file->size - (file->size < (sizeof block.data - file_system.head_offset) ? file->size : (sizeof block.data - file_system.head_offset)), SIZE_BYTE_DATA);
         uint64_t blocks = d.quot + (d.rem ? 1 : 0);
         if (file->blocks[i][0] != blocks)
             continue; /* this copy is corrupt; try the next */
@@ -324,14 +344,13 @@ extern bool stegfs_file_read(stegfs_file_t *file)
              * the complete file as outherwise the stat would have
              * failed
              */
-            stegfs_block_t block;
             memset(&block, 0x00, sizeof block);
             if (block_read(file->blocks[i][j], &block, mc, file->path))
             {
                 size_t l = sizeof block.data;
-                if (l + k * sizeof block.data > (file->size - SIZE_BYTE_HEAD))
-                    l = l - ((l + k * sizeof block.data) - (file->size - SIZE_BYTE_HEAD));
-                memcpy(file->data + SIZE_BYTE_HEAD + k * sizeof block.data, block.data, l);
+                if (l + k * sizeof block.data > (file->size - (sizeof block.data - file_system.head_offset)))
+                    l = l - ((l + k * sizeof block.data) - (file->size - (sizeof block.data - file_system.head_offset)));
+                memcpy(file->data + (sizeof block.data - file_system.head_offset) + k * sizeof block.data, block.data, l);
             }
             else
             {
@@ -356,7 +375,8 @@ extern bool stegfs_file_read(stegfs_file_t *file)
 
 extern bool stegfs_file_write(stegfs_file_t *file)
 {
-    lldiv_t d = lldiv(file->size - (file->size < SIZE_BYTE_HEAD ? file->size :SIZE_BYTE_HEAD), SIZE_BYTE_DATA);
+    stegfs_block_t block;
+    lldiv_t d = lldiv(file->size - (file->size < (sizeof block.data - file_system.head_offset) ? file->size : (sizeof block.data - file_system.head_offset)), SIZE_BYTE_DATA);
     uint64_t blocks = d.quot + (d.rem ? 1 : 0);
     uint64_t z = file->size;
 
@@ -430,13 +450,12 @@ extern bool stegfs_file_write(stegfs_file_t *file)
         MCRYPT mc = cipher_init(file, i);
         for (uint64_t j = 1, k = 0; j <= blocks; j++, k++)
         {
-            stegfs_block_t block;
             memset(&block, 0x00, sizeof block);
             size_t l = sizeof block.data;
             if (l + k * sizeof block.data > file->size)
                 l = l - ((l + k * sizeof block.data) - file->size);
             rand_nonce(block.data, sizeof block.data);
-            memcpy(block.data, file->data + SIZE_BYTE_HEAD + k * sizeof block.data, l);
+            memcpy(block.data, file->data + (sizeof block.data - file_system.head_offset) + k * sizeof block.data, l);
             block.next = htonll(file->blocks[i][j + 1]);
             if (!block_write(file->blocks[i][j], block, mc, file->path))
             {
@@ -467,7 +486,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
     rand_nonce(inode.data, sizeof inode.data);
     memcpy(inode.data, first, sizeof first);
     if (file->data && file->size)
-        memcpy(inode.data + file_system.head_offset, file->data, file->size < SIZE_BYTE_HEAD ? file->size : SIZE_BYTE_HEAD);
+        memcpy(inode.data + file_system.head_offset, file->data, file->size < (sizeof inode.data - file_system.head_offset) ? file->size : (sizeof inode.data - file_system.head_offset));
     inode.next = htonll(file->size);
     for (int i = 0; i < MAX_COPIES; i++)
     {
@@ -501,7 +520,8 @@ extern void stegfs_file_delete(stegfs_file_t *file)
     char *p = NULL;
     if (!stegfs_file_stat(file))
         goto rfc;
-    lldiv_t d = lldiv(file->size - (file->size < SIZE_BYTE_HEAD ? file->size :SIZE_BYTE_HEAD), SIZE_BYTE_DATA);
+    stegfs_block_t block;
+    lldiv_t d = lldiv(file->size - (file->size < (sizeof block.data - file_system.head_offset) ? file->size : (sizeof block.data - file_system.head_offset)), SIZE_BYTE_DATA);
     uint64_t blocks = d.quot + (d.rem ? 1 : 0);
     for (int i = 0; i < MAX_COPIES; i++)
     {
@@ -809,7 +829,8 @@ c2a3:
                 memcpy(ptr->file->data, file->data, ptr->file->size);
             }
             /* copy blocks */
-            lldiv_t d = lldiv(file->size - (file->size < SIZE_BYTE_HEAD ? file->size :SIZE_BYTE_HEAD), SIZE_BYTE_DATA);
+            stegfs_block_t block;
+            lldiv_t d = lldiv(file->size - (file->size < (sizeof block.data - file_system.head_offset) ? file->size : (sizeof block.data - file_system.head_offset)), SIZE_BYTE_DATA);
             uint64_t blocks = d.quot + (d.rem ? 1 : 0);
             for (int i = 0; i < MAX_COPIES; i++)
             {

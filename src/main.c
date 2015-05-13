@@ -61,6 +61,7 @@ static int fuse_stegfs_release(const char *, struct fuse_file_info *);
 static int fuse_stegfs_truncate(const char *, off_t);
 static int fuse_stegfs_create(const char *, mode_t, struct fuse_file_info *);
 static int fuse_stegfs_mknod(const char *, mode_t, dev_t);
+static void fuse_stegfs_destroy(void *);
 /*
  * empty functions; required by fuse, but not used by stegfs
  */
@@ -72,27 +73,28 @@ static int fuse_stegfs_flush(const char *, struct fuse_file_info *);
 
 static struct fuse_operations fuse_stegfs_functions =
 {
-    .statfs   = fuse_stegfs_statfs,
-    .getattr  = fuse_stegfs_getattr,
-    .mkdir    = fuse_stegfs_mkdir,
-    .rmdir    = fuse_stegfs_rmdir,
-    .readdir  = fuse_stegfs_readdir,
-    .unlink   = fuse_stegfs_unlink,
-    .read     = fuse_stegfs_read,
-    .write    = fuse_stegfs_write,
-    .open     = fuse_stegfs_open,
-    .release  = fuse_stegfs_release,
-    .truncate = fuse_stegfs_truncate,
-    .create   = fuse_stegfs_create,
-    .mknod    = fuse_stegfs_mknod,
+    .statfs    = fuse_stegfs_statfs,
+    .getattr   = fuse_stegfs_getattr,
+    .mkdir     = fuse_stegfs_mkdir,
+    .rmdir     = fuse_stegfs_rmdir,
+    .readdir   = fuse_stegfs_readdir,
+    .unlink    = fuse_stegfs_unlink,
+    .read      = fuse_stegfs_read,
+    .write     = fuse_stegfs_write,
+    .open      = fuse_stegfs_open,
+    .release   = fuse_stegfs_release,
+    .truncate  = fuse_stegfs_truncate,
+    .create    = fuse_stegfs_create,
+    .mknod     = fuse_stegfs_mknod,
+    .destroy   = fuse_stegfs_destroy,
     /*
      * empty functions; required by fuse, but not used by stegfs
      */
-    .readlink = fuse_stegfs_readlink,
-    .utime    = fuse_stegfs_utime,
-    .chmod    = fuse_stegfs_chmod,
-    .chown    = fuse_stegfs_chown,
-    .flush    = fuse_stegfs_flush
+    .readlink  = fuse_stegfs_readlink,
+    .utime     = fuse_stegfs_utime,
+    .chmod     = fuse_stegfs_chmod,
+    .chown     = fuse_stegfs_chown,
+    .flush     = fuse_stegfs_flush
 };
 
 static int fuse_stegfs_statfs(const char *path, struct statvfs *stvbuf)
@@ -471,8 +473,15 @@ static int fuse_stegfs_release(const char *path, struct fuse_file_info *info)
     return -errno;
 }
 
+static void fuse_stegfs_destroy(void *ptr)
+{
+    (void)ptr;
+
+    stegfs_deinit();
+}
+
 /*
- * empty functions; required by fuse, but not used by stegfs
+ * empty functions; required by fuse, but not used by stegfs; return ENOTSUP
  */
 
 static int fuse_stegfs_readlink(const char *path, char *buf, size_t size)
