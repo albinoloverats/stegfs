@@ -328,6 +328,7 @@ int main(int argc, char **argv)
 superblock:
     printf("superblock   : ");
     stegfs_block_t sb;
+    rand_nonce(&sb, sizeof sb);
     memset(sb.path, 0xFF, sizeof sb.path);
     superblock_info(&sb, MCRYPT_SERPENT, MCRYPT_CBC, (char *)mhash_get_hash_name(MHASH_TIGER));
     sb.hash[0] = htonll(MAGIC_0);

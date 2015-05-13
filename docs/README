@@ -29,6 +29,8 @@ Ideas For Another Day
 
 * Bring back multi-threaded support
 * Allow user configured algorithm (select during mkfs)
+  - Hash length must be at least 128 bits
+  - Cipher block length must be either 128 or 192 bits
 * Cache time limit (force forget if a file isn’t accessed)
 * Don’t break backwards compatibility (again)!
 
