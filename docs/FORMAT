@@ -4,21 +4,21 @@ Technical Data
 Units used here (and through-out stegfs) are in powers of 2---so think
 mulitples of 1,024 not 1,000.
 
-Each file system block is 1,024 bytes, with 960 being used for actual
+Each file system block is 1,024 bytes, with 976 being used for actual
 data, with the rest being used to verify the integrity of the data, and
-point to the location of the next block. (Yes this makes it VERY
-inefficient, but the possibility of not being able to retrieve data
-eclipses this.)
+point to the location of the next block. (Yes this makes it inefficient,
+but the possibility of not being able to retrieve data eclipses this.)
 
 Using 64 bits to represent the block numbers allows up to 1.845e19
 blocks. This allows a theoretical maximum partition size of 16ZB, and a
-theoretical capacity of 15ZB. Although the maximum file size will always
+theoretical capacity of 15¼ZB. Although the maximum file size will always
 be 1/8 of the overall capacity due to file replication.
 
 In practice, due to the limits of the open64() function used by the GNU
 C Library and the Linux kernel, the maximum usable limit stands as 8EB.
-This gives approximately 70 trillion blocks, equalling upto 5EB of
-available storage space. (Other limits may exist on other systems.)
+This gives approximately 9 thousand billion (long scale) blocks,
+equalling over 8PB available storage space. (Other limits may exist on
+other systems.)
 
 RAM requirements for stegfs are a little on the high side too: it will
 use between 0.8% and just over 1.6% of the total file system size. This
@@ -42,30 +42,29 @@ Example/Exmplanation
 
 A 1GB file system has 1,048,576 blocks (1,048,575 are available for file
 data, as the first contains file system information). Each of these
-blocks can store 960 bytes of data, leading to 960MB of total capacity.
+blocks can store 976 bytes of data, leading to 976MB of total capacity.
 As each file is duplicated multiple times (8×) the single largest file
-size is 120MB---which is also the maximum available capacity if
+size is 122MB---which is also the maximum available capacity if
 everything is stored in the / of the file system.
 
 Block Layout
 ------------
 
-Total block size = 1KB = 8,192 bits = 960 file data bytes + metadata
+Total block size = 1KB = 8,192 bits = 976 file data bytes + metadata
 
      Chunk Name                                        Size (in bits)
     +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+
-    | Directory/Path checksum                              24  (192) |  |
-    | [Nothing - 0xFF]                                               |  +‐ Tiger
-    |                                                                |  |
-    +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+
-    | Padding/Unused                                        8   (64) |
+    | Directory/Path checksum                              16  (128) |  +‐ Tiger128
+    | [Nothing - 0xFF]                                               |  |
     +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+‐‐‐‐‐‐‐‐+
-    | Data                                               960 (7,680) |           |
+    | Data                                               976 (7,808) |           |
     | (First block of each copy - 8 × 64 bits = 512 bits¹)           |           |
     | [File system infomration]                                      |           |
-    |                                                                |           +‐ Serpent × 62
+    |                                                                |           +‐ Serpent × 63
     | ¹ Followed by last modification time (64 bits)                 |           |
     |                                                                |           |
+    |                                                                |  		 |
+    |                                                                |  		 |
     |                                                                |           |
     |                                                                |           |
     |                                                                |           |

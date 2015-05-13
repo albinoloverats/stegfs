@@ -93,12 +93,13 @@ extern bool stegfs_init(const char * const restrict fs)
         tlv_append(&tlv, t);
         free(t.value);
     }
-    if (!tlv_has_tag(tlv, TAG_STEGFS) ||
-        !tlv_has_tag(tlv, TAG_VERSION) ||
-        !tlv_has_tag(tlv, TAG_CIPHER) ||
-        !tlv_has_tag(tlv, TAG_HASH) ||
-        !tlv_has_tag(tlv, TAG_MODE) ||
-        !tlv_has_tag(tlv, TAG_BLOCKSIZE))
+    if (!tlv_has_tag(tlv, TAG_STEGFS)    ||
+        !tlv_has_tag(tlv, TAG_VERSION)   ||
+        !tlv_has_tag(tlv, TAG_CIPHER)    ||
+        !tlv_has_tag(tlv, TAG_HASH)      ||
+        !tlv_has_tag(tlv, TAG_MODE)      ||
+        !tlv_has_tag(tlv, TAG_BLOCKSIZE) ||
+        !tlv_has_tag(tlv, TAG_HEADER_OFFSET))
         return false;
 
     if (strncmp((char *)tlv_value_of(tlv, TAG_STEGFS), STEGFS_NAME, strlen(STEGFS_NAME)))
@@ -110,8 +111,12 @@ extern bool stegfs_init(const char * const restrict fs)
     file_system.mode = strndup((char *)tlv_value_of(tlv, TAG_MODE), tlv_size_of(tlv, TAG_MODE));
     memcpy(&file_system.blocksize, tlv_value_of(tlv, TAG_BLOCKSIZE), tlv_size_of(tlv, TAG_BLOCKSIZE));
     file_system.blocksize = ntohl(file_system.blocksize);
+    memcpy(&file_system.head_offset, tlv_value_of(tlv, TAG_HEADER_OFFSET), tlv_size_of(tlv, TAG_HEADER_OFFSET));
+    file_system.head_offset = ntohl(file_system.head_offset);
     file_system.used = calloc(file_system.size / file_system.blocksize, sizeof(bool));
     if (ntohll(block.next) != file_system.size / file_system.blocksize)
+        return false;
+    if (file_system.head_offset > (ssize_t)file_system.blocksize)
         return false;
 
     tlv_deinit(&tlv);
@@ -295,7 +300,7 @@ extern bool stegfs_file_read(stegfs_file_t *file)
         memset(&inode, 0x00, sizeof inode);
         if (block_read(file->inodes[i], &inode, mc, file->path))
         {
-            memcpy(file->data, inode.data + OFFT_BYTE_HEAD, file->size < SIZE_BYTE_HEAD ? file->size : SIZE_BYTE_HEAD);
+            memcpy(file->data, inode.data + file_system.head_offset, file->size < SIZE_BYTE_HEAD ? file->size : SIZE_BYTE_HEAD);
             c = 1;
         }
         mcrypt_generic_deinit(mc);
@@ -462,7 +467,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
     rand_nonce(inode.data, sizeof inode.data);
     memcpy(inode.data, first, sizeof first);
     if (file->data && file->size)
-        memcpy(inode.data + OFFT_BYTE_HEAD, file->data, file->size < SIZE_BYTE_HEAD ? file->size : SIZE_BYTE_HEAD);
+        memcpy(inode.data + file_system.head_offset, file->data, file->size < SIZE_BYTE_HEAD ? file->size : SIZE_BYTE_HEAD);
     inode.next = htonll(file->size);
     for (int i = 0; i < MAX_COPIES; i++)
     {
@@ -542,9 +547,9 @@ static bool block_read(uint64_t bid, stegfs_block_t *block, MCRYPT mc, const cha
     /* decrypt block */
     uint32_t sz = file_system.blocksize - sizeof block->path;
     uint8_t *data = calloc(sz, sizeof(uint8_t));
-    memcpy(data, ((uint8_t *)block) + sizeof block->path + sizeof block->padding, sz);
+    memcpy(data, ((uint8_t *)block) + sizeof block->path, sz);
     mdecrypt_generic(mc, data, sz);
-    memcpy(((uint8_t *)block) + sizeof block->path + sizeof block->padding, data, sz);
+    memcpy(((uint8_t *)block) + sizeof block->path, data, sz);
     free(data);
 #endif
     /* check data hash */
@@ -577,7 +582,6 @@ static bool block_write(uint64_t bid, stegfs_block_t block, MCRYPT mc, const cha
         memcpy(block.path, p, sizeof block.path);
         free(p);
     }
-    block.padding = htonll(padding);
     /* compute data hash */
     MHASH hash = hash_init();
     mhash(hash, block.data, sizeof block.data);
@@ -588,9 +592,9 @@ static bool block_write(uint64_t bid, stegfs_block_t block, MCRYPT mc, const cha
     /* encrypt the data */
     uint32_t sz = file_system.blocksize - sizeof block.path;
     uint8_t *data = calloc(sz, sizeof(uint8_t));
-    memcpy(data, ((uint8_t *)&block) + sizeof block.path + sizeof block.padding, sz);
+    memcpy(data, ((uint8_t *)&block) + sizeof block.path, sz);
     mcrypt_generic(mc, data, sz);
-    memcpy(((uint8_t *)&block) + sizeof block.path + sizeof block.padding, data, sz);
+    memcpy(((uint8_t *)&block) + sizeof block.path, data, sz);
     free(data);
 #endif
     memcpy(file_system.memory + (bid * file_system.blocksize), &block, sizeof block);
