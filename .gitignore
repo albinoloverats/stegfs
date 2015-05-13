@@ -1,4 +1,3 @@
-pixmaps/
 src/common/cli.c
 src/common/cli.h
 src/common/version.c
