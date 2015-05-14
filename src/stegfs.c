@@ -29,7 +29,7 @@
 #include <gcrypt.h>
 
 #include "common/common.h"
-#include "common/crypt.h"
+#include "common/ccrypt.h"
 #include "common/tlv.h"
 #include "common/dir.h"
 

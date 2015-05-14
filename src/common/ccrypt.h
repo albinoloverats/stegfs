@@ -44,6 +44,36 @@
 extern void init_crypto(void);
 
 /*!
+ * \brief         Get list of usable ciphers
+ * \return        An array of char* of cipher names
+ *
+ * Get an array of strings which lists the names of usable cipher
+ * algorithms. NB: The array is allocated statically and SHOULD NOT be
+ * free’d (or otherwise altered).
+ */
+extern const char **list_of_ciphers(void) __attribute__((pure));
+
+/*!
+ * \brief         Get list of usable hashes
+ * \return        An array of char* of hash names
+ *
+ * Get an array of strings which lists the names of usable hash
+ * algorithms. NB: The array is allocated statically and SHOULD NOT be
+ * free’d (or otherwise altered).
+ */
+extern const char **list_of_hashes(void) __attribute__((pure));
+
+/*!
+ * \brief         Get list of available cipher modes
+ * \return        An array of char* of mode names
+ *
+ * Get an array of strings which lists the names of available cipher
+ * modes. NB: The array is allocated statically and SHOULD NOT be
+ * free’d (or otherwise altered).
+ */
+extern const char **list_of_modes(void) __attribute__((pure));
+
+/*!
  * \brief         Get cipher ID, given its name
  * \param[in]  n  Cipher name
  * \return        The ID used by libgcrypt

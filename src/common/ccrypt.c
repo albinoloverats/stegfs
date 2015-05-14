@@ -25,9 +25,11 @@
 
 #include <gcrypt.h>
 
-#include "common/common.h"
-#include "common/crypt.h"
-#include "common/error.h"
+#include "common.h"
+#include "error.h"
+#include "ccrypt.h"
+
+static int algorithm_compare(const void *, const void *);
 
 static const char *correct_sha1(const char * const restrict);
 static const char *correct_aes_rijndael(const char * const restrict);
@@ -69,6 +71,98 @@ extern void init_crypto(void)
     errno = 0; /* need to reset errno after gcry_check_version() */
     done = true;
     return;
+}
+
+extern const char **list_of_ciphers(void)
+{
+    init_crypto();
+
+    enum gcry_cipher_algos lid[0xff] = { GCRY_CIPHER_NONE };
+    int len = 0;
+    enum gcry_cipher_algos id = GCRY_CIPHER_NONE;
+    for (unsigned i = 0; i < sizeof lid; i++)
+    {
+        if (gcry_cipher_algo_info(id, GCRYCTL_TEST_ALGO, NULL, NULL) == 0)
+        {
+            lid[len] = id;
+            len++;
+        }
+        id++;
+    }
+    static const char **l = NULL;
+    if (!l)
+    {
+        if (!(l = gcry_calloc_secure(len + 1, sizeof( char * ))))
+            die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof( char * ));
+        int j = 0;
+        for (int i = 0; i < len; i++)
+        {
+            const char *n = cipher_name_from_id(lid[i]);
+            if (!n)
+                continue;
+#ifdef _WIN32
+            /* libgcrypt crashes when trying to use AES (Rijndael) on Windows 8 */
+            if (IsWindows8OrGreater())
+                if (!strncasecmp(NAME_RIJNDAEL, n, strlen(NAME_RIJNDAEL)) || !strncasecmp(NAME_AES, n, strlen(NAME_AES)))
+                    continue;
+#endif
+            l[j] = strdup(n);
+            j++;
+        }
+        //l[j] = NULL;
+        qsort(l, j, sizeof( char * ), algorithm_compare);
+    }
+    return (const char **)l;
+}
+
+extern const char **list_of_hashes(void)
+{
+    init_crypto();
+
+    enum gcry_md_algos lid[0xff] = { GCRY_MD_NONE };
+    int len = 0;
+    enum gcry_md_algos id = GCRY_MD_NONE;
+    for (unsigned i = 0; i < sizeof lid; i++)
+    {
+        if (gcry_md_test_algo(id) == 0)
+        {
+            lid[len] = id;
+            len++;
+        }
+        id++;
+    }
+    static const char **l = NULL;
+    if (!l)
+    {
+        if (!(l = gcry_calloc_secure(len + 1, sizeof( char * ))))
+            die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof( char * ));
+        int j = 0;
+        for (int i = 0; i < len; i++)
+        {
+            const char *n = hash_name_from_id(lid[i]);
+            if (!n)
+                continue;
+            l[j] = strdup(n);
+            j++;
+        }
+        //l[j] = NULL;
+        qsort(l, j, sizeof( char * ), algorithm_compare);
+    }
+    return (const char **)l;
+}
+
+extern const char **list_of_modes(void)
+{
+    static const char **l = NULL;
+    if (!l)
+    {
+        unsigned m = sizeof MODES / sizeof( block_mode_t );
+        if (!(l = gcry_calloc_secure(m + 1, sizeof( char * ))))
+            die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof( char * ));
+        for (unsigned i = 0; i < m; i++)
+            l[i] = MODES[i].name;
+    }
+    return (const char **)l;
 }
 
 extern enum gcry_cipher_algos cipher_id_from_name(const char * const restrict n)
@@ -170,6 +264,11 @@ extern const char *mode_name_from_id(enum gcry_cipher_modes m)
         if (MODES[i].id == m)
             return MODES[i].name;
     return NULL;
+}
+
+static int algorithm_compare(const void *a, const void *b)
+{
+    return strcmp(*(char **)a, *(char **)b);
 }
 
 static const char *correct_sha1(const char * const restrict n)
