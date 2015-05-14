@@ -93,12 +93,14 @@ extern bool stegfs_init(const char * const restrict fs)
         tlv_append(&tlv, t);
         free(t.value);
     }
-    if (!tlv_has_tag(tlv, TAG_STEGFS)    ||
-        !tlv_has_tag(tlv, TAG_VERSION)   ||
-        !tlv_has_tag(tlv, TAG_CIPHER)    ||
-        !tlv_has_tag(tlv, TAG_HASH)      ||
-        !tlv_has_tag(tlv, TAG_MODE)      ||
-        !tlv_has_tag(tlv, TAG_BLOCKSIZE) ||
+    if (!tlv_has_tag(tlv, TAG_STEGFS)      ||
+        !tlv_has_tag(tlv, TAG_VERSION)     ||
+        !tlv_has_tag(tlv, TAG_CIPHER)      ||
+        !tlv_has_tag(tlv, TAG_HASH_LENGTH) ||
+        !tlv_has_tag(tlv, TAG_CIPHER_BLOCK_LENGTH) ||
+        !tlv_has_tag(tlv, TAG_HASH)        ||
+        !tlv_has_tag(tlv, TAG_MODE)        ||
+        !tlv_has_tag(tlv, TAG_BLOCKSIZE)   ||
         !tlv_has_tag(tlv, TAG_HEADER_OFFSET))
         return false;
 
@@ -106,14 +108,24 @@ extern bool stegfs_init(const char * const restrict fs)
         return false;
     if (strncmp((char *)tlv_value_of(tlv, TAG_VERSION), STEGFS_VERSION, strlen(STEGFS_VERSION)))
         return false;
+    /* get cipher info (name, mode, block length) */
     file_system.cipher = strndup((char *)tlv_value_of(tlv, TAG_CIPHER), tlv_size_of(tlv, TAG_CIPHER));
-    file_system.hash = strndup((char *)tlv_value_of(tlv, TAG_HASH), tlv_size_of(tlv, TAG_HASH));
+    memcpy(&file_system.hash_length, tlv_value_of(tlv, TAG_HASH_LENGTH), tlv_size_of(tlv, TAG_HASH_LENGTH));
+    file_system.cipher_block_length = ntohl(file_system.cipher_block_length);
     file_system.mode = strndup((char *)tlv_value_of(tlv, TAG_MODE), tlv_size_of(tlv, TAG_MODE));
+    /* get hash info (name, length) */
+    file_system.hash_length = ntohl(file_system.hash_length);
+    memcpy(&file_system.cipher_block_length, tlv_value_of(tlv, TAG_CIPHER_BLOCK_LENGTH), tlv_size_of(tlv, TAG_CIPHER_BLOCK_LENGTH));
+    file_system.hash = strndup((char *)tlv_value_of(tlv, TAG_HASH), tlv_size_of(tlv, TAG_HASH));
+    /* get fs block size */
     memcpy(&file_system.blocksize, tlv_value_of(tlv, TAG_BLOCKSIZE), tlv_size_of(tlv, TAG_BLOCKSIZE));
     file_system.blocksize = ntohl(file_system.blocksize);
+    /* get number of bytes file data in file header */
     memcpy(&file_system.head_offset, tlv_value_of(tlv, TAG_HEADER_OFFSET), tlv_size_of(tlv, TAG_HEADER_OFFSET));
     file_system.head_offset = ntohl(file_system.head_offset);
+
     file_system.used = calloc(file_system.size / file_system.blocksize, sizeof(bool));
+
     if (ntohll(block.next) != file_system.size / file_system.blocksize)
         return false;
     if (file_system.head_offset > (ssize_t)file_system.blocksize)
@@ -301,7 +313,7 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
             free(file->blocks[i]);
             file->blocks[i] = NULL;
         }
-    return false;
+    return errno = ENOENT, false;
 }
 
 extern bool stegfs_file_read(stegfs_file_t *file)
@@ -547,6 +559,7 @@ static bool block_read(uint64_t bid, stegfs_block_t *block, MCRYPT mc, const cha
     if (!bid || (bid * file_system.blocksize + file_system.blocksize > file_system.size))
         return errno = EINVAL, false;
     memcpy(block, file_system.memory + (bid * file_system.blocksize), sizeof(stegfs_block_t));
+    size_t max_hash_length = sizeof block->path > file_system.hash_length ? file_system.hash_length : sizeof block->path;
     MHASH hash;
     void *p;
     /* ignore path check in root */
@@ -556,7 +569,7 @@ static bool block_read(uint64_t bid, stegfs_block_t *block, MCRYPT mc, const cha
         hash = hash_init();
         mhash(hash, path, strlen(path));
         p = mhash_end(hash);
-        if (memcmp(block->path, p, sizeof block->path))
+        if (memcmp(block->path, p, max_hash_length))
         {
             free(p);
             return false;
@@ -564,19 +577,18 @@ static bool block_read(uint64_t bid, stegfs_block_t *block, MCRYPT mc, const cha
         free(p);
     }
 #ifndef __DEBUG__
-    /* decrypt block */
-    uint32_t sz = file_system.blocksize - sizeof block->path;
-    uint8_t *data = calloc(sz, sizeof(uint8_t));
-    memcpy(data, ((uint8_t *)block) + sizeof block->path, sz);
-    mdecrypt_generic(mc, data, sz);
-    memcpy(((uint8_t *)block) + sizeof block->path, data, sz);
-    free(data);
+    /* decrypt block, but not the path */
+    void *ptr = block;
+    ptr += sizeof block->path;
+    mdecrypt_generic(mc, ptr, file_system.blocksize - sizeof block->path);
+#else
+    (void)mc;
 #endif
     /* check data hash */
     hash = hash_init();
     mhash(hash, block->data, sizeof block->data);
     p = mhash_end(hash);
-    if (memcmp(block->hash, p, sizeof block->hash))
+    if (memcmp(block->hash, p, max_hash_length))
     {
         free(p);
         return false;
@@ -591,31 +603,31 @@ static bool block_write(uint64_t bid, stegfs_block_t block, MCRYPT mc, const cha
     bid %= (file_system.size / file_system.blocksize);
     if (!bid || (bid * file_system.blocksize + file_system.blocksize > file_system.size))
         return errno = EINVAL, false;
-    if (path_equals(path, DIR_SEPARATOR))
-        rand_nonce((void *)block.path, sizeof block.path);
-    else
+    size_t max_hash_length = sizeof block.path > file_system.hash_length ? file_system.hash_length : sizeof block.path;
+    rand_nonce((void *)block.path, sizeof block.path);
+    if (!path_equals(path, DIR_SEPARATOR))
     {
         /* compute path hash */
         MHASH hash = hash_init();
         mhash(hash, path, strlen(path));
         void *p = mhash_end(hash);
-        memcpy(block.path, p, sizeof block.path);
+        memcpy(block.path, p, max_hash_length);
         free(p);
     }
-    /* compute data hash */
+    /* compute data hash (includes 0x00 after EOF) */
     MHASH hash = hash_init();
     mhash(hash, block.data, sizeof block.data);
     void *p = mhash_end(hash);
-    memcpy(block.hash, p, sizeof block.hash);
+    rand_nonce((void *)block.hash, sizeof block.hash);
+    memcpy(block.hash, p, max_hash_length);
     free(p);
 #ifndef __DEBUG__
-    /* encrypt the data */
-    uint32_t sz = file_system.blocksize - sizeof block.path;
-    uint8_t *data = calloc(sz, sizeof(uint8_t));
-    memcpy(data, ((uint8_t *)&block) + sizeof block.path, sz);
-    mcrypt_generic(mc, data, sz);
-    memcpy(((uint8_t *)&block) + sizeof block.path, data, sz);
-    free(data);
+    /* encrypt the data, but not the path */
+    void *ptr = &block;
+    ptr += sizeof block.path;
+    mcrypt_generic(mc, ptr, file_system.blocksize - sizeof block.path);
+#else
+    (void)mc;
 #endif
     memcpy(file_system.memory + (bid * file_system.blocksize), &block, sizeof block);
     msync(file_system.memory + (bid * file_system.blocksize), sizeof block, MS_SYNC);
@@ -625,14 +637,13 @@ static bool block_write(uint64_t bid, stegfs_block_t block, MCRYPT mc, const cha
 static void block_delete(uint64_t bid)
 {
     bid %= (file_system.size / file_system.blocksize);
-    uint8_t *block = malloc(file_system.blocksize);
-    /* keep the same path as before */
-    pread(file_system.handle, block, file_system.blocksize, bid * file_system.blocksize);
-    rand_nonce(block, file_system.blocksize);
+    stegfs_block_t block;
+    memcpy(&block, file_system.memory + (bid * file_system.blocksize), sizeof block);
+    rand_nonce(&block, file_system.blocksize);
     if (!bid || (bid * file_system.blocksize + file_system.blocksize > file_system.size))
         return;
-    pwrite(file_system.handle, block, file_system.blocksize, bid * file_system.blocksize);
-    free(block);
+    memcpy(file_system.memory + (bid * file_system.blocksize), &block, sizeof block);
+    msync(file_system.memory + (bid * file_system.blocksize), sizeof block, MS_SYNC);
     file_system.used[bid] = false;
     return;
 }
@@ -649,9 +660,11 @@ static bool block_in_use(uint64_t bid, const char * const restrict path)
         return true;
     /*
      * block not found in cache; check if this might belong to a file in
-     * this directory, or parent directory
+     * this directory, or any parent directory
      */
 #ifndef __DEBUG__
+    stegfs_block_t block;
+    size_t max_hash_length = sizeof block.path > file_system.hash_length ? file_system.hash_length : sizeof block.path;
     char *p = NULL;
     uint16_t hierarchy = dir_get_deep(path);
     for (uint16_t i = 1; i < hierarchy; i++)
@@ -663,14 +676,15 @@ static bool block_in_use(uint64_t bid, const char * const restrict path)
         MHASH hash = hash_init();
         mhash(hash, p, strlen(p));
         void *h = mhash_end(hash);
-        stegfs_block_t block;
-        pread(file_system.handle, &block, sizeof block, bid * file_system.blocksize);
-        bool r = !memcmp(h, block.path, sizeof block.path);
+        memcpy(&block, file_system.memory + (bid * file_system.blocksize), sizeof block);
+        bool r = !memcmp(h, block.path, max_hash_length);
         free(h);
         if (r)
             return true;
     }
     free(p);
+#else
+    (void)path;
 #endif
     return false;
 }
@@ -701,7 +715,7 @@ static MCRYPT cipher_init(const stegfs_file_t * const restrict file, uint8_t ivi
 {
     MCRYPT c = mcrypt_module_open(file_system.cipher, NULL, file_system.mode, NULL);
     /* create the initial key for the encryption algorithm */
-    uint8_t key[SIZE_BYTE_TIGER] = { 0x00 };
+    uint8_t *key = calloc(file_system.hash_length, sizeof(uint8_t));
     MHASH hash = hash_init();
     mhash(hash, file->path, strlen(file->path));
     mhash(hash, file->name, strlen(file->name));
@@ -710,10 +724,10 @@ static MCRYPT cipher_init(const stegfs_file_t * const restrict file, uint8_t ivi
     else
         mhash(hash, "", strlen(""));
     void *h = mhash_end(hash);
-    memcpy(key, h, sizeof key);
+    memcpy(key, h, file_system.hash_length);
     free(h);
     /* create the initial iv for the encryption algorithm */
-    uint8_t ivs[SIZE_BYTE_SERPENT] = { 0x00 };
+    uint8_t *ivs = calloc(file_system.cipher_block_length, sizeof(uint8_t));
     hash = hash_init();
     if (file->pass)
         mhash(hash, file->pass, strlen(file->pass));
@@ -723,10 +737,22 @@ static MCRYPT cipher_init(const stegfs_file_t * const restrict file, uint8_t ivi
     mhash(hash, file->path, strlen(file->path));
     mhash(hash, &ivi, sizeof ivi);
     h = mhash_end(hash);
-    memcpy(ivs, h, sizeof ivs);
+    memcpy(ivs, h, file_system.cipher_block_length);
     free(h);
     /* done */
-    mcrypt_generic_init(c, key, sizeof key, ivs);
+    /*
+     * TODO ensure that the key/iv lengths are the correct size; NB we
+     * could assume that .cipher_block_length and .hash_size are always
+     * valid, and enforced in mkfs
+     */
+    size_t key_size = mcrypt_enc_get_key_size(c);
+    /*
+     * according the mcrypt(3) key_size is the maximum and “every value
+     * smaller than this is legal.” so we’ll use whichever is smaller
+     */
+    mcrypt_generic_init(c, key, key_size < file_system.hash_length ? key_size : file_system.hash_length, ivs);
+    free(key);
+    free(ivs);
     return c;
 }
 

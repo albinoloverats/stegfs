@@ -30,22 +30,19 @@
 
 
 /* size (in bytes) for various blocks of data */
-#define SIZE_BYTE_SERPENT   0x10                      /*    16 bytes -- 128 bits */
-#define SIZE_BYTE_TIGER     0x18                      /*    24 bytes -- 192 bits */
-
-#define SIZE_BYTE_BLOCK 0x0400                /*!< 1024 bytes */
-#define SIZE_BYTE_PATH  (SIZE_BYTE_TIGER*2/3) /*!<   16 bytes (Tiger128) */
-#define SIZE_BYTE_DATA  0x03D0                /*!<  976 bytes */
-#define SIZE_BYTE_HASH  SIZE_BYTE_TIGER       /*!<   24 bytes */
+#define SIZE_BYTE_BLOCK 0x0800      /*!< 2,048 bytes */
+#define SIZE_BYTE_PATH  0x0020      /*!<    24 bytes */
+#define SIZE_BYTE_DATA  0x07B8      /*!< 1,984 bytes */
+#define SIZE_BYTE_HASH  0x0020      /*!<    24 bytes */
         /* next block (not defined) */
 
-#define SIZE_BYTE_HEAD  0x0200                /*!<  512 bytes (data in header block) */
-#define OFFSET_BYTE_HEAD  (SIZE_BYTE_DATA-SIZE_BYTE_HEAD)
+#define SIZE_BYTE_HEAD  0x0600      /*!< 1,536 bytes (data in header block) */
+#define OFFSET_BYTE_HEAD  (SIZE_BYTE_DATA-SIZE_BYTE_HEAD) /*!< Offset of file data in header block */
 
 /* size in 64 bit ints of parts of block */
-#define SIZE_LONG_PATH  0x02
-#define SIZE_LONG_DATA  0x80
-#define SIZE_LONG_HASH  0x03
+#define SIZE_LONG_PATH  0x04
+#define SIZE_LONG_DATA  0xF7
+#define SIZE_LONG_HASH  0x04
         /* next block (not defined) */
 
 
@@ -68,7 +65,6 @@
 
 #define PASSWORD_SEPARATOR ':'
 
-
 typedef enum
 {
     TAG_STEGFS,
@@ -78,6 +74,8 @@ typedef enum
     TAG_MODE,
     TAG_BLOCKSIZE,
     TAG_HEADER_OFFSET,
+    TAG_CIPHER_BLOCK_LENGTH,
+    TAG_HASH_LENGTH,
     TAG_MAX
 }
 stegfs_tag_e;
@@ -126,6 +124,8 @@ typedef struct stegfs_t
     char           *cipher;
     char           *hash;
     char           *mode;
+    size_t          hash_length;
+    size_t          cipher_block_length;
     size_t          blocksize;   /*!< File system block size; if it needs to be bigger than 4,294,967,295 we have issues */
     off_t           head_offset; /*!< Start location of file data in header blocks; only 32 bits (like blocksize) */
     bool           *used;        /*!< Used block tracker */
@@ -141,10 +141,10 @@ stegfs_t;
 typedef struct stegfs_block_t
 {
     uint64_t path[SIZE_LONG_PATH]; /*!< Hash of block path    */
-    uint8_t  data[SIZE_BYTE_DATA]; /*!< Block data (960 bytes or 120 64-bit words */
+    uint8_t  data[SIZE_BYTE_DATA]; /*!< Block data (1,976 bytes or 247 64-bit words */
     uint64_t hash[SIZE_LONG_HASH]; /*!< Hash of block data    */
     uint64_t next;                 /*!< Address of next block */
-}
+} __attribute__((packed))
 stegfs_block_t;
 
 /*!

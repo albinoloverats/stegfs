@@ -39,6 +39,10 @@
 
 #include "stegfs.h"
 
+/* defaults */
+#define SIZE_BYTE_SERPENT   0x10    /*!<   16 bytes -- 128 bits */
+#define SIZE_BYTE_TIGER     0x18    /*!<   24 bytes -- 192 bits */
+
 #define RATIO 1024
 
 static int64_t open_filesystem(const char * const restrict path, uint64_t *size, bool force, bool recreate, bool dry)
@@ -179,6 +183,22 @@ static void superblock_info(stegfs_block_t *sb, char *cipher, char *mode, char *
     t.value = (byte_t *)cipher;
     tlv_append(&tlv, t);
 
+    t.tag = TAG_HASH_LENGTH;
+    uint32_t key_length = htonl(SIZE_BYTE_TIGER);
+    t.length = sizeof key_length;
+    t.value = malloc(sizeof key_length);
+    memcpy(t.value, &key_length, sizeof key_length);
+    tlv_append(&tlv, t);
+    free(t.value);
+
+    t.tag = TAG_CIPHER_BLOCK_LENGTH;
+    uint32_t block_length = htonl(SIZE_BYTE_SERPENT);
+    t.length = sizeof block_length;
+    t.value = malloc(sizeof block_length);
+    memcpy(t.value, &block_length, sizeof key_length);
+    tlv_append(&tlv, t);
+    free(t.value);
+
     t.tag = TAG_MODE;
     t.length = strlen(mode);
     t.value = (byte_t *)mode;
@@ -318,7 +338,7 @@ int main(int argc, char **argv)
     printf("\e[?25l"); /* hide cursor - mostly for actualy write loop */
     for (uint64_t i = 0; i < size / MEGABYTE; i++)
     {
-        printf("\r1st pass     : %'26.3f %%", PERCENT * i / (size / MEGABYTE));
+        printf("\rWriting      : %'26.3f %%", PERCENT * i / (size / MEGABYTE));
         mcrypt_generic(mc, rnd, sizeof rnd);
         memcpy(mm + (i * sizeof rnd), rnd, sizeof rnd);
         msync(mm + (i * sizeof rnd), sizeof rnd, MS_ASYNC);
