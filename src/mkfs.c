@@ -39,9 +39,6 @@
 
 #include "stegfs.h"
 
-/* defaults */
-#define SIZE_BYTE_SERPENT   0x10    /*!<   16 bytes -- 128 bits */
-#define SIZE_BYTE_TIGER     0x18    /*!<   24 bytes -- 192 bits */
 
 #define RATIO 1024
 
@@ -166,7 +163,7 @@ static MCRYPT crypto_init(void)
     return c;
 }
 
-static void superblock_info(stegfs_block_t *sb, char *cipher, char *mode, char *hash)
+static void superblock_info(stegfs_block_t *sb, char *cipher, char *mode, uint32_t block_length, char *hash, uint32_t hash_length)
 {
     TLV_HANDLE tlv = tlv_init();
 
@@ -176,39 +173,6 @@ static void superblock_info(stegfs_block_t *sb, char *cipher, char *mode, char *
     t.tag = TAG_VERSION;
     t.length = strlen(STEGFS_VERSION);
     t.value = (byte_t *)STEGFS_VERSION;
-    tlv_append(&tlv, t);
-
-    t.tag = TAG_CIPHER;
-    t.length = strlen(cipher);
-    t.value = (byte_t *)cipher;
-    tlv_append(&tlv, t);
-
-    t.tag = TAG_HASH_LENGTH;
-    uint32_t key_length = htonl(SIZE_BYTE_TIGER);
-    t.length = sizeof key_length;
-    t.value = malloc(sizeof key_length);
-    memcpy(t.value, &key_length, sizeof key_length);
-    tlv_append(&tlv, t);
-    free(t.value);
-
-    t.tag = TAG_CIPHER_BLOCK_LENGTH;
-    uint32_t block_length = htonl(SIZE_BYTE_SERPENT);
-    t.length = sizeof block_length;
-    t.value = malloc(sizeof block_length);
-    memcpy(t.value, &block_length, sizeof key_length);
-    tlv_append(&tlv, t);
-    free(t.value);
-
-    t.tag = TAG_MODE;
-    t.length = strlen(mode);
-    t.value = (byte_t *)mode;
-    tlv_append(&tlv, t);
-
-    t.tag = TAG_HASH;
-    t.length = strlen(hash);
-    for (size_t i = 0; i < strlen(hash); i++)
-        hash[i] = tolower(hash[i]);
-    t.value = (byte_t *)hash;
     tlv_append(&tlv, t);
 
     t.tag = TAG_BLOCKSIZE;
@@ -224,6 +188,40 @@ static void superblock_info(stegfs_block_t *sb, char *cipher, char *mode, char *
     t.length = sizeof head_offset;
     t.value = malloc(sizeof head_offset);
     memcpy(t.value, &head_offset, sizeof head_offset);
+    tlv_append(&tlv, t);
+    free(t.value);
+
+    t.tag = TAG_CIPHER;
+    t.length = strlen(cipher);
+    t.value = (byte_t *)cipher;
+    tlv_append(&tlv, t);
+
+    t.tag = TAG_MODE;
+    t.length = strlen(mode);
+    t.value = (byte_t *)mode;
+    tlv_append(&tlv, t);
+
+    t.tag = TAG_CIPHER_BLOCK_LENGTH;
+    block_length = htonl(block_length);
+    t.length = sizeof block_length;
+    t.value = malloc(sizeof block_length);
+    memcpy(t.value, &block_length, sizeof block_length);
+    tlv_append(&tlv, t);
+    free(t.value);
+
+    t.tag = TAG_HASH;
+    t.length = strlen(hash);
+    /* mhash gives us this in uppercase; we lower it here just to be consistent */
+    for (size_t i = 0; i < strlen(hash); i++)
+        hash[i] = tolower(hash[i]);
+    t.value = (byte_t *)hash;
+    tlv_append(&tlv, t);
+
+    t.tag = TAG_HASH_LENGTH;
+    hash_length = htonl(hash_length);
+    t.length = sizeof hash_length;
+    t.value = malloc(sizeof hash_length);
+    memcpy(t.value, &hash_length, sizeof hash_length);
     tlv_append(&tlv, t);
     free(t.value);
 
@@ -350,7 +348,10 @@ superblock:
     stegfs_block_t sb;
     rand_nonce(&sb, sizeof sb);
     memset(sb.path, 0xFF, sizeof sb.path);
-    superblock_info(&sb, MCRYPT_SERPENT, MCRYPT_CBC, (char *)mhash_get_hash_name(MHASH_TIGER));
+
+#define SIZE_BYTE_SERPENT   0x10    /*!<   16 bytes -- 128 bits */
+#define SIZE_BYTE_TIGER     0x18    /*!<   24 bytes -- 192 bits */
+    superblock_info(&sb, MCRYPT_SERPENT, MCRYPT_CBC, SIZE_BYTE_SERPENT, (char *)mhash_get_hash_name(MHASH_TIGER), SIZE_BYTE_TIGER);
     sb.hash[0] = htonll(MAGIC_0);
     sb.hash[1] = htonll(MAGIC_1);
     sb.hash[2] = htonll(MAGIC_2);
