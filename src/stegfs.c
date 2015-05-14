@@ -110,13 +110,13 @@ extern bool stegfs_init(const char * const restrict fs)
         return false;
     /* get cipher info (name, mode, block length) */
     file_system.cipher = strndup((char *)tlv_value_of(tlv, TAG_CIPHER), tlv_size_of(tlv, TAG_CIPHER));
-    memcpy(&file_system.hash_length, tlv_value_of(tlv, TAG_HASH_LENGTH), tlv_size_of(tlv, TAG_HASH_LENGTH));
-    file_system.cipher_block_length = ntohl(file_system.cipher_block_length);
     file_system.mode = strndup((char *)tlv_value_of(tlv, TAG_MODE), tlv_size_of(tlv, TAG_MODE));
-    /* get hash info (name, length) */
-    file_system.hash_length = ntohl(file_system.hash_length);
     memcpy(&file_system.cipher_block_length, tlv_value_of(tlv, TAG_CIPHER_BLOCK_LENGTH), tlv_size_of(tlv, TAG_CIPHER_BLOCK_LENGTH));
+    file_system.cipher_block_length = ntohl(file_system.cipher_block_length);
+    /* get hash info (name, length) */
     file_system.hash = strndup((char *)tlv_value_of(tlv, TAG_HASH), tlv_size_of(tlv, TAG_HASH));
+    memcpy(&file_system.hash_length, tlv_value_of(tlv, TAG_HASH_LENGTH), tlv_size_of(tlv, TAG_HASH_LENGTH));
+    file_system.hash_length = ntohl(file_system.hash_length);
     /* get fs block size */
     memcpy(&file_system.blocksize, tlv_value_of(tlv, TAG_BLOCKSIZE), tlv_size_of(tlv, TAG_BLOCKSIZE));
     file_system.blocksize = ntohl(file_system.blocksize);
