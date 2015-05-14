@@ -54,7 +54,7 @@ Total block size = 2KB = 16,384 bits = 1,976 file data bytes + metadata
 
      Chunk Name                                        Size (in bits)
     +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+
-    | Directory/Path checksum                            32    (256) |  +‐ mhash
+    | Directory/Path checksum                            32    (256) |  +‐ hash
     | [Nothing - 0xFF]                                               |  |
     |                                                                |  |
     |                                                                |  |
@@ -62,7 +62,7 @@ Total block size = 2KB = 16,384 bits = 1,976 file data bytes + metadata
     | Data                                            1,976 (15,808) |             |
     | (First block of each copy - 8 × 8 bytes/64 bits = 64/512¹)     |             |
     | [File system information]                                      |             |
-    |                                                                |             +‐ mcrypt; blocksize: 128 × 126
+    |                                                                |             +‐ cipher; blocksize: 128 × 126
     | ¹ Followed by: - last modification time (64 bit integer)       |             |                     192 × 84
     |                - random (empty)        (368 bytes/2,944 bits)  |             |                     256 × 63
     |                - start of file data  (1,536 bytes/12,288 bits) |  		   |
@@ -308,7 +308,7 @@ Total block size = 2KB = 16,384 bits = 1,976 file data bytes + metadata
     |                                                                |             |
 	+‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+ ‐‐‐‐‐‐‐--+
     | Checksum                                           32    (256) |  |          |
-    | [Hash of "stegfs-2015.XX"]                                     |  +‐ mhash   |
+    | [Hash of "stegfs-2015.XX"]                                     |  +‐ hash    |
     |                                                                |  |          |
     |                                                                |  |          |
     +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+          |

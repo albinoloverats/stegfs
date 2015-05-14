@@ -128,8 +128,8 @@ typedef struct stegfs_t
     uint64_t                size;        /*!< Size of file system in bytes (not capacity) */
     void                  *memory;      /*!< mmap pointer */
     enum gcry_cipher_algos cipher;
-    enum gcry_cipher_modes hash;
-    enum gcry_md_algos     mode;
+    enum gcry_cipher_modes mode;
+    enum gcry_md_algos     hash;
     size_t                 blocksize;   /*!< File system block size; if it needs to be bigger than 4,294,967,295 we have issues */
     off_t                  head_offset; /*!< Start location of file data in header blocks; only 32 bits (like blocksize) */
     stegfs_blocks_t        blocks;      /*!< In use block tracker */

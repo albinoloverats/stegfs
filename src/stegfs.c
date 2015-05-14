@@ -212,7 +212,6 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
     gcry_md_write(hash, file->path, strlen(file->path));
     gcry_md_write(hash, file->name, strlen(file->name));
     uint8_t *inodes = gcry_md_read(hash, file_system.hash);
-    gcry_md_close(hash);
     /*
      * calculate inode values; must be done here, so we have all of them
      * and not just the first that we can read
@@ -288,7 +287,7 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
             available_inodes--;
         gcry_cipher_close(cipher_handle);
     }
-    free(inodes);
+    gcry_md_close(hash);
     /*
      * as long as there’s a valid inode and one complete copy we’re good
      */
