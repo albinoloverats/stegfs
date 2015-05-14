@@ -40,6 +40,9 @@
 #include "stegfs.h"
 
 
+#define SIZE_BYTE_SERPENT   0x10    /*!<   16 bytes -- 128 bits */
+#define SIZE_BYTE_TIGER     0x18    /*!<   24 bytes -- 192 bits */
+
 #define RATIO 1024
 
 static int64_t open_filesystem(const char * const restrict path, uint64_t *size, bool force, bool recreate, bool dry)
@@ -348,9 +351,6 @@ superblock:
     stegfs_block_t sb;
     rand_nonce(&sb, sizeof sb);
     memset(sb.path, 0xFF, sizeof sb.path);
-
-#define SIZE_BYTE_SERPENT   0x10    /*!<   16 bytes -- 128 bits */
-#define SIZE_BYTE_TIGER     0x18    /*!<   24 bytes -- 192 bits */
     superblock_info(&sb, MCRYPT_SERPENT, MCRYPT_CBC, SIZE_BYTE_SERPENT, (char *)mhash_get_hash_name(MHASH_TIGER), SIZE_BYTE_TIGER);
     sb.hash[0] = htonll(MAGIC_0);
     sb.hash[1] = htonll(MAGIC_1);
