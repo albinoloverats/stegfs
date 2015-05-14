@@ -24,6 +24,7 @@
 #include <inttypes.h>
 #include <stdbool.h>
 #include <time.h>
+#include <gcrypt.h>
 
 #define STEGFS_NAME    "stegfs"
 #define STEGFS_VERSION "2015.XX"
@@ -74,8 +75,6 @@ typedef enum
     TAG_MODE,
     TAG_BLOCKSIZE,
     TAG_HEADER_OFFSET,
-    TAG_CIPHER_BLOCK_LENGTH,
-    TAG_HASH_LENGTH,
     TAG_MAX
 }
 stegfs_tag_e;
@@ -110,6 +109,13 @@ typedef struct _stegfs_cache2
 }
 stegfs_cache2_t;
 
+typedef struct stegfs_blocks_t
+{
+    uint64_t used;  /*!< Count of used blocks */
+    bool *in_use;   /*!< Used block tracker */
+}
+stegfs_blocks_t;
+
 /*!
  * \brief  Structure to hold file system information
  *
@@ -118,18 +124,16 @@ stegfs_cache2_t;
  */
 typedef struct stegfs_t
 {
-    int64_t         handle;      /*!< Handle to file system file/device */
-    uint64_t        size;        /*!< Size of file system in bytes (not capacity) */
-    void           *memory;      /*!< mmap pointer */
-    char           *cipher;
-    char           *hash;
-    char           *mode;
-    size_t          hash_length;
-    size_t          cipher_block_length;
-    size_t          blocksize;   /*!< File system block size; if it needs to be bigger than 4,294,967,295 we have issues */
-    off_t           head_offset; /*!< Start location of file data in header blocks; only 32 bits (like blocksize) */
-    bool           *used;        /*!< Used block tracker */
-    stegfs_cache2_t cache2;      /*!< File cache version 2 */
+    int64_t                 handle;      /*!< Handle to file system file/device */
+    uint64_t                size;        /*!< Size of file system in bytes (not capacity) */
+    void                  *memory;      /*!< mmap pointer */
+    enum gcry_cipher_algos cipher;
+    enum gcry_cipher_modes hash;
+    enum gcry_md_algos     mode;
+    size_t                 blocksize;   /*!< File system block size; if it needs to be bigger than 4,294,967,295 we have issues */
+    off_t                  head_offset; /*!< Start location of file data in header blocks; only 32 bits (like blocksize) */
+    stegfs_blocks_t        blocks;      /*!< In use block tracker */
+    stegfs_cache2_t        cache2;      /*!< File cache version 2 */
 }
 stegfs_t;
 

@@ -37,7 +37,7 @@
 #include <sys/statvfs.h>
 #include <sys/stat.h>
 
-#include <mhash.h>
+#include <gcrypt.h>
 
 #include "common/dir.h"
 
@@ -116,10 +116,7 @@ static int fuse_stegfs_statfs(const char *path, struct statvfs *stvbuf)
     stvbuf->f_bsize   = SIZE_BYTE_BLOCK;
     stvbuf->f_frsize  = SIZE_BYTE_DATA;
     stvbuf->f_blocks  = (file_system.size / SIZE_BYTE_BLOCK) - 1;
-    stvbuf->f_bfree   = stvbuf->f_blocks;
-    for (uint64_t i = 0; i < stvbuf->f_blocks; i++)
-        if (file_system.used[i])
-            stvbuf->f_bfree--;
+    stvbuf->f_bfree   = stvbuf->f_blocks - file_system.blocks.used;
     stvbuf->f_bavail  = stvbuf->f_bfree;
     stvbuf->f_files   = stvbuf->f_blocks;
     stvbuf->f_ffree   = stvbuf->f_bfree;
@@ -237,11 +234,11 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
     }
     else if (stbuf->st_mode & S_IFDIR)
     {
-        MHASH hash = mhash_init(MHASH_TIGER);
-        mhash(hash, path, strlen(path));
-        void *h = mhash_end(hash);
-        memcpy(&(stbuf->st_ino), h, sizeof stbuf->st_ino);
-        free(h);
+        size_t hash_length = gcry_md_get_algo_dlen(file_system.hash);
+        uint8_t *hash_buffer = gcry_malloc_secure(hash_length);
+        gcry_md_hash_buffer(file_system.hash, hash_buffer, path, strlen(path));
+        memcpy(&(stbuf->st_ino), hash_buffer, sizeof stbuf->st_ino);
+        gcry_free(hash_buffer);
         stbuf->st_ino %= (file_system.size / SIZE_BYTE_BLOCK);
         stbuf->st_size = SIZE_BYTE_DATA;
     }

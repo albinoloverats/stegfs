@@ -20,22 +20,25 @@
 
 #include <errno.h>
 #include <stdio.h>
+
+#include <ctype.h>
 #include <inttypes.h>
 #include <stdbool.h>
+
 #include <locale.h>
 #include <fcntl.h>
 #include <unistd.h>
+
+#include <linux/limits.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <netinet/in.h>
 
-#include <mhash.h>
-#include <mcrypt.h>
+#include <gcrypt.h>
 
 #include "common/common.h"
 #include "common/error.h"
 #include "common/tlv.h"
-#include "common/rand.h"
 
 #include "stegfs.h"
 
@@ -152,21 +155,26 @@ static void adjust_units(double *size, char *units)
     return;
 }
 
-static MCRYPT crypto_init(void)
+static gcry_cipher_hd_t crypto_init(enum gcry_cipher_algos c, enum gcry_cipher_modes m)
 {
-    MCRYPT c = mcrypt_module_open(MCRYPT_SERPENT, NULL, MCRYPT_CBC, NULL);
+    /* obtain a cipher handle */
+    gcry_cipher_hd_t cipher_handle;
+    gcry_cipher_open(&cipher_handle, c, m, GCRY_CIPHER_SECURE);
     /* create the initial key for the encryption algorithm */
-    uint8_t key[SIZE_BYTE_TIGER];
-    rand_nonce(key, sizeof key);
-    /* create the initial iv for the encryption algorithm */
-    uint8_t iv[SIZE_BYTE_SERPENT];
-    rand_nonce(iv, sizeof iv);
-    /* done */
-    mcrypt_generic_init(c, key, sizeof key, iv);
-    return c;
+    size_t key_length = gcry_cipher_get_algo_keylen(c);
+    uint8_t *key = gcry_calloc_secure(key_length, sizeof( uint8_t ));
+    gcry_create_nonce(key, key_length);
+    gcry_cipher_setkey(cipher_handle, key, key_length);
+    gcry_free(key);
+    /* create the iv for the encryption algorithm */
+    size_t iv_length = gcry_cipher_get_algo_blklen(c);
+    uint8_t *iv = gcry_calloc_secure(iv_length, sizeof( uint8_t ));
+    gcry_create_nonce(iv, iv_length);
+    gcry_cipher_setiv(cipher_handle, iv, iv_length);
+    return cipher_handle;
 }
 
-static void superblock_info(stegfs_block_t *sb, char *cipher, char *mode, uint32_t block_length, char *hash, uint32_t hash_length)
+static void superblock_info(stegfs_block_t *sb, const char *cipher, const char *mode, const char *hash)
 {
     TLV_HANDLE tlv = tlv_init();
 
@@ -204,29 +212,10 @@ static void superblock_info(stegfs_block_t *sb, char *cipher, char *mode, uint32
     t.value = (byte_t *)mode;
     tlv_append(&tlv, t);
 
-    t.tag = TAG_CIPHER_BLOCK_LENGTH;
-    block_length = htonl(block_length);
-    t.length = sizeof block_length;
-    t.value = malloc(sizeof block_length);
-    memcpy(t.value, &block_length, sizeof block_length);
-    tlv_append(&tlv, t);
-    free(t.value);
-
     t.tag = TAG_HASH;
     t.length = strlen(hash);
-    /* mhash gives us this in uppercase; we lower it here just to be consistent */
-    for (size_t i = 0; i < strlen(hash); i++)
-        hash[i] = tolower(hash[i]);
     t.value = (byte_t *)hash;
     tlv_append(&tlv, t);
-
-    t.tag = TAG_HASH_LENGTH;
-    hash_length = htonl(hash_length);
-    t.length = sizeof hash_length;
-    t.value = malloc(sizeof hash_length);
-    memcpy(t.value, &hash_length, sizeof hash_length);
-    tlv_append(&tlv, t);
-    free(t.value);
 
     memcpy(sb->data, tlv_export(tlv), tlv_size(tlv));
 
@@ -333,14 +322,18 @@ int main(int argc, char **argv)
      * write “encrypted” blocks
      */
     uint8_t rnd[MEGABYTE];
-    rand_seed();
-    rand_nonce(rnd, sizeof rnd);
-    MCRYPT mc = crypto_init();
+    gcry_create_nonce(rnd, sizeof rnd);
+
+    enum gcry_cipher_algos c = GCRY_CIPHER_SERPENT256;
+    enum gcry_cipher_modes m = GCRY_CIPHER_MODE_CBC;
+    enum gcry_md_algos     h = GCRY_MD_TIGER;
+
+    gcry_cipher_hd_t gc = crypto_init(c, m);
     printf("\e[?25l"); /* hide cursor - mostly for actualy write loop */
     for (uint64_t i = 0; i < size / MEGABYTE; i++)
     {
         printf("\rWriting      : %'26.3f %%", PERCENT * i / (size / MEGABYTE));
-        mcrypt_generic(mc, rnd, sizeof rnd);
+        gcry_cipher_encrypt(gc, rnd, sizeof rnd, NULL, 0);
         memcpy(mm + (i * sizeof rnd), rnd, sizeof rnd);
         msync(mm + (i * sizeof rnd), sizeof rnd, MS_ASYNC);
     }
@@ -349,9 +342,11 @@ int main(int argc, char **argv)
 superblock:
     printf("superblock   : ");
     stegfs_block_t sb;
-    rand_nonce(&sb, sizeof sb);
+    gcry_create_nonce(&sb, sizeof sb);
     memset(sb.path, 0xFF, sizeof sb.path);
-    superblock_info(&sb, MCRYPT_SERPENT, MCRYPT_CBC, SIZE_BYTE_SERPENT, (char *)mhash_get_hash_name(MHASH_TIGER), SIZE_BYTE_TIGER);
+
+    superblock_info(&sb, gcry_cipher_algo_name(c), "CBC", gcry_md_algo_name(h));
+
     sb.hash[0] = htonll(MAGIC_0);
     sb.hash[1] = htonll(MAGIC_1);
     sb.hash[2] = htonll(MAGIC_2);

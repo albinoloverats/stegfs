@@ -5,13 +5,13 @@ MKFS	 = mkstegfs
 
 SOURCE   = src/main.c src/stegfs.c src/help.c
 MKSRC    = src/mkfs.c
-COMMON   = src/common/error.c src/common/tlv.c src/common/dir.c  src/common/rand.c src/common/non-gnu.c
+COMMON   = src/common/error.c src/common/crypt.c src/common/tlv.c src/common/dir.c src/common/non-gnu.c
 
-CFLAGS   = -Wall -Wextra -Werror -std=gnu99 `pkg-config --cflags fuse` -pipe -O0 -ggdb -I/usr/local/include
+CFLAGS   = -Wall -Wextra -Werror -std=gnu99 `pkg-config --cflags fuse` -pipe -O0 -ggdb -pg -lc -I/usr/local/include
 CPPFLAGS = -Isrc -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -DGIT_COMMIT=\"`git log | head -n1 | cut -f2 -d' '`\"
 
 # -lpthread
-LIBS     = -lmhash -lmcrypt  `pkg-config --libs fuse`
+LIBS     = -lgcrypt `pkg-config --libs fuse`
 
 all: sfs mkfs man
 
