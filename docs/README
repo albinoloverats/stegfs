@@ -10,6 +10,16 @@ Changes
   - If you see the error message “Previous version of stegfs!” download
     version 2010.01 and recover your data, before creating a new stegfs
 	and transferring your data to it
+  - Block size is 2,048 bytes
+    * 32 indicate the path
+	* 1,976 are file data
+	* 32 are a data checksum
+	* 8 indicate the next block
+	* All except the first 32 are encrypted; the cipher can have a block
+	  length of:
+	  - 128 bits
+      - 192 bits
+	  - 256 bits
 * Remove multi-threaded capability (we’ll bring it back soon)
 * Files are:
   - Read when they’re opened
@@ -29,8 +39,6 @@ Ideas For Another Day
 
 * Bring back multi-threaded support
 * Allow user configured algorithm (select during mkfs)
-  - Hash length must be at least 128 bits
-  - Cipher block length must be either 128 or 192 bits
 * Cache time limit (force forget if a file isn’t accessed)
 * Don’t break backwards compatibility (again)!
 
