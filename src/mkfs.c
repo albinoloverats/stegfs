@@ -306,7 +306,7 @@ int main(int argc, char **argv)
     uint64_t blocks = size / SIZE_BYTE_BLOCK;
     void *mm = NULL;
     if (dry)
-        printf("dry run      : file system not modified\n");
+        printf("Test run     : File system not modified\n");
     else
     {
         lockf(fs, F_LOCK, 0);
@@ -321,30 +321,27 @@ int main(int argc, char **argv)
     setlocale(LC_NUMERIC, "");
     printf("Location     : %s\n", path);
 
-    printf("Cipher       : %s\n", cipher_name_from_id(c));
-    printf("Cipher mode  : %s\n", mode_name_from_id(m));
-    printf("Hash         : %s\n", hash_name_from_id(h));
-
-    printf("Duplication  : %d\n", copies);
-
-    if (recreate && !dry)
-        goto superblock;
     /*
      * display some “useful” information about the file system being
      * created
      */
-    char s1[9];
+    char s1[27];
     char *s2;
     int l;
 
-    printf("Blocks       : %'26" PRIu64 "\n", blocks);
+    sprintf(s1, "%'" PRIu64, blocks);
+    int r = strlen(s1);
+    if (r < 7)
+        r = 7;
+    printf("Blocks       : %*s\n", r, s1);
+
     double z = size / MEGABYTE;
     char units[] = "MB";
     adjust_units(&z, units);
     sprintf(s1, "%f", z);
     s2 = strchr(s1, '.');
     l = s2 - s1;
-    printf("Size         : %'26.*g %s\n", (l + 2), z, units);
+    printf("Size         : %'*.*g %s\n", r, (l + 2), z, units);
     if ((z = ((double)size / SIZE_BYTE_BLOCK * SIZE_BYTE_DATA) / MEGABYTE) < 1)
     {
         z *= KILOBYTE;
@@ -356,11 +353,11 @@ int main(int argc, char **argv)
     sprintf(s1, "%f", z);
     s2 = strchr(s1, '.');
     l = s2 - s1;
-    printf("Capacity     : %'26.*g %s\n", (l + 2), z, units);
-    printf("Largest file : %'26.*g %s\n", (l + 2), z / copies, units);
+    printf("Capacity     : %'*.*g %s\n", r, (l + 2), z, units);
+    printf("Largest file : %'*.*g %s\n", r, (l + 2), z / copies, units);
 
-    if (dry)
-        return EXIT_SUCCESS;
+    if (recreate || dry)
+        goto superblock;
     /*
      * write “encrypted” blocks
      */
@@ -368,17 +365,30 @@ int main(int argc, char **argv)
     gcry_create_nonce(rnd, sizeof rnd);
 
     gcry_cipher_hd_t gc = crypto_init(c, m);
-    printf("\e[?25l"); /* hide cursor - mostly for actually write loop */
+    printf("\e[?25l"); /* hide cursor */
     for (uint64_t i = 0; i < size / MEGABYTE; i++)
     {
-        printf("\rWriting      : %'26.3f %%", PERCENT * i / (size / MEGABYTE));
+        printf("\rWriting      : %'*.3f %%", r, PERCENT * i / (size / MEGABYTE));
         gcry_cipher_encrypt(gc, rnd, sizeof rnd, NULL, 0);
         memcpy(mm + (i * sizeof rnd), rnd, sizeof rnd);
         msync(mm + (i * sizeof rnd), sizeof rnd, MS_ASYNC);
     }
-    printf("\rWriting      : %'26.3f %%\n", PERCENT);
+    printf("\rWriting      : %'*.3f %%\n", r, PERCENT);
 
 superblock:
+
+    printf("Duplication  : %*d ×\n", recreate ? 0 : r, copies);
+
+    printf("Cipher       : %s\n", cipher_name_from_id(c));
+    printf("Cipher mode  : %s\n", mode_name_from_id(m));
+    printf("Hash         : %s\n", hash_name_from_id(h));
+
+    if (dry)
+    {
+        printf("Test run     : File system not modified\n");
+        return EXIT_SUCCESS;
+    }
+
     printf("Superblock   : ");
     stegfs_block_t sb;
     gcry_create_nonce(&sb, sizeof sb);
@@ -394,7 +404,7 @@ superblock:
     msync(mm, sizeof sb, MS_SYNC);
     munmap(mm, size);
     close(fs);
-    printf("Done\n\e[?25h");
+    printf("Done\n\e[?25h"); /* show cursor again */
 
     return EXIT_SUCCESS;
 }
