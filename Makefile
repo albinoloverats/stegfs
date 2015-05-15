@@ -2,9 +2,11 @@
 
 STEGFS   = stegfs
 MKFS	 = mkstegfs
+CP		 = cp_tree
 
 SOURCE   = src/main.c src/stegfs.c src/help.c
 MKSRC    = src/mkfs.c
+CPSRC	 = src/cp.c
 COMMON   = src/common/error.c src/common/ccrypt.c src/common/tlv.c src/common/dir.c src/common/non-gnu.c
 
 CFLAGS   = -Wall -Wextra -Werror -std=gnu99 `pkg-config --cflags fuse` -pipe -I/usr/local/include
@@ -30,6 +32,10 @@ mkfs:
 	 @$(CC) $(LIBS) $(CFLAGS) $(CPPFLAGS) -O2 $(MKSRC) $(COMMON) -o $(MKFS)
 	-@echo "built ‘$(MKSRC) $(COMMON)’ --> ‘$(MKFS)’"
 
+cp:
+	 @$(CC) $(CFLAGS) $(CPPFLAGS) -O0 -ggdb $(CPSRC) src/common/error.c src/common/fs.c -o $(CP)
+	-@echo "built ‘$(CPSRC) $(COMMON)’ --> ‘$(CP)’"
+
 man:
 	 @gzip -c docs/$(STEGFS).1 > $(STEGFS).1.gz
 	-@echo -e "compressing ‘docs/$(STEGFS).1’ → ‘$(STEGFS).1.gz"
@@ -53,7 +59,7 @@ uninstall:
 	@rm -fv $(PREFIX)/usr/bin/$(STEGFS)
 
 clean:
-	 @rm -fv $(STEGFS) $(MKFS)
+	 @rm -fv $(STEGFS) $(MKFS) $(CP)
 
 distclean: clean
 	@rm -fv $(STEGFS).1.gz
