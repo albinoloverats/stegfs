@@ -218,6 +218,7 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
     gcry_md_write(hash, file->path, strlen(file->path));
     gcry_md_write(hash, file->name, strlen(file->name));
     uint8_t *inodes = gcry_md_read(hash, GCRY_MD_SHA512);
+    size_t len = gcry_md_get_algo_dlen(GCRY_MD_SHA512);
     /*
      * calculate inode values; must be done here, so we have all of them
      * and not just the first that we can read (I wonder if there is a
@@ -227,8 +228,8 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
     {
         memcpy(&file->inodes[i], inodes, sizeof file->inodes[i]);
         uint8_t b = inodes[0];
-        memmove(inodes, inodes + 1, gcry_md_get_algo_dlen(GCRY_MD_SHA512) - 1);
-        inodes[hash_length] = b;
+        memmove(inodes, inodes + 1, len - 1);
+        inodes[len] = b;
     }
     gcry_md_close(hash);
     /*
