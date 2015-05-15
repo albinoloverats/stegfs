@@ -38,6 +38,7 @@
 
 #include "common/common.h"
 #include "common/error.h"
+#include "common/ccrypt.h"
 #include "common/tlv.h"
 
 #include "stegfs.h"
@@ -227,11 +228,14 @@ static void print_usage_help(char *arg)
     fprintf(stderr, "Usage: %s [-s size] <file system>\n", arg);
     fprintf(stderr, "\n");
     fprintf(stderr, "  -s size Desired file system size, required when creating a file system in\n");
-    fprintf(stderr, "          a nomal file\n");
+    fprintf(stderr, "          a normal file\n");
     fprintf(stderr, "  -f      Force overwrite existing file, required when overwriting a file\n");
     fprintf(stderr, "          system in a normal file\n");
     fprintf(stderr, "  -r      Rewrite the superblock (perhaps it became corrupt)\n");
-    fprintf(stderr, "  -d      Dry run - print details about the file system that would have been created\n");
+    fprintf(stderr, "  -t      Test run - print details about the file system that would have been created\n");
+    fprintf(stderr, "  -c      Algorithm to use to encrypt data\n");
+    fprintf(stderr, "  -m      The encryption mode to use\n");
+    fprintf(stderr, "  -d      Hash algorithm to generate key and check data integrity\n");
     fprintf(stderr, "\nNotes:\n  • Size option isn't necessary when creating a file system on a block device.\n");
     fprintf(stderr, "  • Size are in megabytes unless otherwise specified: GB, TB, PB, or EB.\n");
     exit(EXIT_SUCCESS);
@@ -248,6 +252,10 @@ int main(int argc, char **argv)
     bool recreate = false;
     bool dry = false;
 
+    enum gcry_cipher_algos c = GCRY_CIPHER_SERPENT256;
+    enum gcry_cipher_modes m = GCRY_CIPHER_MODE_CBC;
+    enum gcry_md_algos     h = GCRY_MD_TIGER1;
+
     for (int i = 1; i < argc; i++)
     {
         if (!strcmp("--help", argv[i]) || !strcmp("-h", argv[i]))
@@ -258,8 +266,14 @@ int main(int argc, char **argv)
             force = true;
         else if (!strcmp("-r", argv[i]))
             recreate = true;
-        else if (!strcmp("-d", argv[i]))
+        else if (!strcmp("-t", argv[i]))
             dry = true;
+        else if (!strcmp("-c", argv[i]))
+            c = cipher_id_from_name(argv[++i]);
+        else if (!strcmp("-m", argv[i]))
+            m = mode_id_from_name(argv[++i]);
+        else if (!strcmp("-d", argv[i]))
+            h = hash_id_from_name(argv[++i]);
         else
             realpath(argv[i], path);
     }
@@ -286,9 +300,10 @@ int main(int argc, char **argv)
         }
     }
 
-    enum gcry_cipher_algos c = GCRY_CIPHER_SERPENT256;
-    enum gcry_cipher_modes m = GCRY_CIPHER_MODE_CBC;
-    enum gcry_md_algos     h = GCRY_MD_TIGER1;
+    printf("Location     : %s\n", path);
+    printf("Cipher       : %s\n", cipher_name_from_id(c));
+    printf("Cipher mode  : %s\n", mode_name_from_id(m));
+    printf("Hash         : %s\n", hash_name_from_id(h));
 
     if (recreate && !dry)
         goto superblock;
@@ -302,23 +317,27 @@ int main(int argc, char **argv)
 
     setlocale(LC_NUMERIC, "");
 
-    printf("location     : %s\n", path);
+    printf("Blocks       : %'26" PRIu64 "\n", blocks);
     double z = size / MEGABYTE;
-    printf("blocks       : %'26" PRIu64 "\n", blocks);
     char units[] = "MB";
     adjust_units(&z, units);
     sprintf(s1, "%f", z);
     s2 = strchr(s1, '.');
     l = s2 - s1;
-    printf("size         : %'26.*g %s\n", (l + 2), z, units);
-    z = ((double)size / SIZE_BYTE_BLOCK * SIZE_BYTE_DATA) / MEGABYTE;
-    strcpy(units, "MB");
+    printf("Size         : %'26.*g %s\n", (l + 2), z, units);
+    if ((z = ((double)size / SIZE_BYTE_BLOCK * SIZE_BYTE_DATA) / MEGABYTE) < 1)
+    {
+        z *= KILOBYTE;
+        strcpy(units, "KB");
+    }
+    else
+        strcpy(units, "MB");
     adjust_units(&z, units);
     sprintf(s1, "%f", z);
     s2 = strchr(s1, '.');
     l = s2 - s1;
-    printf("capacity     : %'26.*g %s\n", (l + 2), z, units);
-    printf("largest file : %'26.*g %s\n", (l + 2), z / MAX_COPIES , units);
+    printf("Capacity     : %'26.*g %s\n", (l + 2), z, units);
+    printf("Largest file : %'26.*g %s\n", (l + 2), z / MAX_COPIES , units);
 
     if (dry)
         return EXIT_SUCCESS;
@@ -329,7 +348,7 @@ int main(int argc, char **argv)
     gcry_create_nonce(rnd, sizeof rnd);
 
     gcry_cipher_hd_t gc = crypto_init(c, m);
-    printf("\e[?25l"); /* hide cursor - mostly for actualy write loop */
+    printf("\e[?25l"); /* hide cursor - mostly for actually write loop */
     for (uint64_t i = 0; i < size / MEGABYTE; i++)
     {
         printf("\rWriting      : %'26.3f %%", PERCENT * i / (size / MEGABYTE));
@@ -340,12 +359,12 @@ int main(int argc, char **argv)
     printf("\rWriting      : %'26.3f %%\n", PERCENT);
 
 superblock:
-    printf("superblock   : ");
+    printf("Superblock   : ");
     stegfs_block_t sb;
     gcry_create_nonce(&sb, sizeof sb);
     memset(sb.path, 0xFF, sizeof sb.path);
 
-    superblock_info(&sb, gcry_cipher_algo_name(c), "CBC", gcry_md_algo_name(h));
+    superblock_info(&sb, cipher_name_from_id(c), mode_name_from_id(m), hash_name_from_id(h));
 
     sb.hash[0] = htonll(MAGIC_0);
     sb.hash[1] = htonll(MAGIC_1);
@@ -355,7 +374,7 @@ superblock:
     msync(mm, sizeof sb, MS_SYNC);
     munmap(mm, size);
     close(fs);
-    printf("done\n\e[?25h");
+    printf("Done\n\e[?25h");
 
     return EXIT_SUCCESS;
 }
