@@ -286,6 +286,10 @@ int main(int argc, char **argv)
         }
     }
 
+    enum gcry_cipher_algos c = GCRY_CIPHER_SERPENT256;
+    enum gcry_cipher_modes m = GCRY_CIPHER_MODE_CBC;
+    enum gcry_md_algos     h = GCRY_MD_TIGER1;
+
     if (recreate && !dry)
         goto superblock;
     /*
@@ -323,10 +327,6 @@ int main(int argc, char **argv)
      */
     uint8_t rnd[MEGABYTE];
     gcry_create_nonce(rnd, sizeof rnd);
-
-    enum gcry_cipher_algos c = GCRY_CIPHER_SERPENT256;
-    enum gcry_cipher_modes m = GCRY_CIPHER_MODE_CBC;
-    enum gcry_md_algos     h = GCRY_MD_TIGER1;
 
     gcry_cipher_hd_t gc = crypto_init(c, m);
     printf("\e[?25l"); /* hide cursor - mostly for actualy write loop */

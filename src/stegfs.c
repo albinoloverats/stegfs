@@ -116,6 +116,8 @@ extern bool stegfs_init(const char * const restrict fs)
     char *h = strndup((char *)tlv_value_of(tlv, TAG_HASH), tlv_size_of(tlv, TAG_HASH));
     file_system.hash = hash_id_from_name(h);
     free(h);
+    if (file_system.cipher == GCRY_CIPHER_NONE || file_system.hash == GCRY_MD_NONE || file_system.mode == GCRY_CIPHER_MODE_NONE)
+        return false;
     /* get fs block size */
     memcpy(&file_system.blocksize, tlv_value_of(tlv, TAG_BLOCKSIZE), tlv_size_of(tlv, TAG_BLOCKSIZE));
     file_system.blocksize = ntohl(file_system.blocksize);

@@ -310,7 +310,7 @@ static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t fill
     else if (path_equals(PATH_PROC, path))
     {
         for (uint64_t i = 0; i < file_system.size / SIZE_BYTE_BLOCK; i++)
-            if (file_system.used[i])
+            if (file_system.blocks.in_use[i])
             {
                 char b[21] = { 0x0 }; // max digits for UINT64_MAX
                 snprintf(b, sizeof b, "%ju", i);
