@@ -47,6 +47,8 @@
 #define SIZE_BYTE_SERPENT   0x10    /*!<   16 bytes -- 128 bits */
 #define SIZE_BYTE_TIGER     0x18    /*!<   24 bytes -- 192 bits */
 
+#define DEFAULT_COPIES 8
+
 #define RATIO 1024
 
 static int64_t open_filesystem(const char * const restrict path, uint64_t *size, bool force, bool recreate, bool dry)
@@ -175,7 +177,7 @@ static gcry_cipher_hd_t crypto_init(enum gcry_cipher_algos c, enum gcry_cipher_m
     return cipher_handle;
 }
 
-static void superblock_info(stegfs_block_t *sb, const char *cipher, const char *mode, const char *hash)
+static void superblock_info(stegfs_block_t *sb, const char *cipher, const char *mode, const char *hash, uint32_t copies)
 {
     TLV_HANDLE tlv = tlv_init();
 
@@ -218,6 +220,14 @@ static void superblock_info(stegfs_block_t *sb, const char *cipher, const char *
     t.value = (byte_t *)hash;
     tlv_append(&tlv, t);
 
+    t.tag = TAG_DUPLICATION;
+    copies = htonl(copies);
+    t.length = sizeof copies;
+    t.value = malloc(sizeof copies);
+    memcpy(t.value, &copies, sizeof copies);
+    tlv_append(&tlv, t);
+    free(t.value);
+
     memcpy(sb->data, tlv_export(tlv), tlv_size(tlv));
 
     return;
@@ -227,17 +237,23 @@ static void print_usage_help(char *arg)
 {
     fprintf(stderr, "Usage: %s [-s size] <file system>\n", arg);
     fprintf(stderr, "\n");
-    fprintf(stderr, "  -s size Desired file system size, required when creating a file system in\n");
-    fprintf(stderr, "          a normal file\n");
-    fprintf(stderr, "  -f      Force overwrite existing file, required when overwriting a file\n");
-    fprintf(stderr, "          system in a normal file\n");
-    fprintf(stderr, "  -r      Rewrite the superblock (perhaps it became corrupt)\n");
-    fprintf(stderr, "  -t      Test run - print details about the file system that would have been created\n");
-    fprintf(stderr, "  -c      Algorithm to use to encrypt data\n");
-    fprintf(stderr, "  -m      The encryption mode to use\n");
-    fprintf(stderr, "  -d      Hash algorithm to generate key and check data integrity\n");
+    fprintf(stderr, "  -s  size       Desired file system size, required when creating a file system in\n");
+    fprintf(stderr, "                 a normal file\n");
+    fprintf(stderr, "  -f             Force overwrite existing file, required when overwriting a file\n");
+    fprintf(stderr, "                 system in a normal file\n");
+    fprintf(stderr, "  -r             Rewrite the superblock (perhaps it became corrupt)\n");
+    fprintf(stderr, "  -t             Test run - print details about the file system that would have been created\n");
+    fprintf(stderr, "  -c  algorithm  Algorithm to use to encrypt data\n");
+    fprintf(stderr, "  -m  mode       The encryption mode to use\n");
+    fprintf(stderr, "  -d  algorithm  Hash algorithm to generate key and check data integrity\n");
+    fprintf(stderr, "  -p  copies     File duplication; number of copies\n");
     fprintf(stderr, "\nNotes:\n  • Size option isn't necessary when creating a file system on a block device.\n");
     fprintf(stderr, "  • Size are in megabytes unless otherwise specified: GB, TB, PB, or EB.\n");
+    fprintf(stderr, "  • Defaults for cipher algorithms and data duplication are:\n");
+    fprintf(stderr, "    • Serpent (256 bit block)\n");
+    fprintf(stderr, "    • Cipher Block Bhaining (CBC)\n");
+    fprintf(stderr, "    • Tiger (192 bit digest)\n");
+    fprintf(stderr, "    • 8 copies of each file\n");
     exit(EXIT_SUCCESS);
 }
 
@@ -251,7 +267,7 @@ int main(int argc, char **argv)
     bool force = false;
     bool recreate = false;
     bool dry = false;
-
+    uint32_t copies = DEFAULT_COPIES;
     enum gcry_cipher_algos c = GCRY_CIPHER_SERPENT256;
     enum gcry_cipher_modes m = GCRY_CIPHER_MODE_CBC;
     enum gcry_md_algos     h = GCRY_MD_TIGER1;
@@ -274,6 +290,8 @@ int main(int argc, char **argv)
             m = mode_id_from_name(argv[++i]);
         else if (!strcmp("-d", argv[i]))
             h = hash_id_from_name(argv[++i]);
+        else if (!strcmp("-p", argv[i]))
+            copies = strtol(argv[++i], NULL, 0);
         else
             realpath(argv[i], path);
     }
@@ -300,10 +318,14 @@ int main(int argc, char **argv)
         }
     }
 
+    setlocale(LC_NUMERIC, "");
     printf("Location     : %s\n", path);
+
     printf("Cipher       : %s\n", cipher_name_from_id(c));
     printf("Cipher mode  : %s\n", mode_name_from_id(m));
     printf("Hash         : %s\n", hash_name_from_id(h));
+
+    printf("Duplication  : %d\n", copies);
 
     if (recreate && !dry)
         goto superblock;
@@ -314,8 +336,6 @@ int main(int argc, char **argv)
     char s1[9];
     char *s2;
     int l;
-
-    setlocale(LC_NUMERIC, "");
 
     printf("Blocks       : %'26" PRIu64 "\n", blocks);
     double z = size / MEGABYTE;
@@ -337,7 +357,7 @@ int main(int argc, char **argv)
     s2 = strchr(s1, '.');
     l = s2 - s1;
     printf("Capacity     : %'26.*g %s\n", (l + 2), z, units);
-    printf("Largest file : %'26.*g %s\n", (l + 2), z / MAX_COPIES , units);
+    printf("Largest file : %'26.*g %s\n", (l + 2), z / copies, units);
 
     if (dry)
         return EXIT_SUCCESS;
@@ -364,7 +384,7 @@ superblock:
     gcry_create_nonce(&sb, sizeof sb);
     memset(sb.path, 0xFF, sizeof sb.path);
 
-    superblock_info(&sb, cipher_name_from_id(c), mode_name_from_id(m), hash_name_from_id(h));
+    superblock_info(&sb, cipher_name_from_id(c), mode_name_from_id(m), hash_name_from_id(h), copies);
 
     sb.hash[0] = htonll(MAGIC_0);
     sb.hash[1] = htonll(MAGIC_1);

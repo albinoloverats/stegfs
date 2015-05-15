@@ -37,7 +37,7 @@
 #define SIZE_BYTE_HASH  0x0020      /*!<    24 bytes */
         /* next block (not defined) */
 
-#define SIZE_BYTE_HEAD  0x0600      /*!< 1,536 bytes (data in header block) */
+#define SIZE_BYTE_HEAD  0x0400      /*!< 1,024 bytes (data in header block) */
 #define OFFSET_BYTE_HEAD  (SIZE_BYTE_DATA-SIZE_BYTE_HEAD) /*!< Offset of file data in header block */
 
 /* size in 64 bit ints of parts of block */
@@ -46,9 +46,8 @@
 #define SIZE_LONG_HASH  0x04
         /* next block (not defined) */
 
-
+#define MAX_COPIES 64
 #define SYM_LENGTH -1
-#define MAX_COPIES 8
 
 #define SUPER_ID STEGFS_NAME " " STEGFS_VERSION
 
@@ -75,6 +74,7 @@ typedef enum
     TAG_MODE,
     TAG_BLOCKSIZE,
     TAG_HEADER_OFFSET,
+    TAG_DUPLICATION,
     TAG_MAX
 }
 stegfs_tag_e;
@@ -97,15 +97,16 @@ stegfs_failure_e;
  */
 typedef struct stegfs_file_t
 {
-    char     *path;               /*!< The path component of /path/file:password */
-    char     *name;               /*!< The file name part of /path/file:password */
-    char     *pass;               /*!< Password component of /path/file:password */
-    uint64_t  size;               /*!< File size */
-    time_t    time;               /*!< Last modified timestamp */
-    uint8_t  *data;               /*!< File data */
-    uint64_t  inodes[MAX_COPIES]; /*!< The available inodes */
-    uint64_t *blocks[MAX_COPIES]; /*!< The complete list of used blocks */
-    bool      write;              /*!< Whether the file was opened for write access */
+    char      *path;               /*!< The path component of /path/file:password */
+    char      *name;               /*!< The file name part of /path/file:password */
+    char      *pass;               /*!< Password component of /path/file:password */
+    uint64_t   size;               /*!< File size */
+    time_t     time;               /*!< Last modified timestamp */
+    uint8_t   *data;               /*!< File data */
+    /* you can’t have more than 64 copies; you just can’t */
+    uint64_t   inodes[MAX_COPIES]; /*!< The available inodes */
+    uint64_t  *blocks[MAX_COPIES]; /*!< The complete list of used blocks */
+    bool       write;              /*!< Whether the file was opened for write access */
 }
 stegfs_file_t;
 
@@ -139,6 +140,7 @@ typedef struct stegfs_t
     enum gcry_cipher_algos cipher;
     enum gcry_cipher_modes mode;
     enum gcry_md_algos     hash;
+    uint32_t               copies;      /*!< File duplication */
     size_t                 blocksize;   /*!< File system block size; if it needs to be bigger than 4,294,967,295 we have issues */
     off_t                  head_offset; /*!< Start location of file data in header blocks; only 32 bits (like blocksize) */
     stegfs_blocks_t        blocks;      /*!< In use block tracker */

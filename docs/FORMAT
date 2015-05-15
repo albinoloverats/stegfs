@@ -60,14 +60,15 @@ Total block size = 2KB = 16,384 bits = 1,976 file data bytes + metadata
     |                                                                |  |
     +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+‐‐‐‐‐‐‐‐+
     | Data                                            1,976 (15,808) |             |
-    | (First block of each copy - 8 × 8 bytes/64 bits = 64/512¹)     |             |
+    | (File modification timestamp¹)                                 |             |
     | [File system information]                                      |             |
     |                                                                |             +‐ cipher; blocksize:  64 × 252 blocks
-    | ¹ Followed by: - last modification time (64 bit integer)       |             |                     128 × 126
-    |                - random (empty)        (368 bytes/2,944 bits)  |             |                     192 ×  84
-    |                - start of file data  (1,536 bytes/12,288 bits) |  		   |                     256 ×  63
-    |                                                                |  		   |
+    | ¹ Followed by: - list of first blocks (many 64 bit integers²)  |             |                     128 × 126
+    |                - random (not used; variable size)              |             |                     192 ×  84
+    |                - start of file data  (1,024 bytes/8,192 bits)  |             |                     256 ×  63
     |                                                                |             |
+    | ² The number of copies be vary from 1 to 64, which will use    |             |
+    |   between 8 and 512 bytes                                      |             |
     |                                                                |             |
     |                                                                |             |
     |                                                                |             |
@@ -305,8 +306,7 @@ Total block size = 2KB = 16,384 bits = 1,976 file data bytes + metadata
     |                                                                |             |
     |                                                                |             |
     |                                                                |             |
-    |                                                                |             |
-	+‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+ ‐‐‐‐‐‐‐--+
+    +‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐‐+ ‐+ ‐‐‐‐‐‐‐--+
     | Checksum                                           32    (256) |  |          |
     | [Hash of "stegfs-2015.XX"]                                     |  +‐ hash    |
     |                                                                |  |          |

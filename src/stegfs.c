@@ -92,13 +92,14 @@ extern bool stegfs_init(const char * const restrict fs)
         tlv_append(&tlv, t);
         free(t.value);
     }
-    if (!tlv_has_tag(tlv, TAG_STEGFS)      ||
-        !tlv_has_tag(tlv, TAG_VERSION)     ||
-        !tlv_has_tag(tlv, TAG_CIPHER)      ||
-        !tlv_has_tag(tlv, TAG_MODE)        ||
-        !tlv_has_tag(tlv, TAG_HASH)        ||
-        !tlv_has_tag(tlv, TAG_BLOCKSIZE)   ||
-        !tlv_has_tag(tlv, TAG_HEADER_OFFSET))
+    if (!tlv_has_tag(tlv, TAG_STEGFS)        ||
+        !tlv_has_tag(tlv, TAG_VERSION)       ||
+        !tlv_has_tag(tlv, TAG_CIPHER)        ||
+        !tlv_has_tag(tlv, TAG_MODE)          ||
+        !tlv_has_tag(tlv, TAG_HASH)          ||
+        !tlv_has_tag(tlv, TAG_BLOCKSIZE)     ||
+        !tlv_has_tag(tlv, TAG_HEADER_OFFSET) ||
+        !tlv_has_tag(tlv, TAG_DUPLICATION))
         return errno = -FAIL_MISSING_TAG, false;
 
     if (strncmp((char *)tlv_value_of(tlv, TAG_STEGFS), STEGFS_NAME, strlen(STEGFS_NAME)))
@@ -124,6 +125,9 @@ extern bool stegfs_init(const char * const restrict fs)
     /* get number of bytes file data in file header */
     memcpy(&file_system.head_offset, tlv_value_of(tlv, TAG_HEADER_OFFSET), tlv_size_of(tlv, TAG_HEADER_OFFSET));
     file_system.head_offset = ntohl(file_system.head_offset);
+    /* get number of copies */
+    memcpy(&file_system.copies, tlv_value_of(tlv, TAG_DUPLICATION), tlv_size_of(tlv, TAG_DUPLICATION));
+    file_system.copies = ntohl(file_system.copies);
 
     file_system.blocks.used = 1;
     file_system.blocks.in_use = calloc(file_system.size / file_system.blocksize, sizeof(bool));
@@ -170,7 +174,7 @@ extern bool stegfs_file_will_fit(stegfs_file_t *file)
 {
     stegfs_block_t block;
     lldiv_t d = lldiv(file->size - (file->size < (sizeof block.data - file_system.head_offset) ? file->size : (sizeof block.data - file_system.head_offset)), SIZE_BYTE_DATA);
-    uint64_t blocks_needed = (d.quot + (d.rem ? 1 : 0)) * MAX_COPIES;
+    uint64_t blocks_needed = (d.quot + (d.rem ? 1 : 0)) * file_system.copies;
 
     uint64_t blocks_total = (file_system.size / file_system.blocksize) - 1;
     if (blocks_needed > blocks_total)
@@ -207,27 +211,33 @@ extern void stegfs_directory_create(const char * const restrict path)
 extern bool stegfs_file_stat(stegfs_file_t *file)
 {
     /*
-     * figure out where the file’s inode blocks are
+     * figure out where the files’ inode blocks are
      */
     gcry_md_hd_t hash;
-    gcry_md_open(&hash, file_system.hash, GCRY_MD_FLAG_SECURE);
+    gcry_md_open(&hash, GCRY_MD_SHA512, GCRY_MD_FLAG_SECURE);
     gcry_md_write(hash, file->path, strlen(file->path));
     gcry_md_write(hash, file->name, strlen(file->name));
-    uint8_t *inodes = gcry_md_read(hash, file_system.hash);
+    uint8_t *inodes = gcry_md_read(hash, GCRY_MD_SHA512);
     /*
      * calculate inode values; must be done here, so we have all of them
-     * and not just the first that we can read
+     * and not just the first that we can read (I wonder if there is a
+     * better way than rotating the data…)
      */
-    int available_inodes = MAX_COPIES;
-    int corrupt_copies = 0;
-    for (int i = 0; i < MAX_COPIES; i++)
-        for (int j = (sizeof(uint64_t) / sizeof(uint8_t) ); j >= 0; --j)
-            file->inodes[i] = (file->inodes[i] << 0x08) | inodes[i + j];
+    for (unsigned i = 0; i < file_system.copies; i++)
+    {
+        memcpy(&file->inodes[i], inodes, sizeof file->inodes[i]);
+        uint8_t b = inodes[0];
+        memmove(inodes, inodes + 1, gcry_md_get_algo_dlen(GCRY_MD_SHA512) - 1);
+        inodes[hash_length] = b;
+    }
+    gcry_md_close(hash);
     /*
      * read file inode, pray for success, then see if we can get a
      * complete copy of the file
      */
-    for (int i = 0; i < MAX_COPIES; i++)
+    unsigned available_inodes = file_system.copies;
+    unsigned corrupt_copies = 0;
+    for (unsigned i = 0; i < file_system.copies; i++)
     {
         gcry_cipher_hd_t cipher_handle = cipher_init(file, i);
         stegfs_block_t inode;
@@ -245,30 +255,30 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
 
             uint64_t first[SIZE_LONG_DATA] = { 0x0 };
             memcpy(first, inode.data, sizeof first);
-            file->time = htonll(first[MAX_COPIES]);
-            for (int i = 0; i < MAX_COPIES; i++)
+            file->time = htonll(first[0]);
+            for (unsigned j = 0, l = 1; j < file_system.copies; j++, l++)
             {
-                gcry_cipher_hd_t another = cipher_init(file, i);
+                gcry_cipher_hd_t another = cipher_init(file, j);
                 lldiv_t d = lldiv(file->size - (file->size < (sizeof inode.data - file_system.head_offset) ? file->size : (sizeof inode.data - file_system.head_offset)), SIZE_BYTE_DATA);
                 uint64_t blocks = d.quot + (d.rem ? 1 : 0);
-                file->blocks[i] = realloc(file->blocks[i], (blocks + 2) * sizeof blocks);
-                memset(file->blocks[i], 0x00, blocks * sizeof blocks);
-                file->blocks[i][0] = blocks;
+                file->blocks[j] = realloc(file->blocks[j], (blocks + 2) * sizeof blocks);
+                memset(file->blocks[j], 0x00, blocks * sizeof blocks);
+                file->blocks[j][0] = blocks;
                 if (blocks)
-                    file->blocks[i][1] = htonll(first[i]);
+                    file->blocks[j][1] = htonll(first[l]);
                 /*
                  * travsers file block tree; whilst the whole block
                  * is read, the actual file data is discarded
                  */
-                for (uint64_t j = 2 ; j <= blocks; j++)
+                for (uint64_t k = 2 ; k <= blocks; k++)
                 {
                     stegfs_block_t block;
                     memset(&block, 0x00, sizeof block);
-                    if (block_read(file->blocks[i][j - 1], &block, another, file->path))
+                    if (block_read(file->blocks[j][k - 1], &block, another, file->path))
                     {
-                        file_system.blocks.in_use[file->blocks[i][j - 1] % (file_system.size / file_system.blocksize)] = true;
+                        file_system.blocks.in_use[file->blocks[j][k - 1] % (file_system.size / file_system.blocksize)] = true;
                         file_system.blocks.used++;
-                        file->blocks[i][j] = ntohll(block.next);
+                        file->blocks[j][k] = ntohll(block.next);
                     }
                     else
                     {
@@ -289,16 +299,15 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
             available_inodes--;
         gcry_cipher_close(cipher_handle);
     }
-    gcry_md_close(hash);
     /*
      * as long as there’s a valid inode and one complete copy we’re good
      */
-    if (available_inodes && corrupt_copies < MAX_COPIES)
+    if (available_inodes && corrupt_copies < file_system.copies)
     {
         stegfs_cache2_add(NULL, file);
         return true;
     }
-    for (int i = 0; i < MAX_COPIES; i++)
+    for (unsigned i = 0; i < file_system.copies; i++)
         if (file->blocks[i])
         {
             for (uint64_t j = 1; j < file->blocks[i][0]; j++)
@@ -320,7 +329,7 @@ extern bool stegfs_file_read(stegfs_file_t *file)
      * read the start of the file data
      */
     file->data = realloc(file->data, file->size);
-    for (int i = 0, c = 0; i < MAX_COPIES && !c; i++)
+    for (unsigned i = 0, c = 0; i < file_system.copies && !c; i++)
     {
         gcry_cipher_hd_t cipher_handle = cipher_init(file, i);
         stegfs_block_t inode;
@@ -336,7 +345,7 @@ extern bool stegfs_file_read(stegfs_file_t *file)
      * and then the rest of it
      */
     stegfs_block_t block;
-    for (int i = 0, corrupt_copies = 0; i < MAX_COPIES; i++)
+    for (unsigned i = 0, corrupt_copies = 0; i < file_system.copies; i++)
     {
         lldiv_t d = lldiv(file->size - (file->size < (sizeof block.data - file_system.head_offset) ? file->size : (sizeof block.data - file_system.head_offset)), SIZE_BYTE_DATA);
         uint64_t blocks = d.quot + (d.rem ? 1 : 0);
@@ -370,7 +379,7 @@ extern bool stegfs_file_read(stegfs_file_t *file)
         if (failed)
             continue;
         stegfs_cache2_add(NULL, file);
-        return corrupt_copies < MAX_COPIES;
+        return corrupt_copies < file_system.copies;
     }
     /*
      * somehow we failed to read a complete copy of the file, despite
@@ -388,7 +397,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
 
     if (!stegfs_file_stat(file))
     {
-        for (int i = 0; i < MAX_COPIES; i++)
+        for (unsigned i = 0; i < file_system.copies; i++)
         {
             /*
              * allocate inodes, mark as in use (inode locations are calculated
@@ -407,7 +416,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
                 if (!(file->blocks[i][j] = block_assign(file->path)))
                 {
                     /* failed to allocate space; free what we had claimed */
-                    for (int k = 0; k <= i; k++)
+                    for (unsigned k = 0; k <= i; k++)
                     {
                         file_system.blocks.in_use[file->inodes[i] % (file_system.size / file_system.blocksize)] = false;
                         file_system.blocks.used--;
@@ -429,14 +438,14 @@ extern bool stegfs_file_write(stegfs_file_t *file)
     file->size = z; /* stat can couse size to be reset to 0 */
     if (blocks > file->blocks[0][0]) /* need more blocks than we have */
     {
-        for (int i = 0; i < MAX_COPIES; i++)
+        for (unsigned i = 0; i < file_system.copies; i++)
         {
             file->blocks[i] = realloc(file->blocks[i], (blocks + 2) * sizeof blocks);
             for (uint64_t j = file->blocks[i][0]; j <= blocks; j++)
                 if (!(file->blocks[i][j] = block_assign(file->path)))
                 {
                     /* failed to allocate space; free what we had claimed */
-                    for (int k = 0; k <= i; k++)
+                    for (unsigned k = 0; k <= i; k++)
                         for (uint64_t l = file->blocks[k][0]; l <= j; l++)
                         {
                             file_system.blocks.in_use[file->blocks[k][l] % (file_system.size / file_system.blocksize)] = false;
@@ -445,11 +454,11 @@ extern bool stegfs_file_write(stegfs_file_t *file)
                     return errno = ENOSPC, false;
                 }
         }
-        for (int i = 0; i < MAX_COPIES; i++)
+        for (unsigned i = 0; i < file_system.copies; i++)
             file->blocks[i][0] = blocks;
     }
     else if (blocks < file->blocks[0][0]) /* have more blocks than we need */
-        for (int i = 0; i < MAX_COPIES; i++)
+        for (unsigned i = 0; i < file_system.copies; i++)
         {
             for (uint64_t j = blocks + 1; j <= file->blocks[i][0]; j++)
                 block_delete(file->blocks[i][j]);
@@ -459,7 +468,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
     /*
      * write the data
      */
-    for (int i = 0; i < MAX_COPIES; i++)
+    for (unsigned i = 0; i < file_system.copies; i++)
     {
         gcry_cipher_hd_t cipher_handle = cipher_init(file, i);
         for (uint64_t j = 1, k = 0; j <= blocks; j++, k++)
@@ -474,7 +483,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
             if (!block_write(file->blocks[i][j], block, cipher_handle, file->path))
             {
                 /* see below (where inode blocks are written) */
-                for (int k = 0; k <= i; k++)
+                for (unsigned k = 0; k <= i; k++)
                     for (uint64_t l = 1; l <= j; l++)
                         block_delete(file->blocks[k][l]);
                 gcry_cipher_close(cipher_handle);
@@ -490,22 +499,22 @@ extern bool stegfs_file_write(stegfs_file_t *file)
     memset(&inode, 0x00, sizeof inode);
     uint64_t first[SIZE_LONG_DATA] = { 0x0 };
     if (blocks)
-        for (int i = 0; i < MAX_COPIES; i++)
-            first[i] = htonll(file->blocks[i][1]);
+        for (unsigned i = 0, j = 1; i < file_system.copies; i++, j++)
+            first[j] = htonll(file->blocks[i][1]);
     else
         gcry_create_nonce((void *)first, sizeof first);
-    first[MAX_COPIES] = htonll(file->time);
+    first[0] = htonll(file->time);
     gcry_create_nonce(inode.data, sizeof inode.data);
     memcpy(inode.data, first, sizeof first);
     if (file->data && file->size)
         memcpy(inode.data + file_system.head_offset, file->data, file->size < (sizeof inode.data - file_system.head_offset) ? file->size : (sizeof inode.data - file_system.head_offset));
     inode.next = htonll(file->size);
-    for (int i = 0; i < MAX_COPIES; i++)
+    for (unsigned i = 0; i < file_system.copies; i++)
     {
         gcry_cipher_hd_t cipher_handle = cipher_init(file, i);
         if (!block_write(file->inodes[i], inode, cipher_handle, file->path))
         {
-            for (int j = 0; j <= i; j++)
+            for (unsigned j = 0; j <= i; j++)
                 /*
                  * it’s likely that if a write failed above, it won’t work
                  * here either, but at least the block will be marked as
@@ -533,7 +542,7 @@ extern void stegfs_file_delete(stegfs_file_t *file)
     stegfs_block_t block;
     lldiv_t d = lldiv(file->size - (file->size < (sizeof block.data - file_system.head_offset) ? file->size : (sizeof block.data - file_system.head_offset)), SIZE_BYTE_DATA);
     uint64_t blocks = d.quot + (d.rem ? 1 : 0);
-    for (int i = 0; i < MAX_COPIES; i++)
+    for (unsigned i = 0; i < file_system.copies; i++)
     {
         block_delete(file->inodes[i]);
         for (uint64_t j = 1; j <= blocks && file->blocks[i][j]; j++)
@@ -816,7 +825,7 @@ c2a3:
         asprintf(&ptr->file->name, "%s", file->name);
         asprintf(&ptr->file->pass, "%s", file->pass);
         /* set inodes */
-        for (int i = 0; i < MAX_COPIES; i++)
+        for (unsigned i = 0; i < file_system.copies; i++)
             ptr->file->inodes[i] = file->inodes[i];
         /* set time and size */
             ptr->file->write = file->write;
@@ -834,7 +843,7 @@ c2a3:
             stegfs_block_t block;
             lldiv_t d = lldiv(file->size - (file->size < (sizeof block.data - file_system.head_offset) ? file->size : (sizeof block.data - file_system.head_offset)), SIZE_BYTE_DATA);
             uint64_t blocks = d.quot + (d.rem ? 1 : 0);
-            for (int i = 0; i < MAX_COPIES; i++)
+            for (unsigned i = 0; i < file_system.copies; i++)
             {
                 ptr->file->blocks[i] = realloc(ptr->file->blocks[i], (blocks + 1) * sizeof blocks);
                 memset(ptr->file->blocks[i], 0x00, blocks * sizeof blocks);
@@ -923,7 +932,7 @@ extern void stegfs_cache2_remove(const char * const restrict path)
         free(ptr->file->pass);
         if (ptr->file->data)
             free(ptr->file->data);
-        for (int i = 0; i < MAX_COPIES; i++)
+        for (unsigned i = 0; i < file_system.copies; i++)
             if (ptr->file->blocks[i])
             {
                 free(ptr->file->blocks[i]);

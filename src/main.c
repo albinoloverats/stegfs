@@ -177,7 +177,7 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
         {
             if (c.file)
             {
-                for (int i = 0; i < MAX_COPIES; i++)
+                for (unsigned i = 0; i < file_system.copies; i++)
                     if (c.file->inodes[i])
                     {
                         stbuf->st_ino = (ino_t)(c.file->inodes[i] % (file_system.size / SIZE_BYTE_BLOCK));
@@ -207,7 +207,7 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
             file.pass = dir_get_pass(path);
             if (stegfs_file_stat(&file))
             {
-                for (int i = 0; i < MAX_COPIES; i++)
+                for (unsigned i = 0; i < file_system.copies; i++)
                     if (file.inodes[i])
                     {
                         stbuf->st_ino = (ino_t)(file.inodes[i] % (file_system.size / SIZE_BYTE_BLOCK));
