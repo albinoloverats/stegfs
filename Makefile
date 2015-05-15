@@ -7,8 +7,10 @@ SOURCE   = src/main.c src/stegfs.c src/help.c
 MKSRC    = src/mkfs.c
 COMMON   = src/common/error.c src/common/ccrypt.c src/common/tlv.c src/common/dir.c src/common/non-gnu.c
 
-CFLAGS   = -Wall -Wextra -Werror -std=gnu99 `pkg-config --cflags fuse` -pipe -O0 -ggdb -pg -lc -I/usr/local/include
+CFLAGS   = -Wall -Wextra -Werror -std=gnu99 `pkg-config --cflags fuse` -pipe -I/usr/local/include
 CPPFLAGS = -Isrc -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -DGIT_COMMIT=\"`git log | head -n1 | cut -f2 -d' '`\"
+
+DEBUG    = -O0 -ggdb -pg -lc
 
 # -lpthread
 LIBS     = -lgcrypt `pkg-config --libs fuse`
@@ -16,16 +18,16 @@ LIBS     = -lgcrypt `pkg-config --libs fuse`
 all: sfs mkfs man
 
 sfs:
-	 @$(CC) $(LIBS) $(CFLAGS) $(CPPFLAGS) $(SOURCE) $(COMMON) -o $(STEGFS)
+	 @$(CC) $(LIBS) $(CFLAGS) $(CPPFLAGS) -O2 $(SOURCE) $(COMMON) -o $(STEGFS)
 	-@echo "built ‘$(SOURCE)’ --> ‘$(STEGFS)’"
 
 debug:
-	 @$(CC) $(LIBS) $(CFLAGS) $(CPPFLAGS) -DUSE_PROC $(SOURCE) $(COMMON) -o $(STEGFS)
+	 @$(CC) $(LIBS) $(CFLAGS) $(CPPFLAGS) $(DEBUG) -DUSE_PROC $(SOURCE) $(COMMON) -o $(STEGFS)
 	-@echo "built ‘$(SOURCE)’ --> ‘$(STEGFS)’"
 
 
 mkfs:
-	 @$(CC) $(LIBS) $(CFLAGS) $(CPPFLAGS) $(MKSRC) $(COMMON) -o $(MKFS)
+	 @$(CC) $(LIBS) $(CFLAGS) $(CPPFLAGS) -O2 $(MKSRC) $(COMMON) -o $(MKFS)
 	-@echo "built ‘$(MKSRC) $(COMMON)’ --> ‘$(MKFS)’"
 
 man:
