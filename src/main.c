@@ -682,8 +682,25 @@ int main(int argc, char **argv)
     errno = EXIT_SUCCESS;
     if (!h && !stegfs_init(fs))
     {
-        if (errno == (int)MAGIC_201001_0)
-            fprintf(stderr, "Previous version of stegfs!\n");
+        if (errno < 0)
+            switch (-errno)
+            {
+                case FAIL_NOT_STEGFS:
+                    fprintf(stderr, "Not a stegfs partition!\n");
+                    break;
+                case FAIL_OLD_STEGFS:
+                    fprintf(stderr, "Previous version of stegfs!\n");
+                    break;
+                case FAIL_MISSING_TAG:
+                    fprintf(stderr, "Missing required stegfs metadata!\n");
+                    break;
+                case FAIL_INVALID_TAG:
+                    fprintf(stderr, "Invalid value for stegfs metadata!\n");
+                    break;
+                case FAIL_CORRUPT_TAG:
+                    fprintf(stderr, "Partition size mismatch! (Resizing not allowed!)\n");
+                    break;
+            }
         else
             perror("Could not initialise file system!");
         return errno;

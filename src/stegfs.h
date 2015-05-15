@@ -79,6 +79,15 @@ typedef enum
 }
 stegfs_tag_e;
 
+typedef enum
+{
+    FAIL_NOT_STEGFS,
+    FAIL_OLD_STEGFS,
+    FAIL_MISSING_TAG,
+    FAIL_INVALID_TAG,
+    FAIL_CORRUPT_TAG
+}
+stegfs_failure_e;
 
 /*!
  * \brief  Structure to hold information about a file

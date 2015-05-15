@@ -71,12 +71,12 @@ extern bool stegfs_init(const char * const restrict fs)
     if ((block.hash[0] == MAGIC_201001_0 || htonll(block.hash[0]) == MAGIC_201001_0) &&
         (block.hash[1] == MAGIC_201001_1 || htonll(block.hash[1]) == MAGIC_201001_1) &&
         (block.hash[2] == MAGIC_201001_2 || htonll(block.hash[2]) == MAGIC_201001_2))
-        return errno = (int)MAGIC_201001_0, false;
+        return errno = -FAIL_OLD_STEGFS, false;
 
     if (ntohll(block.hash[0]) != MAGIC_0 ||
         ntohll(block.hash[1]) != MAGIC_1 ||
         ntohll(block.hash[2]) != MAGIC_2)
-        return false;
+        return errno = -FAIL_NOT_STEGFS, false;
     TLV_HANDLE tlv = tlv_init();
     for (int i = 0, j = 0; i < TAG_MAX; i++)
     {
@@ -99,12 +99,12 @@ extern bool stegfs_init(const char * const restrict fs)
         !tlv_has_tag(tlv, TAG_HASH)        ||
         !tlv_has_tag(tlv, TAG_BLOCKSIZE)   ||
         !tlv_has_tag(tlv, TAG_HEADER_OFFSET))
-        return false;
+        return errno = -FAIL_MISSING_TAG, false;
 
     if (strncmp((char *)tlv_value_of(tlv, TAG_STEGFS), STEGFS_NAME, strlen(STEGFS_NAME)))
-        return false;
+        return errno = -FAIL_INVALID_TAG, false;
     if (strncmp((char *)tlv_value_of(tlv, TAG_VERSION), STEGFS_VERSION, strlen(STEGFS_VERSION)))
-        return false;
+        return errno = -FAIL_INVALID_TAG, false;
     /* get cipher info */
     char *c = strndup((char *)tlv_value_of(tlv, TAG_CIPHER), tlv_size_of(tlv, TAG_CIPHER));
     file_system.cipher = cipher_id_from_name(c);
@@ -117,7 +117,7 @@ extern bool stegfs_init(const char * const restrict fs)
     file_system.hash = hash_id_from_name(h);
     free(h);
     if (file_system.cipher == GCRY_CIPHER_NONE || file_system.hash == GCRY_MD_NONE || file_system.mode == GCRY_CIPHER_MODE_NONE)
-        return false;
+        return errno = -FAIL_INVALID_TAG, false;
     /* get fs block size */
     memcpy(&file_system.blocksize, tlv_value_of(tlv, TAG_BLOCKSIZE), tlv_size_of(tlv, TAG_BLOCKSIZE));
     file_system.blocksize = ntohl(file_system.blocksize);
@@ -129,9 +129,9 @@ extern bool stegfs_init(const char * const restrict fs)
     file_system.blocks.in_use = calloc(file_system.size / file_system.blocksize, sizeof(bool));
 
     if (ntohll(block.next) != file_system.size / file_system.blocksize)
-        return false;
+        return errno = -FAIL_CORRUPT_TAG, false;
     if (file_system.head_offset > (ssize_t)file_system.blocksize)
-        return false;
+        return errno = -FAIL_CORRUPT_TAG, false;
 
     tlv_deinit(&tlv);
     init_crypto();
@@ -566,7 +566,7 @@ static bool block_read(uint64_t bid, stegfs_block_t *block, gcry_cipher_hd_t cip
         gcry_md_hash_buffer(file_system.hash, hash_buffer, path, strlen(path));
         if (memcmp(block->path, hash_buffer, hash_length))
         {
-            free(hash_buffer);
+            gcry_free(hash_buffer);
             return false;
         }
     }
