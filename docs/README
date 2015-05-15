@@ -20,6 +20,7 @@ Changes
 	  - 128 bits
       - 192 bits
 	  - 256 bits
+* Allow user configured algorithm (select during mkfs)
 * Remove multi-threaded capability (we’ll bring it back soon)
 * Files are:
   - Read when they’re opened
@@ -38,7 +39,6 @@ Ideas For Another Day
 ---------------------
 
 * Bring back multi-threaded support
-* Allow user configured algorithm (select during mkfs)
 * Cache time limit (force forget if a file isn’t accessed)
 * Don’t break backwards compatibility (again)!
 
