@@ -29,7 +29,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#include <linux/limits.h>
+#include <limits.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <netinet/in.h>
