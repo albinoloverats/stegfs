@@ -1,4 +1,4 @@
-.TH stegfs 1 2015.01
+.TH stegfs 1 2015.XX
 .SH NAME
 \fBstegfs\fR \- A (FUSE based) steganographic file system for Unix-like operating systems
 .P
@@ -11,7 +11,7 @@
 \fBstegfs\fR is a FUSE based file system which provides absolute security. Using
 encryption to secure files, and the art of steganography to hide them, stegfs
 aims to ensure that the existence of such files isn't guaranteed. Implemented as
-a FUSE based file system and using the mhash and mcrypt libraries to provide the
+a FUSE based file system and using the libgcrypt library to provide the
 cryptographic hash and symmetric block cipher functions, stegfs is at the
 cutting edge of secure file system technology.
 .SH OPTIONS
@@ -28,7 +28,7 @@ Display application version
 It doesn't matter which order the file system and mount point are specified
 as stegfs will figure that out. All other options are passed to FUSE.
 .P
-The FUSE option -s (to use a single thread) is (currently) forced by stegfs.
+The FUSE option -s (to use a single thread) is (currently) enforced by stegfs.
 .SH OPTIONS \fImkstegfs\fR
 .TP
 .BR \-s\fR " " \fISIZE\fR
@@ -40,16 +40,31 @@ Force overwrite existing file, required when overwriting a file system in a norm
 .BR \-r\fR
 Rewrite the superblock (perhaps it became corrupt)
 .TP
-.BR \-d\fR
-Dry run - print details about the file system that would have been created
+.BR \-t\fR
+Test run - print details about the file system that would have been created
+.TP
+.BR \-c\fR " " \fIALGORITHM\fR
+Algorithm to use to encrypt data
+.TP
+.BR \-m\fR " " \fIMODE\fR
+The encryption mode to use
+.TP
+.BR \-d\fR " " \fIALGORITHM\fR
+Hash algorithm to generate key and check data integrity
+.TP
+.BR \-p\fR " " \fICOPIES\fR
+File duplication; number of copies
 .SH NOTES \fImkstegfs\fR
 Size option isn't necessary when creating a file system on a block device.
 .P
 Size are in megabytes unless otherwise specified: GB, TB, PB, or EB.
+.P
+Defaults for cipher algorithms and data duplication are: serpent (256 bit block);
+cipher block chaining (CBC); Tiger (192 bit); 8 copies of each file for redundancy.
 .SH AUTHOR
 Written by Ashley Morgan Anderson
 .SH BUGS
-stegfs is currently single threaded - more work is needed to support mutliple
+stegfs is currently single threaded - more work is needed to support multiple
 threads accessing the file system at once. This is force by FUSE.
 .P
 Although if you do think you've really found a bug, please first check the
