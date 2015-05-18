@@ -34,6 +34,8 @@ Changes
   - Are cached while mounted
   - Do not need + prefix
   - Do require creating on each mount (if you want to access your files)
+* Provide an extreme paranoia mode, where by the standard stegfs header
+  block isn’t written, thus disguising the partition.
 
 Ideas For Another Day
 ---------------------
@@ -87,6 +89,16 @@ path). As an example: copying the source code for our encrypt project on
 to a stegfs partition causes several of the files to become corrupt and
 unrecoverable. Obviously one way to avoid this is to bundle files in to
 an archive (tar, zip, etc).
+
+The paranoid mode doesn’t disclose the fact that a stegfs partition is
+present; the entire file or device will appear as random data. Whilst
+this is good for security it does mean that the stegfs application is
+unable to confirm that it is mounting an actual stegfs partition; it
+will ignore some basic sanity checks and then succeed regardless---this
+could cause serious data loss! You have to way up the risks for
+yourself: security and increased plausible deniability, or risk of
+destroying data if you accidentally mount something that isn’t a stegfs
+partition.
 
 mkstegfs
 --------
