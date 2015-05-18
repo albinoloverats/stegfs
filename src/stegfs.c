@@ -366,7 +366,7 @@ extern bool stegfs_file_read(stegfs_file_t *file)
             if (block_read(file->blocks[i][j], &block, cipher_handle, file->path))
             {
                 size_t l = sizeof block.data;
-                if (l + k * sizeof block.data > (file->size - (sizeof block.data - file_system.head_offset)))
+                if ((l + k * sizeof block.data) > (file->size - (sizeof block.data - file_system.head_offset)))
                     l = l - ((l + k * sizeof block.data) - (file->size - (sizeof block.data - file_system.head_offset)));
                 memcpy(file->data + (sizeof block.data - file_system.head_offset) + k * sizeof block.data, block.data, l);
             }
@@ -477,8 +477,8 @@ extern bool stegfs_file_write(stegfs_file_t *file)
         {
             memset(&block, 0x00, sizeof block);
             size_t l = sizeof block.data;
-            if (l + k * sizeof block.data > file->size)
-                l = l - ((l + k * sizeof block.data) - file->size);
+            if ((l + k * sizeof block.data) > (file->size - (sizeof block.data - file_system.head_offset)))
+                l = l - ((l + k * sizeof block.data) - (file->size - (sizeof block.data - file_system.head_offset)));
             gcry_create_nonce(block.data, sizeof block.data);
             memcpy(block.data, file->data + (sizeof block.data - file_system.head_offset) + k * sizeof block.data, l);
             block.next = htonll(file->blocks[i][j + 1]);
