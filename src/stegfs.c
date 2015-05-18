@@ -676,6 +676,12 @@ static bool block_in_use(uint64_t bid, const char * const restrict path)
         if (!memcmp(hash_buffer, file_system.memory + (bid * file_system.blocksize), hash_length))
         {
             gcry_free(hash_buffer);
+            /*
+             * block detected as being used by a file that exists closer
+             * to the root of the system; mark it as such
+             */
+            file_system.blocks.in_use[bid] = true;
+            file_system.blocks.used++;
             return true;
         }
     }
@@ -701,6 +707,7 @@ static uint64_t block_assign(const char * const restrict path)
     do
     {
         block = (lrand48() << 32 | lrand48());// % (file_system.size / file_system.blocksize);
+        /* eventually “timeout” after trying as many blocks as exists */
         if ((++tries) > file_system.size / file_system.blocksize)
             return 0;
     }
