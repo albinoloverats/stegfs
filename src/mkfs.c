@@ -378,7 +378,7 @@ int main(int argc, char **argv)
         printf("\rWriting      : %'*.3f %%", r, PERCENT * i / (size / MEGABYTE));
         gcry_cipher_encrypt(gc, rnd, sizeof rnd, NULL, 0);
         memcpy(mm + (i * sizeof rnd), rnd, sizeof rnd);
-        msync(mm + (i * sizeof rnd), sizeof rnd, MS_ASYNC);
+        msync(mm + (i * sizeof rnd), sizeof rnd, MS_SYNC);
     }
     printf("\rWriting      : %'*.3f %%\n", r, PERCENT);
 
@@ -408,7 +408,7 @@ superblock:
     sb.hash[2] = htonll(MAGIC_2);
     sb.next = htonll(blocks);
     memcpy(mm, &sb, sizeof sb);
-    msync(mm, sizeof sb, MS_ASYNC);
+    msync(mm, sizeof sb, MS_SYNC);
     munmap(mm, size);
     close(fs);
     printf("Done\n\e[?25h"); /* show cursor again */

@@ -144,7 +144,7 @@ extern bool stegfs_init(const char * const restrict fs)
 
 extern void stegfs_deinit(void)
 {
-    msync(file_system.memory, file_system.size,  MS_ASYNC);
+    msync(file_system.memory, file_system.size,  MS_SYNC);
     munmap(file_system.memory, file_system.size);
     close(file_system.handle);
 
@@ -627,7 +627,7 @@ static bool block_write(uint64_t bid, stegfs_block_t block, gcry_cipher_hd_t cip
     (void)cipher;
 #endif
     memcpy(file_system.memory + (bid * file_system.blocksize), &block, sizeof block);
-    msync(file_system.memory + (bid * file_system.blocksize), sizeof block, MS_ASYNC);
+    msync(file_system.memory + (bid * file_system.blocksize), sizeof block, MS_SYNC);
     return true;
 }
 
@@ -640,7 +640,7 @@ static void block_delete(uint64_t bid)
     if (!bid || (bid * file_system.blocksize + file_system.blocksize > file_system.size))
         return;
     memcpy(file_system.memory + (bid * file_system.blocksize), &block, sizeof block);
-    msync(file_system.memory + (bid * file_system.blocksize), sizeof block, MS_ASYNC);
+    msync(file_system.memory + (bid * file_system.blocksize), sizeof block, MS_SYNC);
     file_system.blocks.in_use[bid] = false;
     file_system.blocks.used--;
     return;
