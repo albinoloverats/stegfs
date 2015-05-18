@@ -50,7 +50,11 @@ static void copy(const char *from_prefix, const char *from, const char *to_prefi
 
 int main(int argc, char **argv)
 {
-    (void)argc;
+    if (argc != 3)
+    {
+        fprintf(stderr, "Usage: %s <source> <destination>\n", argv[0]);
+        return EXIT_FAILURE;
+    }
 
     char *in = strdup(argv[1]);
     char *to = strdup(argv[2]);
