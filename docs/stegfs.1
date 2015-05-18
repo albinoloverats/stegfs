@@ -6,7 +6,7 @@
 .SH SYNOPSIS
 \fBstegfs\fR <\fIfile system\fR> <\fImount point\fR> [\fIFUSE options ...\fR]
 .P
-\fBmkstegfs\fR [\fB\-s\fR \fIsize\fR] <\fIfile system\fR>
+\fBmkstegfs\fR [\fB\-s\fR \fIsize\fR] <\fIfile system\fR> [\fIoptional arguments ...\fR]
 .SH DESCRIPTION
 \fBstegfs\fR is a FUSE based file system which provides absolute security. Using
 encryption to secure files, and the art of steganography to hide them, stegfs
@@ -59,7 +59,7 @@ Size option isn't necessary when creating a file system on a block device.
 .P
 Size are in megabytes unless otherwise specified: GB, TB, PB, or EB.
 .P
-Defaults for cipher algorithms and data duplication are: serpent (256 bit block);
+Defaults for cipher algorithms and data duplication are: serpent (192 bit key);
 cipher block chaining (CBC); Tiger (192 bit); 8 copies of each file for redundancy.
 .SH AUTHOR
 Written by Ashley Morgan Anderson

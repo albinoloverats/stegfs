@@ -101,3 +101,10 @@ conditions where no files are compromised: each file is written 8 times
 to minimise the loss, and maximise the chance of being able to recover
 it. Under normal working conditions it’s highly likely this value will
 never be achieved due to the Birthday Paradox.
+
+By default the mkfs utility will use the Serpent cipher with a 192 bit
+key, in cipher block chaining mode, and the Tiger hash algorithm, which
+generates 192 bit hashes. These can be changed by passing the
+appropriate arguments and values to mkstegfs. You can find a list of
+supported algorithms/modes either from encrypt (as it uses libgcrypt) or
+from: https://www.gnupg.org/documentation/manuals/gcrypt/

@@ -44,12 +44,7 @@
 #include "stegfs.h"
 
 
-#define SIZE_BYTE_SERPENT   0x10    /*!<   16 bytes -- 128 bits */
-#define SIZE_BYTE_TIGER     0x18    /*!<   24 bytes -- 192 bits */
-
 #define DEFAULT_COPIES 8
-
-#define RATIO 1024
 
 static int64_t open_filesystem(const char * const restrict path, uint64_t *size, bool force, bool recreate, bool dry)
 {
@@ -116,13 +111,13 @@ static uint64_t parse_size(const char * const restrict s)
     switch (toupper(f[0]))
     {
         case 'E':
-            z *= RATIO;
+            z *= KILOBYTE; /* Ratio between EB and PB (ditto below) */
         case 'P':
-            z *= RATIO;
+            z *= KILOBYTE;
         case 'T':
-            z *= RATIO;
+            z *= KILOBYTE;
         case 'G':
-            z *= RATIO;
+            z *= KILOBYTE;
         case 'M':
         case '\0':
             z *= MEGABYTE;
@@ -135,24 +130,24 @@ static uint64_t parse_size(const char * const restrict s)
 
 static void adjust_units(double *size, char *units)
 {
-    if (*size >= RATIO)
+    if (*size >= KILOBYTE)
     {
-        *size /= RATIO;
+        *size /= KILOBYTE;
         strcpy(units, "GB");
     }
-    if (*size >= RATIO)
+    if (*size >= KILOBYTE)
     {
-        *size /= RATIO;
+        *size /= KILOBYTE;
         strcpy(units, "TB");
     }
-    if (*size >= RATIO)
+    if (*size >= KILOBYTE)
     {
-        *size /= RATIO;
+        *size /= KILOBYTE;
         strcpy(units, "PB");
     }
-    if (*size >= RATIO)
+    if (*size >= KILOBYTE)
     {
-        *size /= RATIO;
+        *size /= KILOBYTE;
         strcpy(units, "EB");
     }
     return;
@@ -268,7 +263,7 @@ int main(int argc, char **argv)
     bool recreate = false;
     bool dry = false;
     uint32_t copies = DEFAULT_COPIES;
-    enum gcry_cipher_algos c = GCRY_CIPHER_SERPENT256;
+    enum gcry_cipher_algos c = GCRY_CIPHER_SERPENT192;
     enum gcry_cipher_modes m = GCRY_CIPHER_MODE_CBC;
     enum gcry_md_algos     h = GCRY_MD_TIGER1;
 

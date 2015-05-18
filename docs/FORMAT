@@ -34,18 +34,19 @@ Cipher Details
 stegfs is currently (during this development phase) aiming to support
 a variety of ciphers and hashes, as well as various key and block
 lengths. These will be set when the file system is created and detected
-at each mount. The file system block size has been chosen to allow cipher
-block lengths of 128, 192, and 256 bits, and keys up to 256 bits.
+at each mount. The file system block size has been chosen to allow
+cipher key lengths of 128, 192, and 256 bits, and hashes up to 256 bits
+(excess are discarded).
 
 Example/Explanation
 --------------------
 
 A 1GB file system has 524,288 blocks (524,287 are available for file
 data, as the first contains file system information). Each of these
-blocks can store 1,976 bytes of data, leading to 988MB of total capacity.
-As each file is duplicated multiple times (8×) the single largest file
-size is over 123MB---which is also the maximum available capacity if
-everything is stored in the / of the file system.
+blocks can store 1,976 bytes of data, resulting in 988MB of total
+capacity.  As each file is duplicated multiple times (8×) the single
+largest file size is over 123MB---which is also the maximum available
+capacity if everything is stored in the / of the file system.
 
 Block Layout
 ------------
