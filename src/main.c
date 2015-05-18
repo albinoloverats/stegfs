@@ -630,6 +630,7 @@ int main(int argc, char **argv)
 #ifdef __DEBUG__
     bool d = false;
 #endif
+    bool p = false;
 
     for (int i = 1; i < argc; i++)
     {
@@ -647,6 +648,13 @@ int main(int argc, char **argv)
         if (!strcmp(argv[i], "-d"))
             d = true;
 #endif
+        if (!strcmp(argv[i], "-x"))
+        {
+            p = true;
+            argv[i] = NULL;
+            argc--;
+        }
+
         struct stat s;
         memset(&s, 0x00, sizeof s);
         stat(argv[i], &s);
@@ -680,7 +688,7 @@ int main(int argc, char **argv)
     free(mp);
 
     errno = EXIT_SUCCESS;
-    if (!h && !stegfs_init(fs))
+    if (!h && !stegfs_init(fs, p))
     {
         if (errno < 0)
             switch (-errno)

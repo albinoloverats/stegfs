@@ -49,7 +49,7 @@ static gcry_cipher_hd_t cipher_init(const stegfs_file_t * const restrict, uint8_
 
 static stegfs_t file_system;
 
-extern bool stegfs_init(const char * const restrict fs)
+extern bool stegfs_init(const char * const restrict fs, bool p)
 {
     if ((file_system.handle = open(fs, O_RDWR, S_IRUSR | S_IWUSR)) < 0)
         return false;
@@ -65,6 +65,16 @@ extern bool stegfs_init(const char * const restrict fs)
 #ifdef USE_PROC
     stegfs_cache2_add(PATH_PROC, NULL);
 #endif
+    if (p)
+    {
+        file_system.cipher = GCRY_CIPHER_SERPENT192;
+        file_system.mode = GCRY_CIPHER_MODE_CBC;
+        file_system.hash = GCRY_MD_TIGER1;
+        file_system.blocksize = SIZE_BYTE_BLOCK;
+        file_system.head_offset = OFFSET_BYTE_HEAD;
+        file_system.copies = DEFAULT_COPIES;
+        goto done;
+    }
 
     stegfs_block_t block;
     memcpy(&block, file_system.memory, sizeof block);
@@ -130,15 +140,17 @@ extern bool stegfs_init(const char * const restrict fs)
     memcpy(&file_system.copies, tlv_value_of(tlv, TAG_DUPLICATION), tlv_size_of(tlv, TAG_DUPLICATION));
     file_system.copies = ntohl(file_system.copies);
 
-    file_system.blocks.used = 1;
-    file_system.blocks.in_use = calloc(file_system.size / file_system.blocksize, sizeof(bool));
-
     if (ntohll(block.next) != file_system.size / file_system.blocksize)
         return errno = -FAIL_CORRUPT_TAG, false;
     if (file_system.head_offset > (ssize_t)file_system.blocksize)
         return errno = -FAIL_CORRUPT_TAG, false;
 
     tlv_deinit(&tlv);
+
+done:
+    file_system.blocks.used = 1;
+    file_system.blocks.in_use = calloc(file_system.size / file_system.blocksize, sizeof(bool));
+
     init_crypto();
     return true;
 }

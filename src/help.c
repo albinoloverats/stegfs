@@ -58,9 +58,13 @@ extern void show_help(void)
     fprintf(stderr, _("  -h, --help                   Display this message\n"));
     fprintf(stderr, _("  -l, --licence                Display GNU GPL v3 licence header\n"));
     fprintf(stderr, _("  -v, --version                Display application version\n"));
+    fprintf(stderr, _("  -x                           Enable extra paranoid node\n"));
     fprintf(stderr, _("\nNotes:\n  • It doesn't matter which order the file system and mount point are specified\n"));
     fprintf(stderr, _("    as stegfs will figure that out. All other options are passed to FUSE.\n"));
     fprintf(stderr, _("  • The FUSE option -s (to use a single thread) is (currently) forced by stegfs.\n"));
+    fprintf(stderr, _("  • If you’re feeling extra paranoid you can now disable to stegfs file\n"));
+    fprintf(stderr, _("    system header. This will also disable the checks when mounting and then\n"));
+    fprintf(stderr, _("    anything could happen ;-)\n"));
     fprintf(stderr, "\n");
     return;
 }

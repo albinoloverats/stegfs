@@ -47,6 +47,7 @@
         /* next block (not defined) */
 
 #define MAX_COPIES 64
+#define DEFAULT_COPIES 8
 #define SYM_LENGTH -1
 
 #define SUPER_ID STEGFS_NAME " " STEGFS_VERSION
@@ -169,11 +170,12 @@ stegfs_block_t;
 /*!
  * \brief          Initialise stegfs library, set internal data structures
  * \param[in]  fs  Name and path to file system
+ * \param[in]  p   Paranoid mode
  *
  * Initialise the file system and popular static information structures,
  * making note whether to cache file details
  */
-extern bool stegfs_init(const char * const restrict fs) __attribute__((nonnull(1)));
+extern bool stegfs_init(const char * const restrict fs, bool p) __attribute__((nonnull(1)));
 
 /*!
  * \brief                Retrieve information about the file system

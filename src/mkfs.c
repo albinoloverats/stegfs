@@ -44,8 +44,6 @@
 #include "stegfs.h"
 
 
-#define DEFAULT_COPIES 8
-
 static int64_t open_filesystem(const char * const restrict path, uint64_t *size, bool force, bool recreate, bool dry)
 {
     int64_t fs = 0x0;
@@ -242,6 +240,7 @@ static void print_usage_help(char *arg)
     fprintf(stderr, "  -m  mode       The encryption mode to use\n");
     fprintf(stderr, "  -d  algorithm  Hash algorithm to generate key and check data integrity\n");
     fprintf(stderr, "  -p  copies     File duplication; number of copies\n");
+    fprintf(stderr, "  -x             Enable extra paranoid node\n");
     fprintf(stderr, "\nNotes:\n  • Size option isn't necessary when creating a file system on a block device.\n");
     fprintf(stderr, "  • Size are in megabytes unless otherwise specified: GB, TB, PB, or EB.\n");
     fprintf(stderr, "  • Defaults for cipher algorithms and data duplication are:\n");
@@ -249,6 +248,9 @@ static void print_usage_help(char *arg)
     fprintf(stderr, "    • Cipher Block Bhaining (CBC)\n");
     fprintf(stderr, "    • Tiger (192 bit digest)\n");
     fprintf(stderr, "    • 8 copies of each file\n");
+    fprintf(stderr, "  • If you’re feeling extra paranoid you can now disable to stegfs file\n");
+    fprintf(stderr, "    system header. This will also disable the checks when mounting and then\n");
+    fprintf(stderr, "    anything could happen ;-)\n");
     exit(EXIT_SUCCESS);
 }
 
@@ -262,6 +264,7 @@ int main(int argc, char **argv)
     bool force = false;
     bool recreate = false;
     bool dry = false;
+    bool paranoid = false;
     uint32_t copies = DEFAULT_COPIES;
     enum gcry_cipher_algos c = GCRY_CIPHER_SERPENT192;
     enum gcry_cipher_modes m = GCRY_CIPHER_MODE_CBC;
@@ -287,6 +290,8 @@ int main(int argc, char **argv)
             h = hash_id_from_name(argv[++i]);
         else if (!strcmp("-p", argv[i]))
             copies = strtol(argv[++i], NULL, 0);
+        else if (!strcmp("-x", argv[i]))
+            paranoid = true;
         else
             realpath(argv[i], path);
     }
@@ -392,6 +397,9 @@ superblock:
     }
 
     printf("Superblock   : ");
+    if (paranoid)
+        goto done;
+
     stegfs_block_t sb;
     gcry_create_nonce(&sb, sizeof sb);
     memset(sb.path, 0xFF, sizeof sb.path);
@@ -404,9 +412,10 @@ superblock:
     sb.next = htonll(blocks);
     memcpy(mm, &sb, sizeof sb);
     msync(mm, sizeof sb, MS_SYNC);
+done:
     munmap(mm, size);
     close(fs);
-    printf("Done\n\e[?25h"); /* show cursor again */
+    printf("%s\n\e[?25h", paranoid ? "Ignored" : "Done"); /* show cursor again */
 
     return EXIT_SUCCESS;
 }
