@@ -1,4 +1,4 @@
-stegfs - 2015.00                                          ---- ---- ----
+stegfs - 2015.06                                          ---- June 2015
 ================
 
 Changes
@@ -32,7 +32,7 @@ Changes
 * Directories:
   - Still not stored
   - Are cached while mounted
-  - DO NOT NEED + PREFIX!!
+  - Do not need + prefix
   - Do require creating on each mount (if you want to access your files)
 
 Ideas For Another Day
