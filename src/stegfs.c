@@ -144,7 +144,7 @@ extern bool stegfs_init(const char * const restrict fs)
 
 extern void stegfs_deinit(void)
 {
-    msync(file_system.memory, file_system.size,  MS_SYNC);
+    msync(file_system.memory, file_system.size,  MS_ASYNC);
     munmap(file_system.memory, file_system.size);
     close(file_system.handle);
 
@@ -627,7 +627,7 @@ static bool block_write(uint64_t bid, stegfs_block_t block, gcry_cipher_hd_t cip
     (void)cipher;
 #endif
     memcpy(file_system.memory + (bid * file_system.blocksize), &block, sizeof block);
-    msync(file_system.memory + (bid * file_system.blocksize), sizeof block, MS_SYNC);
+    msync(file_system.memory + (bid * file_system.blocksize), sizeof block, MS_ASYNC);
     return true;
 }
 
@@ -640,7 +640,7 @@ static void block_delete(uint64_t bid)
     if (!bid || (bid * file_system.blocksize + file_system.blocksize > file_system.size))
         return;
     memcpy(file_system.memory + (bid * file_system.blocksize), &block, sizeof block);
-    msync(file_system.memory + (bid * file_system.blocksize), sizeof block, MS_SYNC);
+    msync(file_system.memory + (bid * file_system.blocksize), sizeof block, MS_ASYNC);
     file_system.blocks.in_use[bid] = false;
     file_system.blocks.used--;
     return;
@@ -661,7 +661,6 @@ static bool block_in_use(uint64_t bid, const char * const restrict path)
      * this directory, or any parent directory
      */
 #ifndef __DEBUG__
-    stegfs_block_t block;
     size_t hash_length = gcry_md_get_algo_dlen(file_system.hash);
     uint8_t *hash_buffer = gcry_malloc_secure(hash_length);
     char *p = NULL;
@@ -673,8 +672,7 @@ static bool block_in_use(uint64_t bid, const char * const restrict path)
         if (e)
             free(e);
         gcry_md_hash_buffer(file_system.hash, hash_buffer, p, strlen(p));
-        memcpy(&block, file_system.memory + (bid * file_system.blocksize), sizeof block);
-        if (!memcmp(hash_buffer, block.path, hash_length))
+        if (!memcmp(hash_buffer, file_system.memory + (bid * file_system.blocksize), hash_length))
         {
             gcry_free(hash_buffer);
             return true;
@@ -770,7 +768,8 @@ extern void stegfs_cache2_add(const char * const restrict path, stegfs_file_t *f
         goto c2a3; /* already in cache */
     ptr = &(file_system.cache2);
     char *name = dir_get_name(p, PASSWORD_SEPARATOR);
-    for (uint16_t i = 1; i < dir_get_deep(p); i++)
+    uint16_t hierarchy = dir_get_deep(p);
+    for (uint16_t i = 1; i < hierarchy; i++)
     {
         char *e = dir_get_part(p, i);
         bool found = false;
@@ -868,7 +867,8 @@ extern stegfs_cache2_t *stegfs_cache2_exists(const char * const restrict path, s
 {
     stegfs_cache2_t *ptr = &(file_system.cache2);
     char *name = dir_get_name(path, PASSWORD_SEPARATOR);
-    for (uint16_t i = 1; i < dir_get_deep(path); i++)
+    uint16_t hierarchy = dir_get_deep(path);
+    for (uint16_t i = 1; i < hierarchy; i++)
     {
         bool found = false;
         char *e = dir_get_part(path, i);
@@ -901,7 +901,8 @@ extern void stegfs_cache2_remove(const char * const restrict path)
 {
     stegfs_cache2_t *ptr = &(file_system.cache2);
     char *name = dir_get_name(path, PASSWORD_SEPARATOR);
-    for (uint16_t i = 1; i < dir_get_deep(path); i++)
+    uint16_t hierarchy = dir_get_deep(path);
+    for (uint16_t i = 1; i < hierarchy; i++)
     {
         bool found = false;
         char *e = dir_get_part(path, i);

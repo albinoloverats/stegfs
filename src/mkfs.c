@@ -298,11 +298,18 @@ int main(int argc, char **argv)
 
     if (!strlen(path))
     {
-        fprintf(stderr, "missing file system target\n");
+        fprintf(stderr, "Missing file system target!\n");
         return EXIT_FAILURE;
     }
 
     int64_t fs = open_filesystem(path, &size, force, recreate, dry);
+
+    if (!size)
+    {
+        fprintf(stderr, "Invalid file system size!\n");
+        return EXIT_FAILURE;
+    }
+
     uint64_t blocks = size / SIZE_BYTE_BLOCK;
     void *mm = NULL;
     if (dry)
@@ -401,7 +408,7 @@ superblock:
     sb.hash[2] = htonll(MAGIC_2);
     sb.next = htonll(blocks);
     memcpy(mm, &sb, sizeof sb);
-    msync(mm, sizeof sb, MS_SYNC);
+    msync(mm, sizeof sb, MS_ASYNC);
     munmap(mm, size);
     close(fs);
     printf("Done\n\e[?25h"); /* show cursor again */
