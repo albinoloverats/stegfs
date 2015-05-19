@@ -1,10 +1,11 @@
-.TH stegfs 1 2015.06
+.TH mkstegfs 1 2015.06
 .SH NAME
-\fBstegfs\fR \- A (FUSE based) steganographic file system for Unix-like
-operating systems
+\fBmkstegfs\fR \- mkfs binary to create stegfs file systems
 .SH SYNOPSIS
-\fBstegfs\fR <\fIfile system\fR> <\fImount point\fR> [\fIadditional options ...\fR]
+\fBmkstegfs\fR [\fB\-s\fR \fIsize\fR] <\fIfile system\fR> [\fIoptional arguments ...\fR]
+
 .SH DESCRIPTION
+
 \fBstegfs\fR is a FUSE based file system which provides absolute security. Using
 encryption to secure files, and the art of steganography to hide them, stegfs
 aims to ensure that the existence of such files isn't guaranteed. Implemented as
@@ -36,11 +37,22 @@ Enable paranoia mode
 .TP
 .BR \-x ", " \-\-duplicates\fR " " \fICOPIES\fR
 Number of times each file should be duplicated
+.TP
+.BR \-z ", " \-\-size\fR " " \fISIZE\fR
+Desired file system size, required when creating a file system in a normal file
+.TP
+.BR \-f ", " \-\-force\fR
+Force overwrite existing file, required when overwriting a file system in a
+normal file
+.TP
+.BR \-r ", " \-\-rewrite-sb\fR
+Rewrite the superblock (perhaps it became corrupt)
+.TP
+.BR \-d ", " \-\-dry-run\fR
+Dry run - print details about the file system that would have been created
 .SH NOTES
 It doesn't matter which order the file system and mount point are specified as
 stegfs will figure that out. All other options are passed to FUSE.
-.P
-The FUSE option -s (to use a single thread) is (currently) forced by stegfs.
 .P
 If you’re feeling extra paranoid you can now disable to stegfs file system
 header. This will also disable the checks when mounting and thus anything could
@@ -48,12 +60,9 @@ happen ;-)
 .SH AUTHOR
 Written by Ashley Morgan Anderson
 .SH BUGS
-stegfs is currently single threaded - more work is needed to support multiple
-threads accessing the file system at once. This is enforced by FUSE.
-.P
-Although if you do think you've really found a bug, please first check the
-README or the CHANGELOG to see if it has already been documented and scheduled
-for the next release; then if you're still convinced, let us know at
+If you do think you've really found a bug, please first check the README or the
+CHANGELOG to see if it has already been documented and scheduled for the next
+release; then if you're still convinced, let us know at
 https://albinoloverats.net/?tracker
 .SH COPYRIGHT
 Copyright \(co 2007\-2015 albinoloverats ~ Software Development

@@ -66,7 +66,7 @@
 
 
 #define DEFAULT_CIPHER GCRY_CIPHER_RIJNDAEL256
-#define DEFAULT_MDOE   GCRY_CIPHER_MODE_CBC
+#define DEFAULT_MODE   GCRY_CIPHER_MODE_CBC
 #define DEFAULT_HASH   GCRY_MD_SHA256
 
 #ifdef USE_PROC
@@ -91,13 +91,15 @@ stegfs_tag_e;
 
 typedef enum
 {
-    FAIL_NOT_STEGFS,
-    FAIL_OLD_STEGFS,
-    FAIL_MISSING_TAG,
-    FAIL_INVALID_TAG,
-    FAIL_CORRUPT_TAG
+    STEGFS_INIT_OKAY,
+    STEGFS_INIT_UNKNOWN,
+    STEGFS_INIT_NOT_STEGFS,
+    STEGFS_INIT_OLD_STEGFS,
+    STEGFS_INIT_MISSING_TAG,
+    STEGFS_INIT_INVALID_TAG,
+    STEGFS_INIT_CORRUPT_TAG
 }
-stegfs_failure_e;
+stegfs_init_e;
 
 /*!
  * \brief  Structure to hold information about a file
@@ -144,12 +146,12 @@ stegfs_blocks_t;
  */
 typedef struct stegfs_t
 {
-    int64_t                 handle;      /*!< Handle to file system file/device */
-    uint64_t                size;        /*!< Size of file system in bytes (not capacity) */
+    int64_t                handle;      /*!< Handle to file system file/device */
+    uint64_t               size;        /*!< Size of file system in bytes (not capacity) */
     void                  *memory;      /*!< mmap pointer */
-    enum gcry_cipher_algos cipher;
-    enum gcry_cipher_modes mode;
-    enum gcry_md_algos     hash;
+    enum gcry_cipher_algos cipher;      /*!< Cipher algorithm used by the file system */
+    enum gcry_cipher_modes mode;        /*!< Cipher mode used by the file system */
+    enum gcry_md_algos     hash;        /*!< Hash algorithm used by the file system */
     uint32_t               copies;      /*!< File duplication */
     size_t                 blocksize;   /*!< File system block size; if it needs to be bigger than 4,294,967,295 we have issues */
     off_t                  head_offset; /*!< Start location of file data in header blocks; only 32 bits (like blocksize) */
@@ -176,11 +178,16 @@ stegfs_block_t;
  * \brief          Initialise stegfs library, set internal data structures
  * \param[in]  fs  Name and path to file system
  * \param[in]  p   Paranoid mode
+ * \param[in]  c   Cipher algorithm
+ * \param[in]  m   Cipher mode
+ * \param[in]  h   Hash algorithm
+ * \param[in]  x   Duplication copies
+ * \returns        The initialisation status
  *
  * Initialise the file system and popular static information structures,
  * making note whether to cache file details
  */
-extern bool stegfs_init(const char * const restrict fs, bool p) __attribute__((nonnull(1)));
+extern stegfs_init_e stegfs_init(const char * const restrict fs, bool p, enum gcry_cipher_algos c, enum gcry_cipher_modes m, enum gcry_md_algos h, uint32_t x);
 
 /*!
  * \brief                Retrieve information about the file system

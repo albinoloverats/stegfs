@@ -49,14 +49,15 @@ static gcry_cipher_hd_t cipher_init(const stegfs_file_t * const restrict, uint8_
 
 static stegfs_t file_system;
 
-extern bool stegfs_init(const char * const restrict fs, bool p)
+extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid,
+            enum gcry_cipher_algos cipher, enum gcry_cipher_modes mode, enum gcry_md_algos hash, uint32_t dups)
 {
     if ((file_system.handle = open(fs, O_RDWR, S_IRUSR | S_IWUSR)) < 0)
-        return false;
+        return STEGFS_INIT_UNKNOWN;
     lockf(file_system.handle, F_LOCK, 0);
     file_system.size = lseek(file_system.handle, 0, SEEK_END);
     if ((file_system.memory = mmap(NULL, file_system.size, PROT_READ | PROT_WRITE, MAP_SHARED, file_system.handle, 0)) == MAP_FAILED)
-        return false;
+        return STEGFS_INIT_UNKNOWN;
 
     file_system.cache2.name = strdup(DIR_SEPARATOR);
     file_system.cache2.ents = 0;
@@ -65,14 +66,14 @@ extern bool stegfs_init(const char * const restrict fs, bool p)
 #ifdef USE_PROC
     stegfs_cache2_add(PATH_PROC, NULL);
 #endif
-    if (p)
+    if (paranoid)
     {
-        file_system.cipher = DEFAULT_CIPHER;
-        file_system.mode = DEFAULT_MDOE;
-        file_system.hash = DEFAULT_HASH;
+        file_system.cipher = cipher;
+        file_system.mode = mode;
+        file_system.hash = hash;
         file_system.blocksize = SIZE_BYTE_BLOCK;
         file_system.head_offset = OFFSET_BYTE_HEAD;
-        file_system.copies = DEFAULT_COPIES;
+        file_system.copies = dups;
         goto done;
     }
 
@@ -82,12 +83,13 @@ extern bool stegfs_init(const char * const restrict fs, bool p)
     if ((block.hash[0] == MAGIC_201001_0 || htonll(block.hash[0]) == MAGIC_201001_0) &&
         (block.hash[1] == MAGIC_201001_1 || htonll(block.hash[1]) == MAGIC_201001_1) &&
         (block.hash[2] == MAGIC_201001_2 || htonll(block.hash[2]) == MAGIC_201001_2))
-        return errno = -FAIL_OLD_STEGFS, false;
+        return STEGFS_INIT_OLD_STEGFS;
 
     if (ntohll(block.hash[0]) != MAGIC_0 ||
         ntohll(block.hash[1]) != MAGIC_1 ||
         ntohll(block.hash[2]) != MAGIC_2)
-        return errno = -FAIL_NOT_STEGFS, false;
+        return STEGFS_INIT_NOT_STEGFS;
+
     TLV_HANDLE tlv = tlv_init();
     for (int i = 0, j = 0; i < TAG_MAX; i++)
     {
@@ -111,12 +113,12 @@ extern bool stegfs_init(const char * const restrict fs, bool p)
         !tlv_has_tag(tlv, TAG_BLOCKSIZE)     ||
         !tlv_has_tag(tlv, TAG_HEADER_OFFSET) ||
         !tlv_has_tag(tlv, TAG_DUPLICATION))
-        return errno = -FAIL_MISSING_TAG, false;
+        return STEGFS_INIT_MISSING_TAG;
 
     if (strncmp((char *)tlv_value_of(tlv, TAG_STEGFS), STEGFS_NAME, strlen(STEGFS_NAME)))
-        return errno = -FAIL_INVALID_TAG, false;
+        return STEGFS_INIT_INVALID_TAG;
     if (strncmp((char *)tlv_value_of(tlv, TAG_VERSION), STEGFS_VERSION, strlen(STEGFS_VERSION)))
-        return errno = -FAIL_INVALID_TAG, false;
+        return STEGFS_INIT_INVALID_TAG;
     /* get cipher info */
     char *c = strndup((char *)tlv_value_of(tlv, TAG_CIPHER), tlv_size_of(tlv, TAG_CIPHER));
     file_system.cipher = cipher_id_from_name(c);
@@ -129,7 +131,7 @@ extern bool stegfs_init(const char * const restrict fs, bool p)
     file_system.hash = hash_id_from_name(h);
     free(h);
     if (file_system.cipher == GCRY_CIPHER_NONE || file_system.hash == GCRY_MD_NONE || file_system.mode == GCRY_CIPHER_MODE_NONE)
-        return errno = -FAIL_INVALID_TAG, false;
+        return STEGFS_INIT_INVALID_TAG;
     /* get fs block size */
     memcpy(&file_system.blocksize, tlv_value_of(tlv, TAG_BLOCKSIZE), tlv_size_of(tlv, TAG_BLOCKSIZE));
     file_system.blocksize = ntohl(file_system.blocksize);
@@ -141,9 +143,9 @@ extern bool stegfs_init(const char * const restrict fs, bool p)
     file_system.copies = ntohl(file_system.copies);
 
     if (ntohll(block.next) != file_system.size / file_system.blocksize)
-        return errno = -FAIL_CORRUPT_TAG, false;
+        return STEGFS_INIT_CORRUPT_TAG;
     if (file_system.head_offset > (ssize_t)file_system.blocksize)
-        return errno = -FAIL_CORRUPT_TAG, false;
+        return STEGFS_INIT_CORRUPT_TAG;
 
     tlv_deinit(&tlv);
 
@@ -152,7 +154,7 @@ done:
     file_system.blocks.in_use = calloc(file_system.size / file_system.blocksize, sizeof(bool));
 
     init_crypto();
-    return true;
+    return STEGFS_INIT_OKAY;
 }
 
 extern void stegfs_deinit(void)

@@ -39,10 +39,11 @@
 
 #include <gcrypt.h>
 
+#include <common/ccrypt.h>
 #include "common/dir.h"
 
-#include "help.h"
 #include "stegfs.h"
+#include "init.h"
 
 
 /*
@@ -104,6 +105,11 @@ static struct fuse_operations fuse_stegfs_functions =
     .chown     = fuse_stegfs_chown,
     .flush     = fuse_stegfs_flush
 };
+
+extern bool is_stegfs(void)
+{
+    return true;
+}
 
 static int fuse_stegfs_statfs(const char *path, struct statvfs *stvbuf)
 {
@@ -623,104 +629,46 @@ static int fuse_stegfs_chown(const char *path, uid_t uid, gid_t gid)
 
 int main(int argc, char **argv)
 {
-    char *fs = NULL;
-    char *mp = NULL;
+    char **fuse = calloc(argc, sizeof(char *));
+    fuse[0] = argv[0];
 
-    bool h = false;
-#ifdef __DEBUG__
-    bool d = false;
-#endif
-    bool p = false;
+    args_t args = init(argc, argv, fuse);
 
-    for (int i = 1; i < argc; i++)
-    {
-        if (!strcmp(argv[i], "--licence") || !strcmp(argv[i], "-l"))
-            show_licence();
-        if (!strcmp(argv[i], "--version") || !strcmp(argv[i], "-v"))
-            show_version();
-        if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-h"))
-        {
-            show_help();
-            h = true;
-            break; // break to allow FUSE to show its options
-        }
-#ifdef __DEBUG__
-        if (!strcmp(argv[i], "-d"))
-            d = true;
-#endif
-        if (!strcmp(argv[i], "-x"))
-        {
-            p = true;
-            argv[i] = NULL;
-            argc--;
-        }
-
-        struct stat s;
-        memset(&s, 0x00, sizeof s);
-        stat(argv[i], &s);
-        switch (s.st_mode & S_IFMT)
-        {
-            case S_IFBLK:
-            case S_IFLNK:
-            case S_IFREG:
-                fs = strdup(argv[i]);
-                /*
-                 * stegfs is currently single threaded (much more work
-                 * is needed to overcome this) so until that time, we’ll
-                 * force that condition here
-                 */
-                argv[i] = "-s";
-                break;
-            case S_IFDIR:
-                mp = strdup(argv[i]);
-                break;
-            default:
-                /* ignore unknown options (they might be fuse options) */
-                break;
-        }
-    }
-
-    if (!h && !(mp && fs))
+    if (!args.help && !(args.fs && args.mount))
     {
         fprintf(stderr, "Missing file system and/or mount point!\n");
         show_usage();
     }
-    free(mp);
 
     errno = EXIT_SUCCESS;
-    if (!h && !stegfs_init(fs, p))
+    if (!args.help)
     {
-        if (errno < 0)
-            switch (-errno)
-            {
-                case FAIL_NOT_STEGFS:
-                    fprintf(stderr, "Not a stegfs partition!\n");
-                    break;
-                case FAIL_OLD_STEGFS:
-                    fprintf(stderr, "Previous version of stegfs!\n");
-                    break;
-                case FAIL_MISSING_TAG:
-                    fprintf(stderr, "Missing required stegfs metadata!\n");
-                    break;
-                case FAIL_INVALID_TAG:
-                    fprintf(stderr, "Invalid value for stegfs metadata!\n");
-                    break;
-                case FAIL_CORRUPT_TAG:
-                    fprintf(stderr, "Partition size mismatch! (Resizing not allowed!)\n");
-                    break;
-            }
-        else
-            perror("Could not initialise file system!");
-        return errno;
+        switch (stegfs_init(args.fs, args.paranoid, args.cipher, args.mode, args.hash, args.duplicates))
+        {
+            case STEGFS_INIT_OKAY:
+                goto done;
+            case STEGFS_INIT_NOT_STEGFS:
+                fprintf(stderr, "Not a stegfs partition!\n");
+                break;
+            case STEGFS_INIT_OLD_STEGFS:
+                fprintf(stderr, "Previous version of stegfs!\n");
+                break;
+            case STEGFS_INIT_MISSING_TAG:
+                fprintf(stderr, "Missing required stegfs metadata!\n");
+                break;
+            case STEGFS_INIT_INVALID_TAG:
+                fprintf(stderr, "Invalid value for stegfs metadata!\n");
+                break;
+            case STEGFS_INIT_CORRUPT_TAG:
+                fprintf(stderr, "Partition size mismatch! (Resizing not allowed!)\n");
+                break;
+            default:
+                fprintf(stderr, "Unknown error initialising stegfs partition!\n");
+                break;
+        }
+        return EXIT_FAILURE;
     }
-    free(fs);
 
-#ifdef __DEBUG__
-    if (!d)
-    {
-        argv[argc] = strdup("-d");
-        argc++;
-    }
-#endif
-    return fuse_main(argc, argv, &fuse_stegfs_functions, NULL);
+done:
+    return fuse_main(argc, fuse, &fuse_stegfs_functions, NULL);
 }

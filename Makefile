@@ -4,8 +4,8 @@ STEGFS   = stegfs
 MKFS	 = mkstegfs
 CP		 = cp_tree
 
-SOURCE   = src/main.c src/stegfs.c src/help.c
-MKSRC    = src/mkfs.c
+SOURCE   = src/main.c src/stegfs.c src/init.c
+MKSRC    = src/mkfs.c src/init.c
 CPSRC	 = src/cp.c
 COMMON   = src/common/error.c src/common/ccrypt.c src/common/tlv.c src/common/dir.c src/common/non-gnu.c
 
@@ -23,11 +23,6 @@ sfs:
 	 @$(CC) $(LIBS) $(CFLAGS) $(CPPFLAGS) -O2 $(SOURCE) $(COMMON) -o $(STEGFS)
 	-@echo "built ‘$(SOURCE)’ --> ‘$(STEGFS)’"
 
-debug:
-	 @$(CC) $(LIBS) $(CFLAGS) $(CPPFLAGS) $(DEBUG) -DUSE_PROC $(SOURCE) $(COMMON) -o $(STEGFS)
-	-@echo "built ‘$(SOURCE)’ --> ‘$(STEGFS)’"
-
-
 mkfs:
 	 @$(CC) $(LIBS) $(CFLAGS) $(CPPFLAGS) -O2 $(MKSRC) $(COMMON) -o $(MKFS)
 	-@echo "built ‘$(MKSRC) $(COMMON)’ --> ‘$(MKFS)’"
@@ -36,9 +31,21 @@ cp:
 	 @$(CC) $(CFLAGS) $(CPPFLAGS) -O0 -ggdb $(CPSRC) src/common/error.c src/common/fs.c -o $(CP)
 	-@echo "built ‘$(CPSRC) $(COMMON)’ --> ‘$(CP)’"
 
+debug: debug-sfs debug-mkfs
+
+debug-sfs:
+	 @$(CC) $(LIBS) $(CFLAGS) $(CPPFLAGS) $(DEBUG) -DUSE_PROC $(SOURCE) $(COMMON) -o $(STEGFS)
+	-@echo "built ‘$(SOURCE)’ --> ‘$(STEGFS)’"
+
+debug-mkfs:
+	 @$(CC) $(LIBS) $(CFLAGS) $(CPPFLAGS) $(DEBUG) $(MKSRC) $(COMMON) -o $(MKFS)
+	-@echo "built ‘$(MKSRC) $(COMMON)’ --> ‘$(MKFS)’"
+
 man:
 	 @gzip -c docs/$(STEGFS).1 > $(STEGFS).1.gz
 	-@echo -e "compressing ‘docs/$(STEGFS).1’ → ‘$(STEGFS).1.gz"
+	 @gzip -c docs/$(MKFS).1 > $(MKFS).1.gz
+	-@echo -e "compressing ‘docs/$(MKFS).1’ → ‘$(MKFS).1.gz"
 
 install:
 # install stegfs and mkstegfs
@@ -49,8 +56,8 @@ install:
 # now the man page(s)
 	 @install -c -m 644 -D -T $(STEGFS).1.gz $(PREFIX)/usr/$(LOCAL)/share/man/man1/$(STEGFS).1.gz
 	-@echo -e "installed ‘$(STEGFS).1.gz’ → ‘$(PREFIX)/usr/$(LOCAL)/share/man/man1/$(STEGFS).1.gz’"
-	 @ln -f $(PREFIX)/usr/$(LOCAL)/share/man/man1/$(STEGFS).1.gz $(PREFIX)/usr/$(LOCAL)/share/man/man1/$(MKFS).1.gz
-	-@echo -e "linked ‘$(PREFIX)/usr/$(LOCAL)/share/man/man1/$(MKFS).1.gz’ → ‘$(PREFIX)/usr/$(LOCAL)/share/man/man1/$(STEGFS).1.gz’"
+	 @install -c -m 644 -D -T $(MKFS).1.gz $(PREFIX)/usr/$(LOCAL)/share/man/man1/$(MKFS).1.gz
+	-@echo -e "installed ‘$(MKFS).1.gz’ → ‘$(PREFIX)/usr/$(LOCAL)/share/man/man1/$(MKFS).1.gz’"
 
 uninstall:
 	@rm -fv $(PREFIX)/usr/$(LOCAL)/share/man/man1/$(STEGFS).1.gz
@@ -63,6 +70,7 @@ clean:
 
 distclean: clean
 	@rm -fv $(STEGFS).1.gz
+	@rm -fv $(MKFS).1.gz
 	@rm -fvr pkg build
 	@rm -fv $(STEGFS)*.pkg.tar.xz
 	@rm -fv $(STEGFS)*.tgz
