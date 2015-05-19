@@ -67,9 +67,9 @@ extern bool stegfs_init(const char * const restrict fs, bool p)
 #endif
     if (p)
     {
-        file_system.cipher = GCRY_CIPHER_SERPENT192;
-        file_system.mode = GCRY_CIPHER_MODE_CBC;
-        file_system.hash = GCRY_MD_TIGER1;
+        file_system.cipher = DEFAULT_CIPHER;
+        file_system.mode = DEFAULT_MDOE;
+        file_system.hash = DEFAULT_HASH;
         file_system.blocksize = SIZE_BYTE_BLOCK;
         file_system.head_offset = OFFSET_BYTE_HEAD;
         file_system.copies = DEFAULT_COPIES;

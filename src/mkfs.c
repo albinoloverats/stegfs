@@ -244,13 +244,13 @@ static void print_usage_help(char *arg)
     fprintf(stderr, "\nNotes:\n  • Size option isn't necessary when creating a file system on a block device.\n");
     fprintf(stderr, "  • Size are in megabytes unless otherwise specified: GB, TB, PB, or EB.\n");
     fprintf(stderr, "  • Defaults for cipher algorithms and data duplication are:\n");
-    fprintf(stderr, "    • Serpent (256 bit block)\n");
-    fprintf(stderr, "    • Cipher Block Bhaining (CBC)\n");
-    fprintf(stderr, "    • Tiger (192 bit digest)\n");
+    fprintf(stderr, "    • %s\n", cipher_name_from_id(DEFAULT_CIPHER));
+    fprintf(stderr, "    • %s\n", mode_name_from_id(DEFAULT_MDOE));
+    fprintf(stderr, "    • %s\n", hash_name_from_id(DEFAULT_HASH));
     fprintf(stderr, "    • 8 copies of each file\n");
     fprintf(stderr, "  • If you’re feeling extra paranoid you can now disable to stegfs file\n");
     fprintf(stderr, "    system header. This will also disable the checks when mounting and then\n");
-    fprintf(stderr, "    anything could happen ;-)\n");
+    fprintf(stderr, "    anything could happen ;-) This will force the use of the above defaults.\n");
     exit(EXIT_SUCCESS);
 }
 
@@ -266,9 +266,9 @@ int main(int argc, char **argv)
     bool dry = false;
     bool paranoid = false;
     uint32_t copies = DEFAULT_COPIES;
-    enum gcry_cipher_algos c = GCRY_CIPHER_SERPENT192;
-    enum gcry_cipher_modes m = GCRY_CIPHER_MODE_CBC;
-    enum gcry_md_algos     h = GCRY_MD_TIGER1;
+    enum gcry_cipher_algos c = DEFAULT_CIPHER;
+    enum gcry_cipher_modes m = DEFAULT_MDOE;
+    enum gcry_md_algos     h = DEFAULT_HASH;
 
     for (int i = 1; i < argc; i++)
     {
@@ -294,6 +294,13 @@ int main(int argc, char **argv)
             paranoid = true;
         else
             realpath(argv[i], path);
+    }
+
+    if (paranoid)
+    {
+        c = DEFAULT_CIPHER;
+        m = DEFAULT_MDOE;
+        h = DEFAULT_HASH;
     }
 
     if (!strlen(path))

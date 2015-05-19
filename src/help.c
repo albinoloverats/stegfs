@@ -24,6 +24,7 @@
 #include <stdbool.h>
 
 #include "common/common.h"
+#include "common/ccrypt.h"
 
 #include "stegfs.h"
 #include "help.h"
@@ -65,6 +66,10 @@ extern void show_help(void)
     fprintf(stderr, _("  • If you’re feeling extra paranoid you can now disable to stegfs file\n"));
     fprintf(stderr, _("    system header. This will also disable the checks when mounting and then\n"));
     fprintf(stderr, _("    anything could happen ;-)\n"));
+    fprintf(stderr, _("  • Using the extra paranoid mode will force the defaults:\n"));
+    fprintf(stderr, _("    • %s\n"), cipher_name_from_id(DEFAULT_CIPHER));
+    fprintf(stderr, _("    • %s\n"), mode_name_from_id(DEFAULT_MDOE));
+    fprintf(stderr, _("    • %s\n"), hash_name_from_id(DEFAULT_HASH));
     fprintf(stderr, "\n");
     return;
 }

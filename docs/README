@@ -98,7 +98,14 @@ will ignore some basic sanity checks and then succeed regardless---this
 could cause serious data loss! You have to way up the risks for
 yourself: security and increased plausible deniability, or risk of
 destroying data if you accidentally mount something that isn’t a stegfs
-partition.
+partition. The set libgcrypt options for when in extreme paranoia mode
+are the same as the defaults for mkstegfs.
+
+The default cipher (Rijndael/AES) has been chosen because it might give
+slight performance improvements over other algorithms, as it’s likely
+modern chipsets have it implemented in hardware. The reason for choosing
+SHA-2 256 is so that the path and data checksum make use of all of the
+available space within their locations of each file system block.
 
 mkstegfs
 --------
@@ -114,9 +121,14 @@ to minimise the loss, and maximise the chance of being able to recover
 it. Under normal working conditions it’s highly likely this value will
 never be achieved due to the Birthday Paradox.
 
-By default the mkfs utility will use the Serpent cipher with a 192 bit
-key, in cipher block chaining mode, and the Tiger hash algorithm, which
-generates 192 bit hashes. These can be changed by passing the
+By default the mkfs utility will use the Rijndael cipher with a 256 bit
+key (AES256), in cipher block chaining mode, and the SHA-2 hash
+algorithm with a 256 bit output. These can be changed by passing the
 appropriate arguments and values to mkstegfs. You can find a list of
 supported algorithms/modes either from encrypt (as it uses libgcrypt) or
 from: https://www.gnupg.org/documentation/manuals/gcrypt/
+
+If you use the extreme paranoia mode any changes to the defaults are
+ignored. This is because stegfs will be unable to detect which
+algorithms/mode was selected when the file system was created. (This may
+change in the future.)
