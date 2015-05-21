@@ -36,3 +36,4 @@ rm -rf %{buildroot}
 /usr/bin/stegfs
 /usr/bin/mkstegfs
 /usr/share/man/man1/stegfs.1.gz
+/usr/share/man/man1/mkstegfs.1.gz
