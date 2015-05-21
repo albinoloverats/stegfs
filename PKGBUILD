@@ -7,7 +7,7 @@ pkgdesc="stegfs is a FUSE based file system which provides absolute security. Us
 url="https://albinoloverats.net/projects/stegfs"
 arch=('i686' 'x86_64' 'arm')
 license=('GPL3')
-depends=('fuse' 'libmcrypt' 'mhash')
+depends=('fuse' 'libgcrypt')
 makedepends=('pkgconfig')
 
 # you shouldn't need to uncomment this as this PKGBUILD file lives in
