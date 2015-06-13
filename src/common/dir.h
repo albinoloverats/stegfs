@@ -38,11 +38,11 @@
 #include "common.h"
 
 #ifndef _WIN32
-    #define DIR_SEPARATOR "/"
-    #define DIR_SEPARATOR_CHAR '/'
+	#define DIR_SEPARATOR "/"
+	#define DIR_SEPARATOR_CHAR '/'
 #else
-    #define DIR_SEPARATOR "\\"
-    #define DIR_SEPARATOR_CHAR '\\'
+	#define DIR_SEPARATOR "\\"
+	#define DIR_SEPARATOR_CHAR '\\'
 #endif
 
 #define path_equals(X, Y)       (X && Y && !strcmp(X, Y))

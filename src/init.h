@@ -36,23 +36,23 @@
  */
 typedef struct
 {
-    char *fs;
-    char *mount;
+	char *fs;
+	char *mount;
 
-    enum gcry_cipher_algos cipher; /*!< The cryptoraphic cipher selected by the user */
-    enum gcry_cipher_modes mode;   /*!< The hash function selected by the user */
-    enum gcry_md_algos     hash;   /*!< The encryption mode selected by the user */
-    uint32_t duplicates;           /*!< Number of duplicates of each file */
+	enum gcry_cipher_algos cipher; /*!< The cryptoraphic cipher selected by the user */
+	enum gcry_cipher_modes mode;   /*!< The hash function selected by the user */
+	enum gcry_md_algos     hash;   /*!< The encryption mode selected by the user */
+	uint32_t duplicates;           /*!< Number of duplicates of each file */
 
-    uint64_t size;                 /*!< File system size (mkfs) */
+	uint64_t size;                 /*!< File system size (mkfs) */
 
-    bool paranoid:1;               /*!< Paranoid mode */
+	bool paranoid:1;               /*!< Paranoid mode */
 
-    bool force:1;                  /*!< Force file system creation (mkfs) */
-    bool rewrite_sb:1;             /*!< Rewrite superblock (mkfs) */
-    bool dry_run:1;                /*!< Create file system dry-run */
+	bool force:1;                  /*!< Force file system creation (mkfs) */
+	bool rewrite_sb:1;             /*!< Rewrite superblock (mkfs) */
+	bool dry_run:1;                /*!< Create file system dry-run */
 
-    bool help:1;                   /*!< -h argument was passed (FUSE) */
+	bool help:1;                   /*!< -h argument was passed (FUSE) */
 }
 args_t;
 

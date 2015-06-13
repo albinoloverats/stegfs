@@ -32,7 +32,7 @@
  */
 
 #ifdef BUILD_GUI
-    #include <gtk/gtk.h>
+	#include <gtk/gtk.h>
 #endif
 
 #define BACKTRACE_BUFFER_LIMIT 1024 /*!< Maximum number of elements in the backtrace buffer */

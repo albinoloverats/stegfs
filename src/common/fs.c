@@ -27,7 +27,7 @@
 #include <unistd.h>
 
 #ifdef _WIN32
-    #include "win32_ext.h"
+	#include "win32_ext.h"
 #endif
 
 /*
@@ -35,20 +35,20 @@
  */
 extern void recursive_mkdir(const char *path, mode_t mode)
 {
-    char *opath = strdup(path);
-    size_t len = strlen(opath);
-    if (opath[len - 1] == '/')
-        opath[len - 1] = '\0';
-    for (char *p = opath; *p; p++)
-        if (*p == '/')
-        {
-            *p = '\0';
-            if (access(opath, F_OK))
-                mkdir(opath, mode);
-            *p = '/';
-        }
-    if (access(opath, F_OK)) /* if path is not terminated with / */
-        mkdir(opath, mode);
-    free(opath);
-    return;
+	char *opath = strdup(path);
+	size_t len = strlen(opath);
+	if (opath[len - 1] == '/')
+		opath[len - 1] = '\0';
+	for (char *p = opath; *p; p++)
+		if (*p == '/')
+		{
+			*p = '\0';
+			if (access(opath, F_OK))
+				mkdir(opath, mode);
+			*p = '/';
+		}
+	if (access(opath, F_OK)) /* if path is not terminated with / */
+		mkdir(opath, mode);
+	free(opath);
+	return;
 }

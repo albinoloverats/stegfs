@@ -51,9 +51,9 @@ typedef void * TLV_HANDLE; /*<! Handle type for TLV functions */
  */
 typedef struct
 {
-    uint8_t  tag;    /*!< The tag value */
-    uint16_t length; /*!< The length of the value */
-    void    *value;  /*!< The actual data */
+	uint8_t  tag;    /*!< The tag value */
+	uint16_t length; /*!< The length of the value */
+	void    *value;  /*!< The actual data */
 }
 tlv_t;
 

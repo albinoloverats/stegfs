@@ -35,7 +35,7 @@
 #define SIZE_BYTE_PATH  0x0020      /*!<    24 bytes */
 #define SIZE_BYTE_DATA  0x07B8      /*!< 1,984 bytes */
 #define SIZE_BYTE_HASH  0x0020      /*!<    24 bytes */
-        /* next block (not defined) */
+		/* next block (not defined) */
 
 #define SIZE_BYTE_HEAD  0x0400      /*!< 1,024 bytes (data in header block) */
 #define OFFSET_BYTE_HEAD  (SIZE_BYTE_DATA-SIZE_BYTE_HEAD) /*!< Offset of file data in header block */
@@ -44,7 +44,7 @@
 #define SIZE_LONG_PATH  0x04
 #define SIZE_LONG_DATA  0xF7
 #define SIZE_LONG_HASH  0x04
-        /* next block (not defined) */
+		/* next block (not defined) */
 
 #define MAX_COPIES 64
 #define DEFAULT_COPIES 8
@@ -70,34 +70,34 @@
 #define DEFAULT_HASH   GCRY_MD_SHA256
 
 #ifdef USE_PROC
-    #define PATH_PROC DIR_SEPARATOR "proc"
+	#define PATH_PROC DIR_SEPARATOR "proc"
 #endif
 
 #define PASSWORD_SEPARATOR ':'
 
 typedef enum
 {
-    TAG_STEGFS,
-    TAG_VERSION,
-    TAG_CIPHER,
-    TAG_HASH,
-    TAG_MODE,
-    TAG_BLOCKSIZE,
-    TAG_HEADER_OFFSET,
-    TAG_DUPLICATION,
-    TAG_MAX
+	TAG_STEGFS,
+	TAG_VERSION,
+	TAG_CIPHER,
+	TAG_HASH,
+	TAG_MODE,
+	TAG_BLOCKSIZE,
+	TAG_HEADER_OFFSET,
+	TAG_DUPLICATION,
+	TAG_MAX
 }
 stegfs_tag_e;
 
 typedef enum
 {
-    STEGFS_INIT_OKAY,
-    STEGFS_INIT_UNKNOWN,
-    STEGFS_INIT_NOT_STEGFS,
-    STEGFS_INIT_OLD_STEGFS,
-    STEGFS_INIT_MISSING_TAG,
-    STEGFS_INIT_INVALID_TAG,
-    STEGFS_INIT_CORRUPT_TAG
+	STEGFS_INIT_OKAY,
+	STEGFS_INIT_UNKNOWN,
+	STEGFS_INIT_NOT_STEGFS,
+	STEGFS_INIT_OLD_STEGFS,
+	STEGFS_INIT_MISSING_TAG,
+	STEGFS_INIT_INVALID_TAG,
+	STEGFS_INIT_CORRUPT_TAG
 }
 stegfs_init_e;
 
@@ -109,32 +109,32 @@ stegfs_init_e;
  */
 typedef struct stegfs_file_t
 {
-    char      *path;               /*!< The path component of /path/file:password */
-    char      *name;               /*!< The file name part of /path/file:password */
-    char      *pass;               /*!< Password component of /path/file:password */
-    uint64_t   size;               /*!< File size */
-    time_t     time;               /*!< Last modified timestamp */
-    uint8_t   *data;               /*!< File data */
-    /* you can’t have more than 64 copies; you just can’t */
-    uint64_t   inodes[MAX_COPIES]; /*!< The available inodes */
-    uint64_t  *blocks[MAX_COPIES]; /*!< The complete list of used blocks */
-    bool       write;              /*!< Whether the file was opened for write access */
+	char      *path;               /*!< The path component of /path/file:password */
+	char      *name;               /*!< The file name part of /path/file:password */
+	char      *pass;               /*!< Password component of /path/file:password */
+	uint64_t   size;               /*!< File size */
+	time_t     time;               /*!< Last modified timestamp */
+	uint8_t   *data;               /*!< File data */
+	/* you can’t have more than 64 copies; you just can’t */
+	uint64_t   inodes[MAX_COPIES]; /*!< The available inodes */
+	uint64_t  *blocks[MAX_COPIES]; /*!< The complete list of used blocks */
+	bool       write;              /*!< Whether the file was opened for write access */
 }
 stegfs_file_t;
 
 typedef struct _stegfs_cache2
 {
-    char *name;
-    uint64_t ents;
-    struct _stegfs_cache2 **child;
-    stegfs_file_t *file;
+	char *name;
+	uint64_t ents;
+	struct _stegfs_cache2 **child;
+	stegfs_file_t *file;
 }
 stegfs_cache2_t;
 
 typedef struct stegfs_blocks_t
 {
-    uint64_t used;  /*!< Count of used blocks */
-    bool *in_use;   /*!< Used block tracker */
+	uint64_t used;  /*!< Count of used blocks */
+	bool *in_use;   /*!< Used block tracker */
 }
 stegfs_blocks_t;
 
@@ -146,17 +146,17 @@ stegfs_blocks_t;
  */
 typedef struct stegfs_t
 {
-    int64_t                handle;      /*!< Handle to file system file/device */
-    uint64_t               size;        /*!< Size of file system in bytes (not capacity) */
-    void                  *memory;      /*!< mmap pointer */
-    enum gcry_cipher_algos cipher;      /*!< Cipher algorithm used by the file system */
-    enum gcry_cipher_modes mode;        /*!< Cipher mode used by the file system */
-    enum gcry_md_algos     hash;        /*!< Hash algorithm used by the file system */
-    uint32_t               copies;      /*!< File duplication */
-    size_t                 blocksize;   /*!< File system block size; if it needs to be bigger than 4,294,967,295 we have issues */
-    off_t                  head_offset; /*!< Start location of file data in header blocks; only 32 bits (like blocksize) */
-    stegfs_blocks_t        blocks;      /*!< In use block tracker */
-    stegfs_cache2_t        cache2;      /*!< File cache version 2 */
+	int64_t                handle;      /*!< Handle to file system file/device */
+	uint64_t               size;        /*!< Size of file system in bytes (not capacity) */
+	void                  *memory;      /*!< mmap pointer */
+	enum gcry_cipher_algos cipher;      /*!< Cipher algorithm used by the file system */
+	enum gcry_cipher_modes mode;        /*!< Cipher mode used by the file system */
+	enum gcry_md_algos     hash;        /*!< Hash algorithm used by the file system */
+	uint32_t               copies;      /*!< File duplication */
+	size_t                 blocksize;   /*!< File system block size; if it needs to be bigger than 4,294,967,295 we have issues */
+	off_t                  head_offset; /*!< Start location of file data in header blocks; only 32 bits (like blocksize) */
+	stegfs_blocks_t        blocks;      /*!< In use block tracker */
+	stegfs_cache2_t        cache2;      /*!< File cache version 2 */
 }
 stegfs_t;
 
@@ -167,10 +167,10 @@ stegfs_t;
  */
 typedef struct stegfs_block_t
 {
-    uint64_t path[SIZE_LONG_PATH]; /*!< Hash of block path    */
-    uint8_t  data[SIZE_BYTE_DATA]; /*!< Block data (1,976 bytes or 247 64-bit words */
-    uint64_t hash[SIZE_LONG_HASH]; /*!< Hash of block data    */
-    uint64_t next;                 /*!< Address of next block */
+	uint64_t path[SIZE_LONG_PATH]; /*!< Hash of block path    */
+	uint8_t  data[SIZE_BYTE_DATA]; /*!< Block data (1,976 bytes or 247 64-bit words */
+	uint64_t hash[SIZE_LONG_HASH]; /*!< Hash of block data    */
+	uint64_t next;                 /*!< Address of next block */
 } __attribute__((packed))
 stegfs_block_t;
 
