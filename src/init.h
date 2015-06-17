@@ -21,6 +21,8 @@
 #ifndef _STEGFS_INIT_H_
 #define _STEGFS_INIT_H_
 
+#include <gcrypt.h>
+
 #define GIT_COMMIT_LENGTH 7
 
 #define MKFS_NAME "mkstegfs"

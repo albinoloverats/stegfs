@@ -148,7 +148,6 @@ extern args_t init(int argc, char **argv, char **fuse)
 				default:
 					die("unknown size suffix %c", f[0]);
 			}
-
 		}
 		else if (!is_stegfs() && (!strcmp("--force", argv[i]) || !strcmp("-f", argv[i])))
 			a.force = true;
@@ -213,33 +212,33 @@ static void print_help(void)
 	print_usage();
 	fprintf(stderr, "\n");
 	fprintf(stderr, _("Options:\n"));
-	fprintf(stderr, _("  -h, --help                   Display this message\n"));
-	fprintf(stderr, _("  -l, --licence                Display GNU GPL v3 licence header\n"));
-	fprintf(stderr, _("  -v, --version                Display application version\n"));
-	fprintf(stderr, _("  -c, --cipher=<algorithm>     Algorithm to use to encrypt data\n"));
-	fprintf(stderr, _("  -s, --hash=<algorithm>       Hash algorithm to generate key\n"));
-	fprintf(stderr, _("  -m, --mode=<mode>            The encryption mode to use\n"));
-	fprintf(stderr, _("  -p, --paranoid               Enable paranoia mode\n"));
-	fprintf(stderr, _("  -x, --duplicates             Number of times each file should be duplicated\n"));
+	fprintf(stderr, _("  -h, --help				   Display this message\n"));
+	fprintf(stderr, _("  -l, --licence				Display GNU GPL v3 licence header\n"));
+	fprintf(stderr, _("  -v, --version				Display application version\n"));
+	fprintf(stderr, _("  -c, --cipher=<algorithm>	 Algorithm to use to encrypt data\n"));
+	fprintf(stderr, _("  -s, --hash=<algorithm>	   Hash algorithm to generate key\n"));
+	fprintf(stderr, _("  -m, --mode=<mode>			The encryption mode to use\n"));
+	fprintf(stderr, _("  -p, --paranoid			   Enable paranoia mode\n"));
+	fprintf(stderr, _("  -x, --duplicates			 Number of times each file should be duplicated\n"));
 	if (!is_stegfs())
 	{
-		fprintf(stderr, _("  -z, --size=<size>            Desired file system size, required when creating\n"));
-		fprintf(stderr, _("                               a file system in a normal file\n"));
-		fprintf(stderr, _("  -f, --force                  Force overwrite existing file, required when\n"));
-		fprintf(stderr, _("                               overwriting a file system in a normal file\n"));
-		fprintf(stderr, _("  -r, --rewrite-sb             Rewrite the superblock (perhaps it became corrupt)\n"));
-		fprintf(stderr, _("  -d, --dry-run                Dry run - print details about the file system that\n"));
-		fprintf(stderr, _("                               would have been created\n"));
+		fprintf(stderr, _("  -z, --size=<size>			Desired file system size, required when creating\n"));
+		fprintf(stderr, _("							   a file system in a normal file\n"));
+		fprintf(stderr, _("  -f, --force				  Force overwrite existing file, required when\n"));
+		fprintf(stderr, _("							   overwriting a file system in a normal file\n"));
+		fprintf(stderr, _("  -r, --rewrite-sb			 Rewrite the superblock (perhaps it became corrupt)\n"));
+		fprintf(stderr, _("  -d, --dry-run				Dry run - print details about the file system that\n"));
+		fprintf(stderr, _("							   would have been created\n"));
 	}
 	fprintf(stderr, _("\nNotes:\n"));
 	if (is_stegfs())
 	{
 		fprintf(stderr, _("  • It doesn't matter which order the file system and mount point are specified\n"));
-		fprintf(stderr, _("    as stegfs will figure that out. All other options are passed to FUSE.\n"));
+		fprintf(stderr, _("	as stegfs will figure that out. All other options are passed to FUSE.\n"));
 	}
 	fprintf(stderr, _("  • If you’re feeling extra paranoid you can now disable to stegfs file\n"));
-	fprintf(stderr, _("    system header. This will also disable the checks when mounting and thus\n"));
-	fprintf(stderr, _("    anything could happen ;-)\n"));
+	fprintf(stderr, _("	system header. This will also disable the checks when mounting and thus\n"));
+	fprintf(stderr, _("	anything could happen ;-)\n"));
 	if (is_stegfs())
 		fprintf(stderr, "\n");
 	return;
