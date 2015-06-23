@@ -1,12 +1,12 @@
 .PHONY: clean distclean
 
 STEGFS   = stegfs
-MKFS	 = mkstegfs
-CP		 = cp_tree
+MKFS     = mkstegfs
+CP       = cp_tree
 
 SOURCE   = src/main.c src/stegfs.c src/init.c
 MKSRC    = src/mkfs.c src/init.c
-CPSRC	 = src/cp.c
+CPSRC    = src/cp.c
 COMMON   = src/common/error.c src/common/ccrypt.c src/common/tlv.c src/common/dir.c src/common/non-gnu.c
 
 CFLAGS   = -Wall -Wextra -Werror -std=gnu99 `pkg-config --cflags fuse` -pipe -I/usr/local/include
