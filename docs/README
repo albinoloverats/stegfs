@@ -9,17 +9,17 @@ Changes
   - Change key/IV processing
   - If you see the error message “Previous version of stegfs!” download
     version 2010.01 and recover your data, before creating a new stegfs
-	and transferring your data to it
+    and transferring your data to it
   - Block size is 2,048 bytes
     * 32 indicate the path
-	* 1,976 are file data
-	* 32 are a data checksum
-	* 8 indicate the next block
-	* All except the first 32 are encrypted; the cipher can have a block
-	  length of:
-	  - 128 bits
+    * 1,976 are file data
+    * 32 are a data checksum
+    * 8 indicate the next block
+    * All except the first 32 are encrypted; the cipher can have a block
+      length of:
+      - 128 bits
       - 192 bits
-	  - 256 bits
+      - 256 bits
 * Allow user configured algorithm (select during mkfs)
 * Remove multi-threaded capability (we’ll bring it back soon)
 * Files are:
@@ -27,8 +27,8 @@ Changes
   - Written when they’re closed
   - Cached until the file system is unmounted; if could be argued that
     keeping file contents in memory is dangerous but if you’ve mounted
-	the file system and accessed files then this is where an attacker is
-	likely to strike
+    the file system and accessed files then this is where an attacker is
+    likely to strike
 * Directories:
   - Still not stored
   - Are cached while mounted
