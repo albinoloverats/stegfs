@@ -58,9 +58,9 @@ char *strchrnul(const char *s, int c_in)
 	/* Handle the first few characters by reading one character at a time.
 	   Do this until CHAR_PTR is aligned on a longword boundary.  */
 	for (char_ptr = (const unsigned char *) s;
-		 ((unsigned long int) char_ptr & (sizeof (longword) - 1)) != 0;
-		 ++char_ptr)
-	  if (*char_ptr == c || *char_ptr == '\0')
+		((unsigned long int) char_ptr & (sizeof (longword) - 1)) != 0;
+		++char_ptr)
+	if (*char_ptr == c || *char_ptr == '\0')
 		return (void *) char_ptr;
 
 	/* All these elucidatory comments refer to 4-byte longwords,
@@ -78,27 +78,27 @@ char *strchrnul(const char *s, int c_in)
 	   The 1-bits make sure that carries propagate to the next 0-bit.
 	   The 0-bits provide holes for carries to fall into.  */
 	switch (sizeof (longword))
-	  {
-	  case 4: magic_bits = 0x7efefeffL; break;
-	  case 8: magic_bits = ((0x7efefefeL << 16) << 16) | 0xfefefeffL; break;
-	  default:
-		abort ();
-	  }
+	{
+		case 4: magic_bits = 0x7efefeffL; break;
+		case 8: magic_bits = ((0x7efefefeL << 16) << 16) | 0xfefefeffL; break;
+		default:
+			abort ();
+	}
 
 	/* Set up a longword, each of whose bytes is C.  */
 	charmask = c | (c << 8);
 	charmask |= charmask << 16;
 	if (sizeof (longword) > 4)
-	  /* Do the shift in two steps to avoid a warning if long has 32 bits.  */
-	  charmask |= (charmask << 16) << 16;
+		/* Do the shift in two steps to avoid a warning if long has 32 bits.  */
+		charmask |= (charmask << 16) << 16;
 	if (sizeof (longword) > 8)
-	  abort ();
+		abort ();
 
 	/* Instead of the traditional loop which tests each character,
 	   we will test a longword at a time.  The tricky part is testing
 	   if *any of the four* bytes in the longword in question are zero.  */
 	for (;;)
-	  {
+	{
 		/* We tentatively exit the loop if adding MAGIC_BITS to
 		   LONGWORD fails to change any of the hole bits of LONGWORD.
 
@@ -138,44 +138,44 @@ char *strchrnul(const char *s, int c_in)
 		/* Add MAGIC_BITS to LONGWORD.  */
 		if ((((longword + magic_bits)
 
-			  /* Set those bits that were unchanged by the addition.  */
-			  ^ ~longword)
+			/* Set those bits that were unchanged by the addition.  */
+			^ ~longword)
 
 			 /* Look at only the hole bits.  If any of the hole bits
 				are unchanged, most likely one of the bytes was a
 				zero.  */
-			 & ~magic_bits) != 0 ||
+			& ~magic_bits) != 0 ||
 
 			/* That caught zeroes.  Now test for C.  */
 			((((longword ^ charmask) + magic_bits) ^ ~(longword ^ charmask))
-			 & ~magic_bits) != 0)
-		  {
+			& ~magic_bits) != 0)
+		{
 			/* Which of the bytes was C or zero?
 			   If none of them were, it was a misfire; continue the search.  */
 
 			const unsigned char *cp = (const unsigned char *) (longword_ptr - 1);
 
 			if (*cp == c || *cp == '\0')
-			  return (char *) cp;
+				return (char *) cp;
 			if (*++cp == c || *cp == '\0')
-			  return (char *) cp;
+				return (char *) cp;
 			if (*++cp == c || *cp == '\0')
-			  return (char *) cp;
+				return (char *) cp;
 			if (*++cp == c || *cp == '\0')
-			  return (char *) cp;
+				return (char *) cp;
 			if (sizeof (longword) > 4)
-			  {
+			{
 				if (*++cp == c || *cp == '\0')
-				  return (char *) cp;
+					return (char *) cp;
 				if (*++cp == c || *cp == '\0')
-				  return (char *) cp;
+					return (char *) cp;
 				if (*++cp == c || *cp == '\0')
-				  return (char *) cp;
+					return (char *) cp;
 				if (*++cp == c || *cp == '\0')
-				  return (char *) cp;
-			  }
-		  }
-	  }
+					return (char *) cp;
+			}
+		}
+	}
 
 	/* This should never happen.  */
 	return NULL;

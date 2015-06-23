@@ -49,8 +49,7 @@ static gcry_cipher_hd_t cipher_init(const stegfs_file_t * const restrict, uint8_
 
 static stegfs_t file_system;
 
-extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid,
-			enum gcry_cipher_algos cipher, enum gcry_cipher_modes mode, enum gcry_md_algos hash, uint32_t dups)
+extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid, enum gcry_cipher_algos cipher, enum gcry_cipher_modes mode, enum gcry_md_algos hash, uint32_t dups)
 {
 	if ((file_system.handle = open(fs, O_RDWR, S_IRUSR | S_IWUSR)) < 0)
 		return STEGFS_INIT_UNKNOWN;
@@ -80,9 +79,7 @@ extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid,
 	stegfs_block_t block;
 	memcpy(&block, file_system.memory, sizeof block);
 	/* quick check for previous version; account for all byte orders */
-	if ((block.hash[0] == MAGIC_201001_0 || htonll(block.hash[0]) == MAGIC_201001_0) &&
-		(block.hash[1] == MAGIC_201001_1 || htonll(block.hash[1]) == MAGIC_201001_1) &&
-		(block.hash[2] == MAGIC_201001_2 || htonll(block.hash[2]) == MAGIC_201001_2))
+	if ((block.hash[0] == MAGIC_201001_0 || htonll(block.hash[0]) == MAGIC_201001_0) && (block.hash[1] == MAGIC_201001_1 || htonll(block.hash[1]) == MAGIC_201001_1) && (block.hash[2] == MAGIC_201001_2 || htonll(block.hash[2]) == MAGIC_201001_2))
 		return STEGFS_INIT_OLD_STEGFS;
 
 	if (ntohll(block.hash[0]) != MAGIC_0 ||
@@ -105,14 +102,7 @@ extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid,
 		tlv_append(&tlv, t);
 		free(t.value);
 	}
-	if (!tlv_has_tag(tlv, TAG_STEGFS)        ||
-		!tlv_has_tag(tlv, TAG_VERSION)       ||
-		!tlv_has_tag(tlv, TAG_CIPHER)        ||
-		!tlv_has_tag(tlv, TAG_MODE)          ||
-		!tlv_has_tag(tlv, TAG_HASH)          ||
-		!tlv_has_tag(tlv, TAG_BLOCKSIZE)     ||
-		!tlv_has_tag(tlv, TAG_HEADER_OFFSET) ||
-		!tlv_has_tag(tlv, TAG_DUPLICATION))
+	if (!tlv_has_tag(tlv, TAG_STEGFS) || !tlv_has_tag(tlv, TAG_VERSION) || !tlv_has_tag(tlv, TAG_CIPHER) || !tlv_has_tag(tlv, TAG_MODE) || !tlv_has_tag(tlv, TAG_HASH) || !tlv_has_tag(tlv, TAG_BLOCKSIZE) || !tlv_has_tag(tlv, TAG_HEADER_OFFSET) || !tlv_has_tag(tlv, TAG_DUPLICATION))
 		return STEGFS_INIT_MISSING_TAG;
 
 	if (strncmp((char *)tlv_value_of(tlv, TAG_STEGFS), STEGFS_NAME, strlen(STEGFS_NAME)))
@@ -283,7 +273,7 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
 				if (blocks)
 					file->blocks[j][1] = htonll(first[l]);
 				/*
-				 * travsers file block tree; whilst the whole block
+				 * traverse file block tree; whilst the whole block
 				 * is read, the actual file data is discarded
 				 */
 				for (uint64_t k = 2 ; k <= blocks; k++)
@@ -451,7 +441,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
 				}
 		}
 	}
-	file->size = z; /* stat can couse size to be reset to 0 */
+	file->size = z; /* stat can cause size to be reset to 0 */
 	if (blocks > file->blocks[0][0]) /* need more blocks than we have */
 	{
 		for (unsigned i = 0; i < file_system.copies; i++)

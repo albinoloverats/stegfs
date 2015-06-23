@@ -35,7 +35,7 @@
 #define SIZE_BYTE_PATH  0x0020      /*!<    24 bytes */
 #define SIZE_BYTE_DATA  0x07B8      /*!< 1,984 bytes */
 #define SIZE_BYTE_HASH  0x0020      /*!<    24 bytes */
-		/* next block (not defined) */
+/* next block (not defined) */
 
 #define SIZE_BYTE_HEAD  0x0400      /*!< 1,024 bytes (data in header block) */
 #define OFFSET_BYTE_HEAD  (SIZE_BYTE_DATA-SIZE_BYTE_HEAD) /*!< Offset of file data in header block */
@@ -44,7 +44,7 @@
 #define SIZE_LONG_PATH  0x04
 #define SIZE_LONG_DATA  0xF7
 #define SIZE_LONG_HASH  0x04
-		/* next block (not defined) */
+/* next block (not defined) */
 
 #define MAX_COPIES 64
 #define DEFAULT_COPIES 8

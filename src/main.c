@@ -491,16 +491,13 @@ static int fuse_stegfs_fallocate(const char *path, int mode, off_t offset, off_t
 			{
 				case -1:                        /* emmulate truncate */
 					break;
-
 				case 0:                         /* make bigger (not smaller) */
 					if (sz < c->file->size)
 						sz = c->file->size;
 					break;
-
 				case FALLOC_FL_KEEP_SIZE:       /* no size change */
 				case FALLOC_FL_PUNCH_HOLE:
 					return errno = EOPNOTSUPP, -errno;
-
 				case FALLOC_FL_COLLAPSE_RANGE:  /* remove data from middle */
 					if (sz > c->file->size)
 						return errno = EINVAL, -errno;
