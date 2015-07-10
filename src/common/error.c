@@ -41,10 +41,10 @@
 #endif
 
 #ifdef BUILD_GUI
-static void error_gui_alert(const char * const restrict);
+	static void error_gui_alert(const char * const restrict);
 
-static GtkWidget *error_gui_window;
-static GtkWidget *error_gui_message;
+	static GtkWidget *error_gui_window;
+	static GtkWidget *error_gui_message;
 #else
 	#define error_gui_alert(X) (void)(X)
 #endif
