@@ -44,7 +44,7 @@ static char *extract_long_option(char *);
 
 extern args_t init(int argc, char **argv, char **fuse)
 {
-	args_t a = { NULL, NULL, DEFAULT_CIPHER, DEFAULT_HASH, DEFAULT_MODE, DEFAULT_COPIES, 0, false, false, false, false, false };
+	args_t a = { NULL, NULL, DEFAULT_CIPHER, DEFAULT_MODE, DEFAULT_HASH, DEFAULT_COPIES, 0, false, false, false, false, false };
 	/*
 	 * parse commandline arguments
 	 */
