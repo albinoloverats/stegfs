@@ -23,6 +23,10 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "non-gnu.h"
+#include "common.h"
+#include "error.h"
+
 /* Copyright (C) 1991,1993-1997,99,2000,2005 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Based on strlen implementation by Torbjorn Granlund (tege@sics.se),
@@ -53,20 +57,20 @@ char *strchrnul(const char *s, int c_in)
 	unsigned long int longword, magic_bits, charmask;
 	unsigned char c;
 
-	c = (unsigned char) c_in;
+	c = (unsigned char)c_in;
 
 	/* Handle the first few characters by reading one character at a time.
 	   Do this until CHAR_PTR is aligned on a longword boundary.  */
-	for (char_ptr = (const unsigned char *) s;
-		((unsigned long int) char_ptr & (sizeof (longword) - 1)) != 0;
+	for (char_ptr = (const unsigned char *)s;
+		((unsigned long int)char_ptr & (sizeof (longword) - 1)) != 0;
 		++char_ptr)
-	if (*char_ptr == c || *char_ptr == '\0')
-		return (void *) char_ptr;
+		if (*char_ptr == c || *char_ptr == '\0')
+			return (void *)char_ptr;
 
 	/* All these elucidatory comments refer to 4-byte longwords,
 	   but the theory applies equally well to 8-byte longwords.  */
 
-	longword_ptr = (unsigned long int *) char_ptr;
+	longword_ptr = (unsigned long int *)char_ptr;
 
 	/* Bits 31, 24, 16, and 8 of this number are zero.  Call these bits
 	   the "holes."  Note that there is a hole just to the left of
@@ -82,7 +86,7 @@ char *strchrnul(const char *s, int c_in)
 		case 4: magic_bits = 0x7efefeffL; break;
 		case 8: magic_bits = ((0x7efefefeL << 16) << 16) | 0xfefefeffL; break;
 		default:
-			abort ();
+			die("unsupported size of unsigned long @ %s:%d:%s [%d]", __FILE__, __LINE__, __func__, sizeof (longword));
 	}
 
 	/* Set up a longword, each of whose bytes is C.  */
@@ -92,7 +96,7 @@ char *strchrnul(const char *s, int c_in)
 		/* Do the shift in two steps to avoid a warning if long has 32 bits.  */
 		charmask |= (charmask << 16) << 16;
 	if (sizeof (longword) > 8)
-		abort ();
+		die("unsupported size of unsigned long @ %s:%d:%s [%d]", __FILE__, __LINE__, __func__, sizeof (longword));
 
 	/* Instead of the traditional loop which tests each character,
 	   we will test a longword at a time.  The tricky part is testing
@@ -176,9 +180,147 @@ char *strchrnul(const char *s, int c_in)
 			}
 		}
 	}
-
-	/* This should never happen.  */
+	/* This should never happen. */
 	return NULL;
 }
 
-#endif
+#endif /* __APPLE__ || _WIN32 */
+
+
+#ifdef _WIN32
+
+#include <errno.h>
+
+#include <stdio.h>
+#include <unistd.h>
+#include <stdarg.h>
+#include <stddef.h>
+
+#include <stdint.h>
+#include <stdbool.h>
+
+#include <dirent.h>
+
+char *program_invocation_short_name = NULL;
+
+extern ssize_t getline(char **lineptr, size_t *n, FILE *stream)
+{
+	bool e = false;
+	ssize_t r = 0;
+	int32_t step = 0xFF;
+	char *buffer = malloc(step);
+	if (!buffer)
+		die("out of memory @ %s:%d:%s [%d]", __FILE__, __LINE__, __func__, step);
+	for (r = 0; ; r++)
+	{
+		int c = fgetc(stream);
+		if (c == EOF)
+		{
+			e = true;
+			break;
+		}
+		buffer[r] = c;
+		if (c == '\n')
+			break;
+		if (r >= step - 0x10)
+		{
+			step += 0xFF;
+			if (!(buffer = realloc(buffer, step)))
+				die("out of memory @ %s:%d:%s [%d]", __FILE__, __LINE__, __func__, step);
+		}
+	}
+	buffer[r + 1] = 0x00;
+	if (*lineptr)
+		free(*lineptr);
+	*lineptr = buffer;
+	*n = r;
+	return e ? -1 : r;
+}
+
+extern char *strndup(const char *s, size_t l)
+{
+	size_t z = strlen(s);
+	if (z > l)
+		z = l;
+	z++;
+	char *r = malloc(z);
+	memmove(r, s, z);
+	r[z - 1] = '\0';
+	return r;
+}
+
+/*
+ * Copyright © 2005-2012 Rich Felker, http://www.musl-libc.org/
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+ * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ *
+ */
+extern int scandir(const char *path, struct dirent ***res, int (*sel)(const struct dirent *), int (*cmp)(const struct dirent **, const struct dirent **))
+{
+	DIR *d = opendir(path);
+	struct dirent *de, **names = 0, **tmp;
+	size_t cnt = 0, len = 0;
+	int old_errno = errno;
+
+	if (!d)
+		return -1;
+
+	while ((errno = 0), (de = readdir(d)))
+	{
+		if (sel && !sel(de))
+			continue;
+
+		if (cnt >= len)
+		{
+			len = 2 * len + 1;
+			if (len > SIZE_MAX / sizeof *names)
+				break;
+
+			if (!(tmp = realloc(names, len * sizeof *names)))
+				die("out of memory @ %s:%d:%s [%d]", __FILE__, __LINE__, __func__, len * sizeof *names);
+			names = tmp;
+		}
+
+		if (!(names[cnt] = malloc(sizeof( struct dirent ))))
+			die("out of memory @ %s:%d:%s [%d]", __FILE__, __LINE__, __func__, sizeof *names);
+
+		memcpy(names[cnt++], de, sizeof( struct dirent ));
+	}
+
+	closedir(d);
+
+	if (errno)
+	{
+		if (names)
+			while (cnt-- > 0)
+				free(names[cnt]);
+		free(names);
+		return -1;
+	}
+	errno = old_errno;
+
+	if (cmp)
+		qsort(names, cnt, sizeof *names, (int (*)(const void *, const void *))cmp);
+
+	*res = names;
+	return cnt;
+}
+
+#endif /* _WIN32 */

@@ -26,9 +26,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#ifdef _WIN32
-	#include "win32_ext.h"
-#endif
+#include "non-gnu.h"
 
 /*
  * Taken from http://nion.modprobe.de/tmp/mkdir.c

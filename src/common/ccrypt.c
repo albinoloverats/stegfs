@@ -26,6 +26,7 @@
 #include <gcrypt.h>
 
 #include "common.h"
+#include "non-gnu.h"
 #include "error.h"
 #include "ccrypt.h"
 
@@ -102,12 +103,6 @@ extern const char **list_of_ciphers(void)
 			const char *n = cipher_name_from_id(lid[i]);
 			if (!n)
 				continue;
-#ifdef _WIN32
-			/* libgcrypt crashes when trying to use AES (Rijndael) on Windows 8 */
-			if (IsWindows8OrGreater())
-				if (!strncasecmp(NAME_RIJNDAEL, n, strlen(NAME_RIJNDAEL)) || !strncasecmp(NAME_AES, n, strlen(NAME_AES)))
-					continue;
-#endif
 			l[j] = strdup(n);
 			j++;
 		}
@@ -188,12 +183,6 @@ extern enum gcry_cipher_algos cipher_id_from_name(const char * const restrict n)
 			const char *x = cipher_name_from_id(list[i]);
 			if (!x)
 				continue;
-#ifdef _WIN32
-			/* libgcrypt crashes when trying to use AES (Rijndael) on Windows 8 */
-			if (IsWindows8OrGreater())
-				if (!strncasecmp(NAME_RIJNDAEL, x, strlen(NAME_RIJNDAEL)) || !strncasecmp(NAME_AES, x, strlen(NAME_AES)))
-					continue;
-#endif
 			if (!strcasecmp(x, n))
 				return list[i];
 		}

@@ -21,13 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if defined(__APPLE__) || defined(_WIN32)
-	#include "non-gnu.h"
-	#ifdef _WIN32
-		#include "win32_ext.h"
-	#endif
-#endif
-
+#include "non-gnu.h"
 #include "dir.h"
 
 extern char *dir_get_name_aux(const char * const path, const char ext)

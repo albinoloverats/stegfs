@@ -35,10 +35,7 @@
 #include <stdbool.h>
 
 #include "error.h"
-
-#ifdef _WIN32
-	#include "common/win32_ext.h"
-#endif
+#include "non-gnu.h"
 
 #ifdef BUILD_GUI
 	static void error_gui_alert(const char * const restrict);

@@ -29,11 +29,8 @@
 #endif
 
 #include "common.h"
+#include "non-gnu.h"
 #include "tlv.h"
-
-#ifdef _WIN32
-	#include "win32_ext.h"
-#endif
 
 typedef struct
 {
