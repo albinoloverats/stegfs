@@ -2,7 +2,7 @@
 .SH NAME
 \fBmkstegfs\fR \- mkfs binary to create stegfs file systems
 .SH SYNOPSIS
-\fBmkstegfs\fR [\fB\-s\fR \fIsize\fR] <\fIfile system\fR> [\fIoptional arguments ...\fR]
+\fBmkstegfs\fR [\fB\-z\fR \fIsize\fR] <\fIfile system\fR> [\fIoptional arguments ...\fR]
 .SH DESCRIPTION
 \fBstegfs\fR is a FUSE based file system which provides absolute security. Using
 encryption to secure files, and the art of steganography to hide them, stegfs
@@ -24,10 +24,10 @@ Display application version
 .BR \-c ", " \-\-cipher\fR " " \fIALGORITHM\fR
 Algorithm to use to encrypt data
 .TP
-.BR \-c ", " \-\-hash\fR " " \fIALGORITHM\fR
+.BR \-s ", " \-\-hash\fR " " \fIALGORITHM\fR
 Hash algorithm to generate key
 .TP
-.BR \-c ", " \-\-mode\fR " " \fIMODE\fR
+.BR \-m ", " \-\-mode\fR " " \fIMODE\fR
 The encryption mode to use
 .TP
 .BR \-p ", " \-\-paranoid\fR
