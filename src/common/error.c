@@ -49,28 +49,25 @@
 extern void die(const char * const restrict s, ...)
 {
 	int ex = errno;
-	if (s)
-	{
-		char *d = NULL;
-		va_list ap;
-		va_start(ap, s);
+	char *d = NULL;
+	va_list ap;
+	va_start(ap, s);
 #ifndef _WIN32
-		vasprintf(&d, s, ap);
-		fprintf(stderr, "%s", d);
-		error_gui_alert(d);
+	vasprintf(&d, s, ap);
+	fprintf(stderr, "%s", d);
+	error_gui_alert(d);
 #else
-		uint8_t l = 0xFF;
-		d = calloc(l, sizeof( uint8_t ));
-		if (d)
-			vsnprintf(d, l - 1, s, ap);
-		fprintf(stderr, "%s", d);
-		error_gui_alert(d);
-		if (d)
-			free(d);
+	uint8_t l = 0xFF;
+	d = calloc(l, sizeof( uint8_t ));
+	if (d)
+		vsnprintf(d, l - 1, s, ap);
+	fprintf(stderr, "%s", d);
+	error_gui_alert(d);
+	if (d)
+		free(d);
 #endif
-		va_end(ap);
-		fprintf(stderr, "\n");
-	}
+	va_end(ap);
+	fprintf(stderr, "\n");
 	if (ex)
 	{
 		char * const restrict e = strdup(strerror(ex));

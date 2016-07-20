@@ -666,6 +666,8 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-done:
-	return fuse_main(argc, fuse, &fuse_stegfs_functions, NULL);
+done:	;
+	struct fuse_args fargs = FUSE_ARGS_INIT(argc, argv);
+	fuse_opt_parse(&fargs, NULL, NULL, NULL);
+	return fuse_main(fargs.argc, fargs.argv, &fuse_stegfs_functions, NULL);
 }

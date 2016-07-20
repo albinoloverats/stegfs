@@ -86,7 +86,7 @@ extern void tlv_append(TLV_HANDLE *ptr, tlv_t tlv)
 
 extern bool tlv_has_tag(TLV_HANDLE ptr, uint8_t tag)
 {
-	return ptr ? tlv_value_of(ptr, tag) != NULL : false;
+	return tlv_value_of(ptr, tag) != NULL;
 }
 
 extern byte_t *tlv_value_of(TLV_HANDLE ptr, uint8_t tag)
@@ -137,7 +137,7 @@ extern byte_t *tlv_export_aux(TLV_HANDLE ptr, bool nbo)
 
 extern uint16_t tlv_count(TLV_HANDLE ptr)
 {
-	return ptr ? ((tlv_private_t *)ptr)->tags : 0;
+	return ((tlv_private_t *)ptr)->tags;
 }
 
 extern size_t tlv_size(TLV_HANDLE ptr)

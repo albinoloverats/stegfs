@@ -164,66 +164,59 @@ extern const char **list_of_modes(void)
 
 extern enum gcry_cipher_algos cipher_id_from_name(const char * const restrict n)
 {
-	if (n)
+	int list[0xff] = { 0x00 };
+	int len = 0;
+	enum gcry_cipher_algos id = GCRY_CIPHER_NONE;
+	for (unsigned i = 0; i < sizeof list; i++)
 	{
-		int list[0xff] = { 0x00 };
-		int len = 0;
-		enum gcry_cipher_algos id = GCRY_CIPHER_NONE;
-		for (unsigned i = 0; i < sizeof list; i++)
+		if (gcry_cipher_algo_info(id, GCRYCTL_TEST_ALGO, NULL, NULL) == 0)
 		{
-			if (gcry_cipher_algo_info(id, GCRYCTL_TEST_ALGO, NULL, NULL) == 0)
-			{
-				list[len] = id;
-				len++;
-			}
-			id++;
+			list[len] = id;
+			len++;
 		}
-		for (int i = 0; i < len; i++)
-		{
-			const char *x = cipher_name_from_id(list[i]);
-			if (!x)
-				continue;
-			if (!strcasecmp(x, n))
-				return list[i];
-		}
+		id++;
+	}
+	for (int i = 0; i < len; i++)
+	{
+		const char *x = cipher_name_from_id(list[i]);
+		if (!x)
+			continue;
+		if (!strcasecmp(x, n))
+			return list[i];
 	}
 	return GCRY_CIPHER_NONE;
 }
 
 extern enum gcry_md_algos hash_id_from_name(const char * const restrict n)
 {
-	if (n)
+	int list[0xff] = { 0x00 };
+	int len = 0;
+	enum gcry_md_algos id = GCRY_MD_NONE;
+	for (unsigned i = 0; i < sizeof list; i++)
 	{
-		int list[0xff] = { 0x00 };
-		int len = 0;
-		enum gcry_md_algos id = GCRY_MD_NONE;
-		for (unsigned i = 0; i < sizeof list; i++)
+		if (gcry_md_test_algo(id) == 0)
 		{
-			if (gcry_md_test_algo(id) == 0)
-			{
-				list[len] = id;
-				len++;
-			}
-			id++;
+			list[len] = id;
+			len++;
 		}
-		for (int i = 0; i < len; i++)
-		{
-			const char *x = hash_name_from_id(list[i]);
-			if (!x)
-				continue;
-			if (!strcasecmp(x, n))
-				return list[i];
-		}
+		id++;
+	}
+	for (int i = 0; i < len; i++)
+	{
+		const char *x = hash_name_from_id(list[i]);
+		if (!x)
+			continue;
+		if (!strcasecmp(x, n))
+			return list[i];
 	}
 	return GCRY_MD_NONE;
 }
 
 extern enum gcry_cipher_modes mode_id_from_name(const char * const restrict n)
 {
-	if (n)
-		for (unsigned i = 0; i < sizeof MODES / sizeof( block_mode_t ); i++)
-			if (!strcasecmp(n, MODES[i].name))
-				return MODES[i].id;
+	for (unsigned i = 0; i < sizeof MODES / sizeof( block_mode_t ); i++)
+		if (!strcasecmp(n, MODES[i].name))
+			return MODES[i].id;
 	return GCRY_CIPHER_MODE_NONE;
 }
 
