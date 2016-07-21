@@ -32,9 +32,10 @@
 
 /* size (in bytes) for various blocks of data */
 #define SIZE_BYTE_BLOCK 0x0800      /*!< 2,048 bytes */
-#define SIZE_BYTE_PATH  0x0020      /*!<    24 bytes */
-#define SIZE_BYTE_DATA  0x07B8      /*!< 1,984 bytes */
-#define SIZE_BYTE_HASH  0x0020      /*!<    24 bytes */
+#define SIZE_BYTE_PATH  0x0020      /*!<    32 bytes */
+#define SIZE_BYTE_DATA  0x07B8      /*!< 1,976 bytes */
+#define SIZE_BYTE_HASH  0x0020      /*!<    32 bytes */
+#define SIZE_BYTE_NEXT  0x0008      /*!<     8 bytes */
 /* next block (not defined) */
 
 #define SIZE_BYTE_HEAD  0x0400      /*!< 1,024 bytes (data in header block) */

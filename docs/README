@@ -1,52 +1,8 @@
-stegfs - 2015.08                                        13th August 2015
+stegfs - 2015.08-1                                        2xth July 2016
 ================
 
-Changes
--------
-
-* Complete rewrite **NOT BACKWARDS COMPATIBLE**
-  - Stores block locations (and other vales) as big endian
-  - Change key/IV processing
-  - If you see the error message “Previous version of stegfs!” download
-    version 2010.01 and recover your data, before creating a new stegfs
-    and transferring your data to it
-  - Block size is 2,048 bytes
-    * 32 indicate the path
-    * 1,976 are file data
-    * 32 are a data checksum
-    * 8 indicate the next block
-    * All except the first 32 are encrypted; the cipher can have a block
-      length of:
-      - 128 bits
-      - 192 bits
-      - 256 bits
-* Allow user configured algorithm (select during mkfs)
-* Remove multi-threaded capability (we’ll bring it back soon)
-* Files are:
-  - Read when they’re opened
-  - Written when they’re closed
-  - Cached until the file system is unmounted; if could be argued that
-    keeping file contents in memory is dangerous but if you’ve mounted
-    the file system and accessed files then this is where an attacker is
-    likely to strike
-* Directories:
-  - Still not stored
-  - Are cached while mounted
-  - Do not need + prefix
-  - Do require creating on each mount (if you want to access your files)
-* Provide an extreme paranoia mode, where by the standard stegfs header
-  block isn’t written, thus disguising the partition.
-
-Ideas For Another Day
----------------------
-
-* Bring back multi-threaded support
-* Cache time limit (force forget if a file isn’t accessed)
-* Don’t break backwards compatibility (again)!
-* Start using ECC
-
-About
------
+About stegfs
+------------
 
 stegfs is a steganographic file system in userspace. Steganographic file
 systems allow the user plausible deniability of files within. It
@@ -108,8 +64,8 @@ modern chipsets have it implemented in hardware. The reason for choosing
 SHA-2 256 is so that the path and data checksum make use of all of the
 available space within their locations of each file system block.
 
-mkstegfs
---------
+About mkstegfs
+--------------
 
 When creating a stegfs file system, the size of the file created (or the
 size of the partition on which it will be created) is shown; this is the
@@ -133,3 +89,33 @@ If you use the extreme paranoia mode any changes to the defaults are
 ignored. This is because stegfs will be unable to detect which
 algorithms/mode was selected when the file system was created. (This may
 change in the future.)
+
+
+Compiling
+---------
+
+Compiling from source is as simple as running one of the following
+commands:
+
+    make
+
+
+Changelog
+---------
+
+### Fixed For Latest Release
+
+* Fix FUSE initialisation bug (caused by update to FUSE library that was
+  stricter than before)
+* Update documentation and man pages
+
+
+TODO
+----
+
+### Add
+
+* Bring back multi-threaded support
+* Cache time limit (force forget if a file isn’t accessed)
+* Don’t break backwards compatibility (again)!
+* Start using ECC
