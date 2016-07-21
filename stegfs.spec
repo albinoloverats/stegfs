@@ -17,6 +17,8 @@ crypto library, libgcrypt, to provide the cryptographic hash and
 symmetric block cipher functions, stegfs is at the cutting edge of
 secure file system technology.
 
+%global debug_package %{nil}
+
 %prep
 %setup -q
 
