@@ -27,7 +27,7 @@
 #include <gcrypt.h>
 
 #define STEGFS_NAME    "stegfs"
-#define STEGFS_VERSION "2015.08.1"
+#define STEGFS_VERSION "2015.08"
 
 
 /* size (in bytes) for various blocks of data */
