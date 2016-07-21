@@ -1,6 +1,6 @@
 Summary: A fuse based steganographic file system
 Name: stegfs
-Version: 2015.08
+Version: 2015.08.1
 Release: 1
 Source: https://albinoloverats.net/downloads/%{name}.tar.xz
 URL: https://albinoloverats.net/projects/%{name}
