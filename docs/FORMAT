@@ -1,8 +1,8 @@
 Technical Data
 ==============
 
-Units used here (and through-out stegfs) are in powers of 2---so think
-multiples of 1,024 not 1,000.
+NB: Units used here (and through-out stegfs) are in powers of 2---so
+think multiples of 1,024 not 1,000.
 
 Each file system block is 2,048 bytes, with 1,984 being used for actual
 data, with the rest being used to verify the integrity of the data, and
@@ -44,274 +44,277 @@ Example/Explanation
 A 1GB file system has 524,288 blocks (524,287 are available for file
 data, as the first contains file system information). Each of these
 blocks can store 1,976 bytes of data, resulting in 988MB of total
-capacity.  As each file is duplicated multiple times (8×) the single
+capacity. As each file is duplicated multiple times (8×) the single
 largest file size is over 123MB---which is also the maximum available
 capacity if everything is stored in the / of the file system.
 
 Block Layout
 ------------
 
-Total block size = 2KB = 16,384 bits = 1,976 file data bytes + metadata
+Total block size = 2KB = 16,384 bits = 1,976 file data bytes + metadata.
+Each space in the diagram below is a single bit. Information between []
+is contents of block 0; whereas () denotes information for each files'
+first block.
 
-     Chunk Name                                        Size (in bits)
+      Sub-block name / contents                 Size in bytes / bits
     +----------------------------------------------------------------+ -+
-    | Directory/Path checksum                            32    (256) |  +- hash
+    | Directory / Path checksum                          32 /    256 |  +- hash
     | [Nothing - 0xFF]                                               |  |
     |                                                                |  |
     |                                                                |  |
-    +----------------------------------------------------------------+ -+--------+
-    | Data                                            1,976 (15,808) |           |
-    | (File modification timestamp¹)                                 |           |
-    | [File system information]                                      |           |
-    |                                                                |           +‐ cipher; blocksize:  64 × 252 blocks
-    | ¹ Followed by: - list of first blocks (many 64 bit integers²)  |           |                     128 × 126
-    |                - random (not used; variable size)              |           |                     192 ×  84
-    |                - start of file data  (1,024 bytes/8,192 bits)  |           |                     256 ×  63
-    |                                                                |           |
-    | ² The number of copies be vary from 1 to 64, which will use    |           |
-    |   between 8 and 512 bytes                                      |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    |                                                                |           |
-    +----------------------------------------------------------------+ -+        |
-    | Checksum                                           32    (256) |  |        |
-    | [Hash of "stegfs-2015.08"]                                     |  +- hash  |
-    |                                                                |  |        |
-    |                                                                |  |        |
-    +----------------------------------------------------------------+ -+        |
-    | Next block (File size) [Total blocks]               8     (64) |           |
-    +----------------------------------------------------------------+ ----------+
+    +----------------------------------------------------------------+ -+-------+
+    | Data                                            1,976 / 15,808 |          |
+    | (File modification timestamp¹)                                 |          |
+    | [File system information]                                      |          |
+    |                                                                |          +‐ cipher; blocksize:  64 × 252 blocks
+    | ¹ Followed by: - list of first blocks (many 64 bit integers²)  |          |                     128 × 126
+    |                - random data (variable size)                   |          |                     192 ×  84
+    |                - start of file data (1,024 bytes / 8,192 bits) |          |                     256 ×  63 default
+    |                                                                |          |
+    | ² The number of copies be vary from 1 to 64, which will use    |          |
+    |   between 8 and 512 bytes (default is 8)                       |          |
+    |                                                                |          |
+    |                                                                |          |
+    | TODO: If using ECC, data block should be 1,912 bytes; this     |          |
+    |       would allow 1,912 + 32 + 8 = 1,952 bytes to be encrypted |          |
+    |       in 61 blocks; then + 32 header = 1,984 bytes, which is   |          |
+    |       < 1,992 bytes max for ECC / 2,048 block (this leaves 56  |          |
+    |       blocks of unused space / block) - (I think)              |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    +----------------------------------------------------------------+ -+       |
+    | Checksum                                           32 /    256 |  |       |
+    | [Hash of "stegfs-2015.08"]                                     |  +- hash |
+    |                                                                |  |       |
+    |                                                                |  |       |
+    +----------------------------------------------------------------+ -+       |
+    | Next block (File size) [Total blocks]               8 /     64 |          |
+    +----------------------------------------------------------------+ ---------+
