@@ -8,3 +8,5 @@ src/common/win32_ext.c
 src/common/win32_ext.h
 src/common/ecc.c
 src/common/ecc.h
+src/common/osx.m
+src/common/osx.h

@@ -1,6 +1,6 @@
 /*
  * Common code which is typically missing on MS Windows
- * Copyright © 2005-2015, albinoloverats ~ Software Development
+ * Copyright © 2005-2017, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -18,7 +18,7 @@
  *
  */
 
-#if defined(__APPLE__) || defined(_WIN32)
+#if defined __APPLE__ || defined _WIN32
 
 #include <string.h>
 #include <stdlib.h>

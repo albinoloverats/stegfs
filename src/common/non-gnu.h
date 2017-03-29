@@ -1,6 +1,6 @@
 /*
  * Common code which is typically missing on Apple OS X
- * Copyright © 2005-2015, albinoloverats ~ Software Development
+ * Copyright © 2005-2017, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -21,7 +21,7 @@
 #ifndef _NON_GNU_EXT_H_
 #define _NON_GNU_EXT_H_
 
-#if defined(__APPLE__) || defined(_WIN32)
+#if defined __APPLE__ || defined _WIN32
 
 extern char *strchrnul(const char *string, int c);
 
