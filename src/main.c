@@ -236,7 +236,7 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
 		stbuf->st_nlink = 1;
 		stbuf->st_blksize = SIZE_BYTE_DATA;
 		lldiv_t d = lldiv(stbuf->st_size, stbuf->st_blksize);
-		stbuf->st_blocks = d.quot + (d.rem ? 1 : 0);
+		stbuf->st_blocks = d.quot + (d.rem > 0);
 	}
 	else if (stbuf->st_mode & S_IFDIR)
 	{

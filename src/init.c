@@ -123,13 +123,18 @@ extern args_t init(int argc, char **argv, char **fuse)
 			{
 				case 'E':
 					a.size *= KILOBYTE; /* Ratio between EB and PB (ditto below) */
+					__attribute__((fallthrough));
 				case 'P':
 					a.size *= KILOBYTE;
+					__attribute__((fallthrough));
 				case 'T':
 					a.size *= KILOBYTE;
+					__attribute__((fallthrough));
 				case 'G':
 					a.size *= KILOBYTE;
+					__attribute__((fallthrough));
 				case 'M':
+					__attribute__((fallthrough));
 				case '\0':
 					a.size *= MEGABYTE;
 					break;

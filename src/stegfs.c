@@ -179,7 +179,7 @@ extern bool stegfs_file_will_fit(stegfs_file_t *file)
 {
 	stegfs_block_t block;
 	lldiv_t d = lldiv(file->size - (file->size < (sizeof block.data - file_system.head_offset) ? file->size : (sizeof block.data - file_system.head_offset)), SIZE_BYTE_DATA);
-	uint64_t blocks_needed = (d.quot + (d.rem ? 1 : 0)) * file_system.copies;
+	uint64_t blocks_needed = (d.quot + (d.rem > 0)) * file_system.copies;
 
 	uint64_t blocks_total = (file_system.size / file_system.blocksize) - 1;
 	if (blocks_needed > blocks_total)
@@ -266,7 +266,7 @@ extern bool stegfs_file_stat(stegfs_file_t *file)
 			{
 				gcry_cipher_hd_t another = cipher_init(file, j);
 				lldiv_t d = lldiv(file->size - (file->size < (sizeof inode.data - file_system.head_offset) ? file->size : (sizeof inode.data - file_system.head_offset)), SIZE_BYTE_DATA);
-				uint64_t blocks = d.quot + (d.rem ? 1 : 0);
+				uint64_t blocks = d.quot + (d.rem > 0);
 				file->blocks[j] = realloc(file->blocks[j], (blocks + 2) * sizeof blocks);
 				memset(file->blocks[j], 0x00, blocks * sizeof blocks);
 				file->blocks[j][0] = blocks;
@@ -354,7 +354,7 @@ extern bool stegfs_file_read(stegfs_file_t *file)
 	for (unsigned i = 0, corrupt_copies = 0; i < file_system.copies; i++)
 	{
 		lldiv_t d = lldiv(file->size - (file->size < (sizeof block.data - file_system.head_offset) ? file->size : (sizeof block.data - file_system.head_offset)), SIZE_BYTE_DATA);
-		uint64_t blocks = d.quot + (d.rem ? 1 : 0);
+		uint64_t blocks = d.quot + (d.rem > 0);
 		if (file->blocks[i][0] != blocks)
 			continue; /* this copy is corrupt; try the next */
 		bool failed = false;
@@ -398,7 +398,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
 {
 	stegfs_block_t block;
 	lldiv_t d = lldiv(file->size - (file->size < (sizeof block.data - file_system.head_offset) ? file->size : (sizeof block.data - file_system.head_offset)), SIZE_BYTE_DATA);
-	uint64_t blocks = d.quot + (d.rem ? 1 : 0);
+	uint64_t blocks = d.quot + (d.rem > 0);
 	uint64_t z = file->size;
 
 	if (!stegfs_file_stat(file))
@@ -547,7 +547,7 @@ extern void stegfs_file_delete(stegfs_file_t *file)
 		goto rfc;
 	stegfs_block_t block;
 	lldiv_t d = lldiv(file->size - (file->size < (sizeof block.data - file_system.head_offset) ? file->size : (sizeof block.data - file_system.head_offset)), SIZE_BYTE_DATA);
-	uint64_t blocks = d.quot + (d.rem ? 1 : 0);
+	uint64_t blocks = d.quot + (d.rem > 0);
 	for (unsigned i = 0; i < file_system.copies; i++)
 	{
 		block_delete(file->inodes[i]);
@@ -854,7 +854,7 @@ c2a3:
 			/* copy blocks */
 			stegfs_block_t block;
 			lldiv_t d = lldiv(file->size - (file->size < (sizeof block.data - file_system.head_offset) ? file->size : (sizeof block.data - file_system.head_offset)), SIZE_BYTE_DATA);
-			uint64_t blocks = d.quot + (d.rem ? 1 : 0);
+			uint64_t blocks = d.quot + (d.rem > 0);
 			for (unsigned i = 0; i < file_system.copies; i++)
 			{
 				ptr->file->blocks[i] = realloc(ptr->file->blocks[i], (blocks + 1) * sizeof blocks);
