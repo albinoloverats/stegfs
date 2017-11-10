@@ -24,7 +24,7 @@
 /*!
  * \file    dir.h
  * \author  albinoloverats ~ Software Development
- * \date    2009-2015
+ * \date    2009-2017
  * \brief   Directory parsing functions
  * \note    These functions all return newly allocated strings
  *
