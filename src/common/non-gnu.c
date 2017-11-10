@@ -86,7 +86,7 @@ char *strchrnul(const char *s, int c_in)
 		case 4: magic_bits = 0x7efefeffL; break;
 		case 8: magic_bits = ((0x7efefefeL << 16) << 16) | 0xfefefeffL; break;
 		default:
-			die("unsupported size of unsigned long @ %s:%d:%s [%d]", __FILE__, __LINE__, __func__, sizeof (longword));
+			die(_("unsupported size of unsigned long @ %s:%d:%s [%zu])"), __FILE__, __LINE__, __func__, sizeof longword);
 	}
 
 	/* Set up a longword, each of whose bytes is C.  */
@@ -96,7 +96,7 @@ char *strchrnul(const char *s, int c_in)
 		/* Do the shift in two steps to avoid a warning if long has 32 bits.  */
 		charmask |= (charmask << 16) << 16;
 	if (sizeof (longword) > 8)
-		die("unsupported size of unsigned long @ %s:%d:%s [%d]", __FILE__, __LINE__, __func__, sizeof (longword));
+		die(_("unsupported size of unsigned long @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof longword);
 
 	/* Instead of the traditional loop which tests each character,
 	   we will test a longword at a time.  The tricky part is testing
@@ -210,7 +210,7 @@ extern ssize_t getline(char **lineptr, size_t *n, FILE *stream)
 	int32_t step = 0xFF;
 	char *buffer = malloc(step);
 	if (!buffer)
-		die("out of memory @ %s:%d:%s [%d]", __FILE__, __LINE__, __func__, step);
+		die(_("out of memory @ %s:%d:%s [%d]"), __FILE__, __LINE__, __func__, step);
 	for (r = 0; ; r++)
 	{
 		int c = fgetc(stream);
@@ -226,7 +226,7 @@ extern ssize_t getline(char **lineptr, size_t *n, FILE *stream)
 		{
 			step += 0xFF;
 			if (!(buffer = realloc(buffer, step)))
-				die("out of memory @ %s:%d:%s [%d]", __FILE__, __LINE__, __func__, step);
+				die(_("out of memory @ %s:%d:%s [%d]"), __FILE__, __LINE__, __func__, step);
 		}
 	}
 	buffer[r + 1] = 0x00;
@@ -294,12 +294,12 @@ extern int scandir(const char *path, struct dirent ***res, int (*sel)(const stru
 				break;
 
 			if (!(tmp = realloc(names, len * sizeof *names)))
-				die("out of memory @ %s:%d:%s [%d]", __FILE__, __LINE__, __func__, len * sizeof *names);
+				die(_("out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, len * sizeof *names);
 			names = tmp;
 		}
 
 		if (!(names[cnt] = malloc(sizeof( struct dirent ))))
-			die("out of memory @ %s:%d:%s [%d]", __FILE__, __LINE__, __func__, sizeof *names);
+			die(_("out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof *names);
 
 		memcpy(names[cnt++], de, sizeof( struct dirent ));
 	}
