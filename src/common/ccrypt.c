@@ -162,6 +162,42 @@ extern const char **list_of_modes(void)
 	return (const char **)l;
 }
 
+extern const char **list_of_macs(void)
+{
+	init_crypto();
+
+	enum gcry_mac_algos lid[0xff] = { GCRY_MAC_NONE };
+	int len = 0;
+	enum gcry_mac_algos id = GCRY_MAC_NONE;
+	for (unsigned i = 0; i < sizeof lid; i++)
+	{
+		if (gcry_mac_test_algo(id) == 0)
+		{
+			lid[len] = id;
+			len++;
+		}
+		id++;
+	}
+	static const char **l = NULL;
+	if (!l)
+	{
+		if (!(l = gcry_calloc_secure(len + 1, sizeof( char * ))))
+			die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof( char * ));
+		int j = 0;
+		for (int i = 0; i < len; i++)
+		{
+			const char *n = gcry_mac_algo_name(lid[i]);
+			if (!n || !strcmp("?", n))
+				continue;
+			l[j] = strdup(n);
+			j++;
+		}
+		//l[j] = NULL;
+		qsort(l, j, sizeof( char * ), algorithm_compare);
+	}
+	return (const char **)l;
+}
+
 extern enum gcry_cipher_algos cipher_id_from_name(const char * const restrict n)
 {
 	int list[0xff] = { 0x00 };
@@ -220,6 +256,31 @@ extern enum gcry_cipher_modes mode_id_from_name(const char * const restrict n)
 	return GCRY_CIPHER_MODE_NONE;
 }
 
+extern enum gcry_mac_algos mac_id_from_name(const char * const restrict n)
+{
+	int list[0xff] = { 0x00 };
+	int len = 0;
+	enum gcry_mac_algos id = GCRY_MAC_NONE;
+	for (unsigned i = 0; i < sizeof list; i++)
+	{
+		if (gcry_mac_test_algo(id) == 0)
+		{
+			list[len] = id;
+			len++;
+		}
+		id++;
+	}
+	for (int i = 0; i < len; i++)
+	{
+		const char *x = mac_name_from_id(list[i]);
+		if (!x)
+			continue;
+		if (!strcasecmp(x, n))
+			return list[i];
+	}
+	return GCRY_MAC_NONE;
+}
+
 extern const char *cipher_name_from_id(enum gcry_cipher_algos c)
 {
 	const char *n = gcry_cipher_algo_name(c);
@@ -248,6 +309,11 @@ extern const char *mode_name_from_id(enum gcry_cipher_modes m)
 		if (MODES[i].id == m)
 			return MODES[i].name;
 	return NULL;
+}
+
+extern const char *mac_name_from_id(enum gcry_mac_algos m)
+{
+	return gcry_mac_algo_name(m);
 }
 
 static int algorithm_compare(const void *a, const void *b)

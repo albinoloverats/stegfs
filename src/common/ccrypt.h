@@ -74,6 +74,16 @@ extern const char **list_of_hashes(void) __attribute__((pure));
 extern const char **list_of_modes(void) __attribute__((pure));
 
 /*!
+ * \brief         Get list of available MAC algorithms
+ * \return        An array of char* of MAC names
+ *
+ * Get an array of strings which lists the names of available MAC
+ * algorithms. NB: The array is allocated statically and SHOULD NOT be
+ * free’d (or otherwise altered).
+ */
+extern const char **list_of_macs(void) __attribute__((pure));
+
+/*!
  * \brief         Get cipher ID, given its name
  * \param[in]  n  Cipher name
  * \return        The ID used by libgcrypt
@@ -99,6 +109,15 @@ extern enum gcry_md_algos hash_id_from_name(const char * const restrict n) __att
  * Get the ID used internally by libgcrypt for the given mode name.
  */
 extern enum gcry_cipher_modes mode_id_from_name(const char * const restrict n) __attribute__((pure, nonnull(1)));
+
+/*!
+ * \brief         Get MAC ID, given its name
+ * \param[in]  n  MAC name
+ * \return        The ID used by libgcrypt
+ *
+ * Get the ID used internally by libgcrypt for the given MAC.
+ */
+extern enum gcry_mac_algos mac_id_from_name(const char * const restrict n) __attribute__((pure, nonnull(1)));
 
 /*!
  * \brief         Get cipher name, given its ID
@@ -130,6 +149,16 @@ extern const char *hash_name_from_id(enum gcry_md_algos h) __attribute__((pure))
  * here’s a function to get the name from the enum.
  */
 extern const char *mode_name_from_id(enum gcry_cipher_modes m) __attribute__((pure));
+
+/*!
+ * \brief         Get MAC algorithm name, given its ID
+ * \param[in]  m  The libgcrypt MAC enum
+ * \return        A string representation of the MAC
+ *
+ * "Correct" the name that libgcrypt gives us; this ensures
+ * compatibility with the Android version.
+ */
+extern const char *mac_name_from_id(enum gcry_mac_algos m) __attribute__((pure));
 
 /*!
  * \brief         Get cipher mode name, given its ID
