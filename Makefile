@@ -12,7 +12,7 @@ COMMON   = src/common/error.c src/common/ccrypt.c src/common/tlv.c src/common/di
 CFLAGS   = -Wall -Wextra -Werror -std=gnu99 `pkg-config --cflags fuse` -pipe -I/usr/local/include
 CPPFLAGS = -Isrc -D_GNU_SOURCE -DGCRYPT_NO_DEPRECATED -D_FILE_OFFSET_BITS=64 -DGIT_COMMIT=\"`git log | head -n1 | cut -f2 -d' '`\"
 
-DEBUG    = -O0 -ggdb -pg -lc
+DEBUG    = -O0 -ggdb -pg -lc -DDEBUG
 
 # -lpthread
 LIBS     = -lgcrypt `pkg-config --libs fuse`
