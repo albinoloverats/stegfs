@@ -33,6 +33,9 @@
  */
 extern void recursive_mkdir(const char *path, mode_t mode)
 {
+#ifdef _WIN32
+	(void)mode;
+#endif
 	char *opath = strdup(path);
 	size_t len = strlen(opath);
 	if (opath[len - 1] == '/')
