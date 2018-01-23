@@ -1,5 +1,5 @@
 /*
- * Copyright © 2005-2017, albinoloverats ~ Software Development
+ * Copyright © 2005-2018, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -23,7 +23,7 @@
 /*!
  * \file    common.h
  * \author  albinoloverats ~ Software Development
- * \date    2009-2017
+ * \date    2009-2018
  * \brief   Mostly common macros, useful when dealing with different OS’s
  *
  * Various macros which help with the transition from one OS to another.
