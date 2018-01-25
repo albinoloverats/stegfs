@@ -1,6 +1,6 @@
 /*
  * stegfs ~ a steganographic file system for unix-like systems
- * Copyright © 2007-2017, albinoloverats ~ Software Development
+ * Copyright © 2007-2018, albinoloverats ~ Software Development
  * email: stegfs@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -27,15 +27,19 @@
 #include <gcrypt.h>
 
 #define STEGFS_NAME    "stegfs"
-#define STEGFS_VERSION "2015.08"
+#define STEGFS_VERSION "2018.XX"
 
 
 /* size (in bytes) for various blocks of data */
-#define SIZE_BYTE_BLOCK 0x0800      /*!< 2,048 bytes */
-#define SIZE_BYTE_PATH  0x0020      /*!<    32 bytes */
-#define SIZE_BYTE_DATA  0x07B8      /*!< 1,976 bytes */
-#define SIZE_BYTE_HASH  0x0020      /*!<    32 bytes */
-#define SIZE_BYTE_NEXT  0x0008      /*!<     8 bytes */
+#define SIZE_BYTE_BLOCK 0x0800       /*!< 2,048 bytes */
+#define SIZE_BYTE_PATH  0x0020       /*!<    32 bytes */
+
+#define SIZE_BYTE_DATA_201508 0x07B8 /*!< 1,976 bytes */
+//#define SIZE_BYTE_DATA_2018XX 0x0780 /*!< 1,920 bytes */
+#define SIZE_BYTE_DATA  SIZE_BYTE_DATA_201508
+
+#define SIZE_BYTE_HASH  0x0020       /*!<    32 bytes */
+#define SIZE_BYTE_NEXT  0x0008       /*!<     8 bytes */
 /* next block (not defined) */
 
 #define SIZE_BYTE_HEAD  0x0400      /*!< 1,024 bytes (data in header block) */
@@ -43,36 +47,63 @@
 
 /* size in 64 bit ints of parts of block */
 #define SIZE_LONG_PATH  0x04
-#define SIZE_LONG_DATA  0xF7
+#define SIZE_LONG_DATA_201508  0xF7
+//#define SIZE_LONG_DATA_2018XX  0xF0
+#define SIZE_LONG_DATA  SIZE_LONG_DATA_201508
 #define SIZE_LONG_HASH  0x04
 /* next block (not defined) */
 
-#define MAX_COPIES 64
-#define DEFAULT_COPIES 8
+#define COPIES_MAX 64
+#define COPIES_DEFAULT 8
 #define SYM_LENGTH -1
 
 #define SUPER_ID STEGFS_NAME " " STEGFS_VERSION
 
-#define MAGIC_201001_0 0xA157AFA602CC9D1BLL
-#define MAGIC_201001_1 0x33BE2B298B76F2ACLL
-#define MAGIC_201001_2 0xC903284D7C593AF6LL
+#define KEY_ITERATIONS 32768
 
-#define MAGIC_201508_0 0x5287505E71E039DFLL
-#define MAGIC_201508_1 0xEBCCB02AB09BA26FLL
-#define MAGIC_201508_2 0x8C9B291A9E55C137LL
+/*
+ * File system header for unsupported first attempt.
+ */
+#define HASH_MAGIC_201001_0 0xa157afa602cc9d1bllu
+#define HASH_MAGIC_201001_1 0x33be2b298b76f2acllu
+#define HASH_MAGIC_201001_2 0xc903284d7c593af6llu
 
-#define MAGIC_0 MAGIC_201508_0
-#define MAGIC_1 MAGIC_201508_1
-#define MAGIC_2 MAGIC_201508_2
+/*
+ * File system header for first re-write; where backwards compatibility
+ * was (hopefully) preserved
+ */
+#define HASH_MAGIC_201508_2 0x8c9b291a9e55c137llu
+
+#define HASH_MAGIC_0 0x5287505e71e039dfllu
+#define HASH_MAGIC_1 0xebccb02ab09ba26fllu
+#define HASH_MAGIC_2 0x089e07f0da733557llu
+
+/*
+ * Previously all 0xFF - these aren't checked during the mount process
+ * but are purely to "make pretty" the beginning of the file system
+ */
+#define PATH_MAGIC_0 0x7374656766732D32llu
+#define PATH_MAGIC_1 0x3031382E58580000llu
+
+
+typedef enum
+{
+	VERSION_UNKNOWN = 0,
+	VERSION_2010_01,
+	VERSION_2015_08,
+
+	VERSION_2018_XX,
+	VERSION_CURRENT
+}
+version_e;
 
 
 #define DEFAULT_CIPHER GCRY_CIPHER_RIJNDAEL256
 #define DEFAULT_MODE   GCRY_CIPHER_MODE_CBC
 #define DEFAULT_HASH   GCRY_MD_SHA256
+#define DEFAULT_MAC    GCRY_MAC_HMAC_SHA256
 
-#ifdef USE_PROC
-	#define PATH_PROC DIR_SEPARATOR "proc"
-#endif
+#define PATH_PROC DIR_SEPARATOR "proc"
 
 #define PASSWORD_SEPARATOR ':'
 
@@ -86,6 +117,7 @@ typedef enum
 	TAG_BLOCKSIZE,
 	TAG_HEADER_OFFSET,
 	TAG_DUPLICATION,
+	TAG_MAC,
 	TAG_MAX
 }
 stegfs_tag_e;
@@ -117,8 +149,8 @@ typedef struct stegfs_file_t
 	time_t     time;               /*!< Last modified timestamp */
 	uint8_t   *data;               /*!< File data */
 	/* you can’t have more than 64 copies; you just can’t */
-	uint64_t   inodes[MAX_COPIES]; /*!< The available inodes */
-	uint64_t  *blocks[MAX_COPIES]; /*!< The complete list of used blocks */
+	uint64_t   inodes[COPIES_MAX]; /*!< The available inodes */
+	uint64_t  *blocks[COPIES_MAX]; /*!< The complete list of used blocks */
 	bool       write;              /*!< Whether the file was opened for write access */
 }
 stegfs_file_t;
@@ -134,8 +166,9 @@ stegfs_cache2_t;
 
 typedef struct stegfs_blocks_t
 {
-	uint64_t used;  /*!< Count of used blocks */
-	bool *in_use;   /*!< Used block tracker */
+	uint64_t used; /*!< Count of used blocks */
+	bool *in_use;  /*!< Used block tracker */
+	char **file;   /*!< File using the given block */
 }
 stegfs_blocks_t;
 
@@ -153,11 +186,13 @@ typedef struct stegfs_t
 	enum gcry_cipher_algos cipher;      /*!< Cipher algorithm used by the file system */
 	enum gcry_cipher_modes mode;        /*!< Cipher mode used by the file system */
 	enum gcry_md_algos     hash;        /*!< Hash algorithm used by the file system */
+	enum gcry_mac_algos    mac;         /*!< MAC algorithm used by the file system */
 	uint32_t               copies;      /*!< File duplication */
 	size_t                 blocksize;   /*!< File system block size; if it needs to be bigger than 4,294,967,295 we have issues */
 	off_t                  head_offset; /*!< Start location of file data in header blocks; only 32 bits (like blocksize) */
 	stegfs_blocks_t        blocks;      /*!< In use block tracker */
 	stegfs_cache2_t        cache2;      /*!< File cache version 2 */
+	version_e              version;     /*!< File system version */
 }
 stegfs_t;
 
@@ -182,13 +217,14 @@ stegfs_block_t;
  * \param[in]  c   Cipher algorithm
  * \param[in]  m   Cipher mode
  * \param[in]  h   Hash algorithm
+ * \param[in]  a   MAC algorithm
  * \param[in]  x   Duplication copies
  * \returns        The initialisation status
  *
  * Initialise the file system and popular static information structures,
  * making note whether to cache file details
  */
-extern stegfs_init_e stegfs_init(const char * const restrict fs, bool p, enum gcry_cipher_algos c, enum gcry_cipher_modes m, enum gcry_md_algos h, uint32_t x);
+extern stegfs_init_e stegfs_init(const char * const restrict fs, bool p, enum gcry_cipher_algos c, enum gcry_cipher_modes m, enum gcry_md_algos h, enum gcry_mac_algos a, uint32_t x);
 
 /*!
  * \brief                Retrieve information about the file system
@@ -212,7 +248,14 @@ extern bool stegfs_file_will_fit(stegfs_file_t *);
 
 extern void stegfs_file_create(const char * const restrict, bool);
 
-extern bool stegfs_file_stat(stegfs_file_t *);
+#define STEGFS_FILE_STAT_ARGS_COUNT(...) STEGFS_FILE_STAT_ARGS_COUNT2(__VA_ARGS__, 2, 1)
+#define STEGFS_FILE_STAT_ARGS_COUNT2(_1, _2, _, ...) _
+
+#define stegfs_file_stat_1(A)     stegfs_file_stat_aux(A, false)
+#define stegfs_file_stat_2(A, B)  stegfs_file_stat_aux(A, B)
+#define stegfs_file_stat(...) CONCAT(stegfs_file_stat_, STEGFS_FILE_STAT_ARGS_COUNT(__VA_ARGS__))(__VA_ARGS__)
+extern bool stegfs_file_stat_aux(stegfs_file_t *f, bool q);
+
 extern bool stegfs_file_read(stegfs_file_t *);
 extern bool stegfs_file_write(stegfs_file_t *);
 extern void stegfs_file_delete(stegfs_file_t *);
