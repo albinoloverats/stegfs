@@ -1,6 +1,6 @@
 /*
  * stegfs ~ a steganographic file system for unix-like systems
- * Copyright © 2007-2017, albinoloverats ~ Software Development
+ * Copyright © 2007-2018, albinoloverats ~ Software Development
  * email: stegfs@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -20,6 +20,7 @@
 
 
 #include <errno.h>
+#include <error.h>
 
 #define FUSE_USE_VERSION 27
 #include <fuse.h>
@@ -127,7 +128,7 @@ static int fuse_stegfs_statfs(const char *path, struct statvfs *stvbuf)
 	stvbuf->f_files   = stvbuf->f_blocks;
 	stvbuf->f_ffree   = stvbuf->f_bfree;
 	stvbuf->f_favail  = stvbuf->f_bfree;
-	stvbuf->f_fsid    = MAGIC_0;
+	stvbuf->f_fsid    = HASH_MAGIC_2;
 	stvbuf->f_flag    = ST_NOSUID;
 	stvbuf->f_namemax = SYM_LENGTH;
 
@@ -141,7 +142,7 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
 	stegfs_t file_system = stegfs_info();
 	char *f = dir_get_name(path, PASSWORD_SEPARATOR); /* used to check for symlink */
 	/* common attributes for root/files/directories */
-	stbuf->st_dev     = (dev_t)MAGIC_0;
+	stbuf->st_dev     = (dev_t)HASH_MAGIC_2;
 	stbuf->st_ino     = 0;
 	stbuf->st_mode    = 0;//S_IFDIR | 0700;
 	stbuf->st_nlink   = 0;
@@ -171,8 +172,16 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
 		 * if we’re looking at files in /proc treat them as blocks (as
 		 * that’s what we’re representing)
 		 */
-		stbuf->st_mode  = S_IFBLK;
+		//stbuf->st_mode  = S_IFBLK | S_IRUSR;
+		stbuf->st_mode  = S_IFLNK | S_IRUSR;
 		stbuf->st_nlink = 1;
+
+		char *b = dir_get_name(path, PASSWORD_SEPARATOR);
+		uint64_t ino = strtol(b, NULL, 0);
+		char *f = file_system.blocks.file[ino];
+		if (f)
+			stbuf->st_size = strlen(f);
+		free(b);
 	}
 #endif
 	else
@@ -362,13 +371,26 @@ static int fuse_stegfs_read(const char *path, char *buf, size_t size, off_t offs
 
 	(void)info;
 
-	stegfs_cache2_t *c = NULL;
-	if ((c = stegfs_cache2_exists(path, NULL)) && c->file)
+	if (path_starts_with(PATH_PROC, path))
 	{
-		if ((unsigned)(offset + size) > c->file->size)
-			size = c->file->size - offset;
-		memcpy(buf, c->file->data + offset, size);
-		return size;
+		stegfs_t file_system = stegfs_info();
+		char *b = dir_get_name(path, PASSWORD_SEPARATOR);
+		uint64_t ino = strtol(b, NULL, 0);
+		char *f = file_system.blocks.file[ino];
+		if (f)
+			snprintf(buf, size, "%s", f);
+		free(b);
+	}
+	else
+	{
+		stegfs_cache2_t *c = NULL;
+		if ((c = stegfs_cache2_exists(path, NULL)) && c->file)
+		{
+			if ((unsigned)(offset + size) > c->file->size)
+				size = c->file->size - offset;
+			memcpy(buf, c->file->data + offset, size);
+			return size;
+		}
 	}
 
 	return errno = ENOENT, -errno;
@@ -418,12 +440,25 @@ static int fuse_stegfs_open(const char *path, struct fuse_file_info *info)
 
 	(void)info;
 
-	stegfs_cache2_t *c = NULL;
-	if ((c = stegfs_cache2_exists(path, NULL)) && c->file)
+	if (path_starts_with(PATH_PROC, path))
 	{
-		c->file->pass = dir_get_pass(path);
-		if (!stegfs_file_read(c->file))
-			errno = EACCES;
+		stegfs_t file_system = stegfs_info();
+		char *b = dir_get_name(path, PASSWORD_SEPARATOR);
+		uint64_t ino = strtol(b, NULL, 0);
+		char *f = file_system.blocks.file[ino];
+		if (f)
+			fprintf(stderr, "%s", f);
+		free(b);
+	}
+	else
+	{
+		stegfs_cache2_t *c = NULL;
+		if ((c = stegfs_cache2_exists(path, NULL)) && c->file)
+		{
+			c->file->pass = dir_get_pass(path);
+			if (!stegfs_file_read(c->file))
+				errno = EACCES;
+		}
 	}
 
 	return -errno;
@@ -489,7 +524,7 @@ static int fuse_stegfs_fallocate(const char *path, int mode, off_t offset, off_t
 			uint64_t sz = offset + length;
 			switch (mode)
 			{
-				case -1:                        /* emmulate truncate */
+				case -1:                        /* emulate truncate */
 					break;
 				case 0:                         /* make bigger (not smaller) */
 					if (sz < c->file->size)
@@ -592,11 +627,22 @@ static void fuse_stegfs_destroy(void *ptr)
 
 static int fuse_stegfs_readlink(const char *path, char *buf, size_t size)
 {
-	(void)path;
-	(void)buf;
-	(void)size;
+	errno = EXIT_SUCCESS;
 
-	return errno = ENOTSUP, -errno;
+	if (path_starts_with(PATH_PROC, path))
+	{
+		stegfs_t file_system = stegfs_info();
+		char *b = dir_get_name(path, PASSWORD_SEPARATOR);
+		uint64_t ino = strtol(b, NULL, 0);
+		char *f = file_system.blocks.file[ino];
+		if (f)
+			snprintf(buf, size, "%s", f);
+		free(b);
+	}
+	else
+		errno = ENOTSUP;
+
+	return -errno;
 }
 
 static int fuse_stegfs_utime(const char *path, struct utimbuf *utime)
@@ -640,7 +686,7 @@ int main(int argc, char **argv)
 	errno = EXIT_SUCCESS;
 	if (!args.help)
 	{
-		switch (stegfs_init(args.fs, args.paranoid, args.cipher, args.mode, args.hash, args.duplicates))
+		switch (stegfs_init(args.fs, args.paranoid, args.cipher, args.mode, args.hash, args.mac, args.duplicates))
 		{
 			case STEGFS_INIT_OKAY:
 				goto done;
@@ -648,7 +694,7 @@ int main(int argc, char **argv)
 				fprintf(stderr, "Not a stegfs partition!\n");
 				break;
 			case STEGFS_INIT_OLD_STEGFS:
-				fprintf(stderr, "Previous version of stegfs!\n");
+				fprintf(stderr, "Previous (unsupported) version of stegfs!\n");
 				break;
 			case STEGFS_INIT_MISSING_TAG:
 				fprintf(stderr, "Missing required stegfs metadata!\n");
@@ -666,7 +712,8 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-done:	;
+done:
+	init_deinit(args);
 	struct fuse_args fargs = FUSE_ARGS_INIT(argc, argv);
 	fuse_opt_parse(&fargs, NULL, NULL, NULL);
 	return fuse_main(fargs.argc, fargs.argv, &fuse_stegfs_functions, NULL);
