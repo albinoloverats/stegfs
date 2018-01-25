@@ -89,7 +89,7 @@ extern bool tlv_has_tag(TLV_HANDLE ptr, uint8_t tag)
 	return tlv_value_of(ptr, tag) != NULL;
 }
 
-extern byte_t *tlv_value_of(TLV_HANDLE ptr, uint8_t tag)
+extern byte_t *tlv_value_of(TLV_HANDLE ptr, uint8_t tag, uint8_t *def)
 {
 	tlv_private_t *tlv_ptr = (tlv_private_t *)ptr;
 	if (!tlv_ptr)
@@ -97,7 +97,7 @@ extern byte_t *tlv_value_of(TLV_HANDLE ptr, uint8_t tag)
 	for (unsigned i = 0; i < tlv_ptr->tags; i++)
 		if (tlv_ptr->buffer[i].tag == tag)
 			return tlv_ptr->buffer[i].value;
-	return NULL;
+	return def;
 }
 
 extern uint16_t tlv_size_of(TLV_HANDLE ptr, uint8_t tag)

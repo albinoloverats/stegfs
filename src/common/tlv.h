@@ -97,16 +97,24 @@ extern void tlv_append(TLV_HANDLE *h, tlv_t t) __attribute__((nonnull(1)));
  */
 extern bool tlv_has_tag(TLV_HANDLE h, uint8_t t) __attribute__((nonnull(1)));
 
+#define TLV_VALUE_OF_ARGS_COUNT(...) TLV_VALUE_OF_ARGS_COUNT2(__VA_ARGS__, 3, 2, 1)
+#define TLV_VALUE_OF_ARGS_COUNT2(_1, _2, _3, _, ...) _
+
+#define tlv_value_of_2(A, B)     tlv_value_of_aux(A, B, NULL)
+#define tlv_value_of_3(A, B, C)  tlv_value_of_aux(A, B, C)
+#define tlv_value_of(...) CONCAT(tlv_value_of_, TLV_VALUE_OF_ARGS_COUNT(__VA_ARGS__))(__VA_ARGS__)
+
 /*!
  * \brief         Get value for tag
  * \param[in]  h  The TLV array to check
  * \param[in]  t  The tag value to get
+ * \param[in]  d  The default to use if the tag doesn't exist
  * \return        The value of the tag
  *
  * Get the value for the given tag. If there are duplicates in the array
  * this will return the value of the first.
  */
-extern byte_t *tlv_value_of(TLV_HANDLE h, uint8_t t) __attribute__((nonnull(1)));
+extern byte_t *tlv_value_of_aux(TLV_HANDLE h, uint8_t t, uint8_t *d) __attribute__((nonnull(1)));
 
 
 extern uint16_t tlv_size_of(TLV_HANDLE ptr, uint8_t t) __attribute__((nonnull(1)));
@@ -128,7 +136,7 @@ extern byte_t *tlv_export_aux(TLV_HANDLE h, bool e) __attribute__((nonnull(1)));
  * \param[in]  h  The TLV array to count
  * \return        The number of TLV items
  *
- * Count the number of TLV triples in the array.
+ * Count the number of TLV elements in the array.
  */
 extern uint16_t tlv_count(TLV_HANDLE h) __attribute__((nonnull(1)));
 
