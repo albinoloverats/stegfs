@@ -1,6 +1,6 @@
 /*
  * stegfs ~ a steganographic file system for unix-like systems
- * Copyright © 2007-2017, albinoloverats ~ Software Development
+ * Copyright © 2007-2018, albinoloverats ~ Software Development
  * email: stegfs@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -145,7 +145,7 @@ static gcry_cipher_hd_t crypto_init(enum gcry_cipher_algos c, enum gcry_cipher_m
 	return cipher_handle;
 }
 
-static void superblock_info(stegfs_block_t *sb, const char *cipher, const char *mode, const char *hash, uint32_t copies)
+static void superblock_info(stegfs_block_t *sb, const char *cipher, const char *mode, const char *hash, const char *mac, uint8_t copies)
 {
 	TLV_HANDLE tlv = tlv_init();
 
@@ -188,8 +188,12 @@ static void superblock_info(stegfs_block_t *sb, const char *cipher, const char *
 	t.value = (byte_t *)hash;
 	tlv_append(&tlv, t);
 
+	t.tag = TAG_MAC;
+	t.length = strlen(mac);
+	t.value = (byte_t *)mac;
+	tlv_append(&tlv, t);
+
 	t.tag = TAG_DUPLICATION;
-	copies = htonl(copies);
 	t.length = sizeof copies;
 	t.value = malloc(sizeof copies);
 	memcpy(t.value, &copies, sizeof copies);
@@ -214,13 +218,13 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	int64_t fs = open_filesystem(path, &args.size, args.force, args.rewrite_sb, args.dry_run);
-
-	if (!args.size)
+	if (!(args.size || args.rewrite_sb))
 	{
 		fprintf(stderr, "Invalid file system size!\n");
 		return EXIT_FAILURE;
 	}
+
+	int64_t fs = open_filesystem(path, &args.size, args.force, args.rewrite_sb, args.dry_run);
 
 	uint64_t blocks = args.size / SIZE_BYTE_BLOCK;
 	void *mm = NULL;
@@ -274,37 +278,41 @@ int main(int argc, char **argv)
 	l = s2 - s1;
 	printf("Capacity     : %'*.*g %s\n", r, (l + 2), z, units);
 	printf("Largest file : %'*.*g %s\n", r, (l + 2), z / args.duplicates, units);
+	printf("Duplication  : %*d ×\n", args.rewrite_sb ? 0 : r, args.duplicates);
+	printf("Cipher       : %s\n", cipher_name_from_id(args.cipher));
+	printf("Cipher mode  : %s\n", mode_name_from_id(args.mode));
+	printf("Hash         : %s\n", hash_name_from_id(args.hash));
+	printf("MAC          : %s\n", mac_name_from_id(args.mac));
 
 	if (args.rewrite_sb || args.dry_run)
 		goto superblock;
 	/*
 	 * write “encrypted” blocks
 	 */
-	uint8_t rnd[MEGABYTE];
+	uint8_t rnd[MEGABYTE] = { 0x00 };
+#ifndef __DEBUG__
 	gcry_create_nonce(rnd, sizeof rnd);
+#endif
 
 	gcry_cipher_hd_t gc = crypto_init(args.cipher, args.mode);
 	printf("\e[?25l"); /* hide cursor */
 	for (uint64_t i = 0; i < args.size / MEGABYTE; i++)
 	{
 		printf("\rWriting      : %'*.3f %%", r, PERCENT * i / (args.size / MEGABYTE));
+#ifndef __DEBUG__
 		gcry_cipher_encrypt(gc, rnd, sizeof rnd, NULL, 0);
+#else
+		(void)gc;
+#endif
 		memcpy(mm + (i * sizeof rnd), rnd, sizeof rnd);
 		msync(mm + (i * sizeof rnd), sizeof rnd, MS_SYNC);
 	}
 	printf("\rWriting      : %'*.3f %%\n", r, PERCENT);
 
 superblock:
-
-	printf("Duplication  : %*d ×\n", args.rewrite_sb ? 0 : r, args.duplicates);
-
-	printf("Cipher       : %s\n", cipher_name_from_id(args.cipher));
-	printf("Cipher mode  : %s\n", mode_name_from_id(args.mode));
-	printf("Hash         : %s\n", hash_name_from_id(args.hash));
-
 	if (args.dry_run)
 	{
-		printf("Test run     : File system not modified\n");
+		printf("\nTest run     : File system not modified\n\n");
 		return EXIT_SUCCESS;
 	}
 
@@ -314,13 +322,14 @@ superblock:
 
 	stegfs_block_t sb;
 	gcry_create_nonce(&sb, sizeof sb);
-	memset(sb.path, 0xFF, sizeof sb.path);
+	sb.path[0] = htonll(PATH_MAGIC_0);
+	sb.path[1] = htonll(PATH_MAGIC_1);
 
-	superblock_info(&sb, cipher_name_from_id(args.cipher), mode_name_from_id(args.mode), hash_name_from_id(args.hash), args.duplicates);
+	superblock_info(&sb, cipher_name_from_id(args.cipher), mode_name_from_id(args.mode), hash_name_from_id(args.hash), mac_name_from_id(args.mac), args.duplicates);
 
-	sb.hash[0] = htonll(MAGIC_0);
-	sb.hash[1] = htonll(MAGIC_1);
-	sb.hash[2] = htonll(MAGIC_2);
+	sb.hash[0] = htonll(HASH_MAGIC_0);
+	sb.hash[1] = htonll(HASH_MAGIC_1);
+	sb.hash[2] = htonll(HASH_MAGIC_2);
 	sb.next = htonll(blocks);
 	memcpy(mm, &sb, sizeof sb);
 	msync(mm, sizeof sb, MS_SYNC);
