@@ -59,7 +59,7 @@ first block.
       Sub-block name / contents                 Size in bytes / bits
     +----------------------------------------------------------------+ -+
     | Directory / Path checksum                          32 /    256 |  +- hash
-    | [Nothing - 0xFF]                                               |  |
+    | [ASCII for stegfs-version]                                     |  |
     |                                                                |  |
     |                                                                |  |
     +----------------------------------------------------------------+ -+-------+
@@ -68,18 +68,18 @@ first block.
     | [File system information]                                      |          |
     |                                                                |          +‐ cipher; blocksize:  64 × 252 blocks
     | ¹ Followed by: - list of first blocks (many 64 bit integers²)  |          |                     128 × 126
-    |                - random data (variable size)                   |          |                     192 ×  84
-    |                - start of file data (1,024 bytes / 8,192 bits) |          |                     256 ×  63 default
+    |                - MAC (up to 64 bytes / 512 bits)               |          |                     192 ×  84
+    |                - random data (variable size)                   |          |                     256 ×  63 default
+    |                - start of file data (1,024 bytes / 8,192 bits) |          |
     |                                                                |          |
-    | ² The number of copies be vary from 1 to 64, which will use    |          |
-    |   between 8 and 512 bytes (default is 8)                       |          |
+    | ² The number of copies can vary from 1 to 64, which will use   |          |
+    |   between 8 and 512 bytes (default is 8 copies)                |          |
     |                                                                |          |
     |                                                                |          |
-    | TODO: If using ECC, data block should be 1,912 bytes; this     |          |
-    |       would allow 1,912 + 32 + 8 = 1,952 bytes to be encrypted |          |
-    |       in 61 blocks; then + 32 header = 1,984 bytes, which is   |          |
-    |       < 1,992 bytes max for ECC / 2,048 block (this leaves 56  |          |
-    |       blocks of unused space / block) - (I think)              |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
+    |                                                                |          |
     |                                                                |          |
     |                                                                |          |
     |                                                                |          |
@@ -311,8 +311,8 @@ first block.
     |                                                                |          |
     |                                                                |          |
     +----------------------------------------------------------------+ -+       |
-    | Checksum                                           32 /    256 |  |       |
-    | [Hash of "stegfs-2015.08"]                                     |  +- hash |
+    | Block checksum                                     32 /    256 |  |       |
+    | [File system verification data]                                |  +- hash |
     |                                                                |  |       |
     |                                                                |  |       |
     +----------------------------------------------------------------+ -+       |

@@ -1,4 +1,4 @@
-.PHONY: clean distclean
+.PHONY: stegfs clean distclean
 
 STEGFS   = stegfs
 MKFS     = mkstegfs
@@ -12,14 +12,15 @@ COMMON   = src/common/error.c src/common/ccrypt.c src/common/tlv.c src/common/di
 CFLAGS   = -Wall -Wextra -Werror -std=gnu99 `pkg-config --cflags fuse` -pipe -I/usr/local/include
 CPPFLAGS = -Isrc -D_GNU_SOURCE -DGCRYPT_NO_DEPRECATED -D_FILE_OFFSET_BITS=64 -DGIT_COMMIT=\"`git log | head -n1 | cut -f2 -d' '`\"
 
-DEBUG    = -O0 -ggdb -pg -lc -DDEBUG
+PROFILE  = -O0 -ggdb -D__DEBUG__ -pg -lc
+DEBUG    = -O0 -ggdb -D__DEBUG__
 
 # -lpthread
 LIBS     = -lgcrypt `pkg-config --libs fuse`
 
-all: sfs mkfs man
+all: stegfs mkfs man
 
-sfs:
+stegfs:
 	 @$(CC) $(LIBS) $(CFLAGS) $(CPPFLAGS) -O2 $(SOURCE) $(COMMON) -o $(STEGFS)
 	-@echo "built ‘$(SOURCE)’ --> ‘$(STEGFS)’"
 
@@ -31,9 +32,9 @@ cp:
 	 @$(CC) $(CFLAGS) $(CPPFLAGS) -O0 -ggdb $(CPSRC) src/common/error.c src/common/fs.c -o $(CP)
 	-@echo "built ‘$(CPSRC) $(COMMON)’ --> ‘$(CP)’"
 
-debug: debug-sfs debug-mkfs
+debug: debug-stegfs debug-mkfs
 
-debug-sfs:
+debug-stegfs:
 	 @$(CC) $(LIBS) $(CFLAGS) $(CPPFLAGS) $(DEBUG) -DUSE_PROC $(SOURCE) $(COMMON) -o $(STEGFS)
 	-@echo "built ‘$(SOURCE)’ --> ‘$(STEGFS)’"
 
