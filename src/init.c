@@ -1,6 +1,6 @@
 /*
  * stegfs ~ a steganographic file system for unix-like systems
- * Copyright © 2007-2017, albinoloverats ~ Software Development
+ * Copyright © 2007-2018, albinoloverats ~ Software Development
  * email: stegfs@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -44,7 +44,7 @@ static char *extract_long_option(char *);
 
 extern args_t init(int argc, char **argv, char **fuse)
 {
-	args_t a = { NULL, NULL, DEFAULT_CIPHER, DEFAULT_MODE, DEFAULT_HASH, DEFAULT_COPIES, 0, false, false, false, false, false };
+	args_t a = { NULL, NULL, DEFAULT_CIPHER, DEFAULT_MODE, DEFAULT_HASH, DEFAULT_MAC, COPIES_DEFAULT, 0, false, false, false, false, false };
 	/*
 	 * parse commandline arguments
 	 */
@@ -100,15 +100,35 @@ extern args_t init(int argc, char **argv, char **fuse)
 			else
 				a.mode = mode_id_from_name(argv[(++i)]);
 		}
+		else if (!strcmp("--mac", argv[i]) || !strcmp("-a", argv[i]))
+		{
+			if (argv[i][1] == '-')
+			{
+				char *x = extract_long_option(argv[i]);
+				a.mode = mac_id_from_name(x);
+				free(x);
+			}
+			else
+				a.mac = mac_id_from_name(argv[(++i)]);
+		}
 		else if (!strcmp("--paranoid", argv[i]) || !strcmp("-p", argv[i]))
 			a.paranoid = true;
 		else if (!strcmp("--duplicates", argv[i]) || !strcmp("-x", argv[i]))
-			a.duplicates = true;
+		{
+			char *s = NULL;
+			if (argv[i][1] == '-')
+				s = argv[i][0] + strchr(argv[i], '=') + sizeof( char );
+			else
+				s = argv[(++i)];
+			a.duplicates = strtol(s, NULL, 0);
+			if (a.duplicates <= 0 || a.duplicates > COPIES_MAX)
+				die("unsupported value for file duplication %d", a.duplicates);
+		}
 		else if (!is_stegfs() && (!strcmp("--size", argv[i]) || !strcmp("-z", argv[i])))
 		{
 			char *s = NULL;
 			if (argv[i][1] == '-')
-				s = argv[i][0] + strchr(argv[i], '=') + sizeof(char);
+				s = argv[i][0] + strchr(argv[i], '=') + sizeof( char );
 			else
 				s = argv[(++i)];
 			/*
@@ -181,6 +201,15 @@ extern args_t init(int argc, char **argv, char **fuse)
 	return a;
 }
 
+extern void init_deinit(args_t args)
+{
+	if (args.fs)
+		free(args.fs);
+	if (args.mount)
+		free(args.mount);
+	return;
+}
+
 static void print_version(void)
 {
 	char *name = is_stegfs() ? STEGFS_NAME : MKFS_NAME;
@@ -211,8 +240,9 @@ static void print_help(void)
 	fprintf(stderr, _("  -c, --cipher=<algorithm>   Algorithm to use to encrypt data\n"));
 	fprintf(stderr, _("  -s, --hash=<algorithm>     Hash algorithm to generate key\n"));
 	fprintf(stderr, _("  -m, --mode=<mode>          The encryption mode to use\n"));
+	fprintf(stderr, _("  -a, --mace=<mac>           The MAC algorithm to use\n"));
 	fprintf(stderr, _("  -p, --paranoid             Enable paranoia mode\n"));
-	fprintf(stderr, _("  -x, --duplicates   Number of times each file should be duplicated\n"));
+	fprintf(stderr, _("  -x, --duplicates=<#>       Number of times each file should be duplicated\n"));
 	if (!is_stegfs())
 	{
 		fprintf(stderr, _("  -z, --size=<size>  Desired file system size, required when creating\n"));

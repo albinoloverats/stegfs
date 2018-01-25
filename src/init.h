@@ -1,6 +1,6 @@
 /*
  * stegfs ~ a steganographic file system for unix-like systems
- * Copyright © 2007-2017, albinoloverats ~ Software Development
+ * Copyright © 2007-2018, albinoloverats ~ Software Development
  * email: stegfs@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -44,7 +44,8 @@ typedef struct
 	enum gcry_cipher_algos cipher; /*!< The cryptoraphic cipher selected by the user */
 	enum gcry_cipher_modes mode;   /*!< The hash function selected by the user */
 	enum gcry_md_algos     hash;   /*!< The encryption mode selected by the user */
-	uint32_t duplicates;           /*!< Number of duplicates of each file */
+	enum gcry_mac_algos    mac;    /*!< The MAC alogrithm selected by the user */
+	uint8_t duplicates;            /*!< Number of duplicates of each file */
 
 	uint64_t size;                 /*!< File system size (mkfs) */
 
@@ -71,6 +72,8 @@ args_t;
  * code that used to exist here.
  */
 extern args_t init(int, char **, char **);
+
+extern void init_deinit(args_t args);
 
 /*!
  * \brief         Show list of command line options
