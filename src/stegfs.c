@@ -182,7 +182,7 @@ extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid, 
 	else
 		file_system.mac = DEFAULT_MAC;
 	if (file_system.version < VERSION_2018_XX)
-		file_system.mac = GCRY_MAC_NONE;
+		file_system.mac = DEFAULT_MAC;
 
 	if (file_system.cipher == GCRY_CIPHER_NONE || file_system.hash == GCRY_MD_NONE || file_system.mode == GCRY_CIPHER_MODE_NONE)
 		return STEGFS_INIT_INVALID_TAG;
@@ -894,16 +894,29 @@ static gcry_cipher_hd_t init_cipher(const stegfs_file_t * const restrict file, u
 	size_t key_length = gcry_cipher_get_algo_keylen(file_system.cipher);
 	/* allocate space for whichever is larger */
 	uint8_t *key_data = gcry_calloc_secure(key_length > hash_length ? key_length : hash_length, sizeof( uint8_t ));
-	gcry_md_write(hash, file->name, strlen(file->name));
-	if (file->pass)
-		gcry_md_write(hash, file->pass, strlen(file->pass));
+	if (file_system.version < VERSION_2018_XX)
+	{
+		gcry_md_write(hash, file->path, strlen(file->path));
+		gcry_md_write(hash, file->name, strlen(file->name));
+		if (file->pass)
+			gcry_md_write(hash, file->pass, strlen(file->pass));
+		else
+			gcry_md_write(hash, "", strlen(""));
+		memcpy(key_data, gcry_md_read(hash, file_system.hash), key_length);
+	}
 	else
-		gcry_md_write(hash, "", strlen(""));
-	/* salt & kdf */
-	gcry_md_write(salt, file->path, strlen(file->path));
-	const uint8_t *hash_data = gcry_md_read(hash, file_system.hash);
-	const uint8_t *salt_data = gcry_md_read(salt, file_system.hash);
-	gcry_kdf_derive(hash_data, hash_length, GCRY_KDF_PBKDF2, file_system.hash, salt_data, salt_length, KEY_ITERATIONS, key_length, key_data);
+	{
+		gcry_md_write(hash, file->name, strlen(file->name));
+		if (file->pass)
+			gcry_md_write(hash, file->pass, strlen(file->pass));
+		else
+			gcry_md_write(hash, "", strlen(""));
+		/* salt & kdf */
+		gcry_md_write(salt, file->path, strlen(file->path));
+		const uint8_t *hash_data = gcry_md_read(hash, file_system.hash);
+		const uint8_t *salt_data = gcry_md_read(salt, file_system.hash);
+		gcry_kdf_derive(hash_data, hash_length, GCRY_KDF_PBKDF2, file_system.hash, salt_data, salt_length, KEY_ITERATIONS, key_length, key_data);
+	}
 	gcry_cipher_setkey(cipher, key_data, key_length);
 	gcry_free(key_data);
 	gcry_md_close(salt);
