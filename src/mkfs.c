@@ -200,7 +200,9 @@ static void superblock_info(stegfs_block_t *sb, const char *cipher, const char *
 	tlv_append(&tlv, t);
 	free(t.value);
 
-	memcpy(sb->data, tlv_export(tlv), tlv_size(tlv));
+	uint64_t tags = htonll(tlv_count(tlv));
+	memcpy(sb->data, &tags, sizeof tags);
+	memcpy(sb->data + sizeof tags, tlv_export(tlv), tlv_size(tlv));
 
 	return;
 }
