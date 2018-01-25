@@ -88,14 +88,31 @@ extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid, 
 	stegfs_block_t block;
 	memcpy(&block, file_system.memory, sizeof block);
 	/* quick check for previous version; account for all byte orders */
-	if ((block.hash[0] == HASH_MAGIC_201001_0 || htonll(block.hash[0]) == HASH_MAGIC_201001_0) && (block.hash[1] == HASH_MAGIC_201001_1 || htonll(block.hash[1]) == HASH_MAGIC_201001_1) && (block.hash[2] == HASH_MAGIC_201001_2 || htonll(block.hash[2]) == HASH_MAGIC_201001_2))
+	if ((block.hash[0] == HASH_MAGIC_201001_0 || htonll(block.hash[0]) == HASH_MAGIC_201001_0)
+			&& (block.hash[1] == HASH_MAGIC_201001_1 || htonll(block.hash[1]) == HASH_MAGIC_201001_1)
+			&& (block.hash[2] == HASH_MAGIC_201001_2 || htonll(block.hash[2]) == HASH_MAGIC_201001_2))
 		return STEGFS_INIT_OLD_STEGFS;
 
-	if (ntohll(block.hash[0]) != HASH_MAGIC_0 || ntohll(block.hash[1]) != HASH_MAGIC_1 || ntohll(block.hash[2]) != HASH_MAGIC_2)
+	if (ntohll(block.hash[0]) != HASH_MAGIC_0 || ntohll(block.hash[1]) != HASH_MAGIC_1)
 		return STEGFS_INIT_NOT_STEGFS;
+	uint64_t tags = TAG_MAX;
+	off_t tag_off = sizeof tags;
+	switch (ntohll(block.hash[2]))
+	{
+		case HASH_MAGIC_201508_2:
+			tags = 8;
+			tag_off = 0;
+			break;
+		case HASH_MAGIC_2:
+			memcpy(&tags, block.data, sizeof tags);
+			tags = ntohll(tags);
+			break; /* save actual version detection until later */
+		default:
+			return STEGFS_INIT_NOT_STEGFS;
+	}
 
 	TLV_HANDLE tlv = tlv_init();
-	for (int i = 0, j = 0; i < TAG_MAX; i++)
+	for (uint64_t i = 0, j = tag_off; i < tags; i++)
 	{
 		tlv_t t;
 		memcpy(&t.tag, block.data + j, sizeof t.tag);
@@ -109,12 +126,14 @@ extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid, 
 		tlv_append(&tlv, t);
 		free(t.value);
 	}
+#if 0
 	if (!tlv_has_tag(tlv, TAG_STEGFS) || !tlv_has_tag(tlv, TAG_VERSION) ||
 			!tlv_has_tag(tlv, TAG_CIPHER) || !tlv_has_tag(tlv, TAG_MODE) || !tlv_has_tag(tlv, TAG_HASH) || !tlv_has_tag(tlv, TAG_MAC) ||
 			!tlv_has_tag(tlv, TAG_BLOCKSIZE) || !tlv_has_tag(tlv, TAG_HEADER_OFFSET) || !tlv_has_tag(tlv, TAG_DUPLICATION))
 		return STEGFS_INIT_MISSING_TAG;
+#endif
 
-	if (strncmp((char *)tlv_value_of(tlv, TAG_STEGFS), STEGFS_NAME, strlen(STEGFS_NAME)))
+	if (strncmp(STEGFS_NAME, (char *)tlv_value_of(tlv, TAG_STEGFS), strlen(STEGFS_NAME)))
 		return STEGFS_INIT_INVALID_TAG;
 	version_e version = parse_version((char *)tlv_value_of(tlv, TAG_VERSION));
 	switch (version)
@@ -128,32 +147,67 @@ extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid, 
 	}
 
 	/* get cipher info */
-	char *c = strndup((char *)tlv_value_of(tlv, TAG_CIPHER), tlv_size_of(tlv, TAG_CIPHER));
-	file_system.cipher = cipher_id_from_name(c);
-	free(c);
-	char *m = strndup((char *)tlv_value_of(tlv, TAG_MODE), tlv_size_of(tlv, TAG_MODE));
-	file_system.mode = mode_id_from_name(m);
-	free(m);
+	if (tlv_has_tag(tlv, TAG_CIPHER))
+	{
+		char *c = strndup((char *)tlv_value_of(tlv, TAG_CIPHER), tlv_size_of(tlv, TAG_CIPHER));
+		file_system.cipher = cipher_id_from_name(c);
+		free(c);
+	}
+	else
+		file_system.cipher = DEFAULT_CIPHER;
+	if (tlv_has_tag(tlv, TAG_MODE))
+	{
+		char *m = strndup((char *)tlv_value_of(tlv, TAG_MODE), tlv_size_of(tlv, TAG_MODE));
+		file_system.mode = mode_id_from_name(m);
+		free(m);
+	}
+	else
+		file_system.mode = DEFAULT_MODE;
 	/* get hash info */
-	char *h = strndup((char *)tlv_value_of(tlv, TAG_HASH), tlv_size_of(tlv, TAG_HASH));
-	file_system.hash = hash_id_from_name(h);
-	free(h);
+	if (tlv_has_tag(tlv, TAG_HASH))
+	{
+		char *h = strndup((char *)tlv_value_of(tlv, TAG_HASH), tlv_size_of(tlv, TAG_HASH));
+		file_system.hash = hash_id_from_name(h);
+		free(h);
+	}
+	else
+		file_system.hash = DEFAULT_HASH;
 	/* get mac info */
-	char *a = strndup((char *)tlv_value_of(tlv, TAG_MAC), tlv_size_of(tlv, TAG_MAC));
-	file_system.mac = mac_id_from_name(a);
-	free(a);
+	if (tlv_has_tag(tlv, TAG_MAC))
+	{
+		char *a = strndup((char *)tlv_value_of(tlv, TAG_MAC), tlv_size_of(tlv, TAG_MAC));
+		file_system.mac = mac_id_from_name(a);
+		free(a);
+	}
+	else
+		file_system.mac = DEFAULT_MAC;
+	if (file_system.version < VERSION_2018_XX)
+		file_system.mac = GCRY_MAC_NONE;
+
 	if (file_system.cipher == GCRY_CIPHER_NONE || file_system.hash == GCRY_MD_NONE || file_system.mode == GCRY_CIPHER_MODE_NONE)
 		return STEGFS_INIT_INVALID_TAG;
 	if (file_system.version > VERSION_2015_08 && file_system.mac == GCRY_MAC_NONE)
 		return STEGFS_INIT_INVALID_TAG;
+
+	/* get number of copies */
+	if (tlv_has_tag(tlv, TAG_DUPLICATION))
+		memcpy(&file_system.copies, tlv_value_of(tlv, TAG_DUPLICATION), tlv_size_of(tlv, TAG_DUPLICATION));
+	else
+		file_system.copies = COPIES_DEFAULT;
+	if (file_system.version < VERSION_2018_XX)
+		file_system.copies = ntohl(file_system.copies);
+
 	/* get fs block size */
+	if (!tlv_has_tag(tlv, TAG_BLOCKSIZE))
+		return STEGFS_INIT_MISSING_TAG;
 	memcpy(&file_system.blocksize, tlv_value_of(tlv, TAG_BLOCKSIZE), tlv_size_of(tlv, TAG_BLOCKSIZE));
 	file_system.blocksize = ntohl(file_system.blocksize);
+
 	/* get number of bytes file data in file header */
+	if (!tlv_has_tag(tlv, TAG_HEADER_OFFSET))
+		return STEGFS_INIT_MISSING_TAG;
 	memcpy(&file_system.head_offset, tlv_value_of(tlv, TAG_HEADER_OFFSET), tlv_size_of(tlv, TAG_HEADER_OFFSET));
 	file_system.head_offset = ntohl(file_system.head_offset);
-	/* get number of copies */
-	memcpy(&file_system.copies, tlv_value_of(tlv, TAG_DUPLICATION), tlv_size_of(tlv, TAG_DUPLICATION));
 
 	if (ntohll(block.next) != file_system.size / file_system.blocksize)
 		return STEGFS_INIT_CORRUPT_TAG;
@@ -449,10 +503,8 @@ extern bool stegfs_file_read(stegfs_file_t *file)
 		}
 		gcry_cipher_close(cipher_handle);
 		/* compare generated MAC with stored MAC */
-		if (gcry_mac_verify(mac_handle, mac_data, mac_length) == GPG_ERR_CHECKSUM)
+		if (file_system.version >= VERSION_2018_XX && gcry_mac_verify(mac_handle, mac_data, mac_length) == GPG_ERR_CHECKSUM)
 			failed = true;
-		uint8_t *x = malloc(mac_length);
-		gcry_mac_read(mac_handle, x, &mac_length);
 		gcry_mac_close(mac_handle);
 		gcry_free(mac_data);
 		if (failed)
@@ -878,7 +930,7 @@ static gcry_mac_hd_t init_mac(const stegfs_file_t * const restrict file, uint8_t
 	/* obtain handles */
 	gcry_mac_hd_t mac;
 	gcry_mac_open(&mac, file_system.mac, GCRY_MAC_FLAG_SECURE, NULL);
-	size_t mac_length = gcry_mac_get_algo_keylen(file_system.mac);
+	size_t mac_key_length = gcry_mac_get_algo_keylen(file_system.mac);
 	gcry_md_hd_t hash;
 	gcry_md_open(&hash, file_system.hash, GCRY_MD_FLAG_SECURE);
 	size_t hash_length = gcry_md_get_algo_dlen(file_system.hash);
@@ -896,10 +948,10 @@ static gcry_mac_hd_t init_mac(const stegfs_file_t * const restrict file, uint8_t
 	const uint8_t *hash_data = gcry_md_read(hash, file_system.hash);
 	const uint8_t *salt_data = gcry_md_read(salt, file_system.hash);
 	/* initialise the mac */
-	uint8_t *mac_data = gcry_calloc_secure(mac_length, sizeof( byte_t ));
-	gcry_kdf_derive(hash_data, hash_length, GCRY_KDF_PBKDF2, file_system.hash, salt_data, salt_length, KEY_ITERATIONS, mac_length, mac_data);
-	gcry_mac_setkey(mac, mac_data, mac_length);
-	gcry_free(mac_data);
+	uint8_t *mac_key_data = gcry_calloc_secure(mac_key_length, sizeof( byte_t ));
+	gcry_kdf_derive(hash_data, hash_length, GCRY_KDF_PBKDF2, file_system.hash, salt_data, salt_length, KEY_ITERATIONS, mac_key_length, mac_key_data);
+	gcry_mac_setkey(mac, mac_key_data, mac_key_length);
+	gcry_free(mac_key_data);
 	gcry_md_close(salt);
 	/* create the iv for the encryption algorithm */
 	gcry_md_reset(hash);
