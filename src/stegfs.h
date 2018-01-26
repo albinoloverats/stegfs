@@ -31,9 +31,8 @@
 
 
 /* size (in bytes) for various blocks of data */
-#define SIZE_BYTE_BLOCK 0x0800       /*!< 2,048 bytes */
-#define SIZE_BYTE_PATH  0x0020       /*!<    32 bytes */
-
+#define SIZE_BYTE_BLOCK       0x0800       /*!< 2,048 bytes */
+#define SIZE_BYTE_PATH        0x0020       /*!<    32 bytes */
 #define SIZE_BYTE_DATA_201508 0x07B8 /*!< 1,976 bytes */
 //#define SIZE_BYTE_DATA_2018XX 0x0780 /*!< 1,920 bytes */
 #define SIZE_BYTE_DATA  SIZE_BYTE_DATA_201508
@@ -46,11 +45,11 @@
 #define OFFSET_BYTE_HEAD  (SIZE_BYTE_DATA-SIZE_BYTE_HEAD) /*!< Offset of file data in header block */
 
 /* size in 64 bit ints of parts of block */
-#define SIZE_LONG_PATH  0x04
+#define SIZE_LONG_PATH         0x04
 #define SIZE_LONG_DATA_201508  0xF7
 //#define SIZE_LONG_DATA_2018XX  0xF0
-#define SIZE_LONG_DATA  SIZE_LONG_DATA_201508
-#define SIZE_LONG_HASH  0x04
+#define SIZE_LONG_DATA         SIZE_LONG_DATA_201508
+#define SIZE_LONG_HASH         0x04
 /* next block (not defined) */
 
 #define COPIES_MAX 64
@@ -86,6 +85,11 @@
 #define PATH_MAGIC_1 0x3031382E58580000llu
 
 
+/*!
+ * \brief  Version enum
+ *
+ * An enum to indicate the file system version.
+ */
 typedef enum
 {
 	VERSION_UNKNOWN = 0,
@@ -107,6 +111,11 @@ version_e;
 
 #define PASSWORD_SEPARATOR ':'
 
+/*!
+ * \brief  Tag (TLV) enum
+ *
+ * An enum to identify tags in the file system superblock TLV array.
+ */
 typedef enum
 {
 	TAG_STEGFS,
@@ -122,6 +131,11 @@ typedef enum
 }
 stegfs_tag_e;
 
+/*!
+ * \brief  Initialisation enum
+ *
+ * Return value enum for file system initialisation.
+ */
 typedef enum
 {
 	STEGFS_INIT_OKAY,
@@ -138,7 +152,7 @@ stegfs_init_e;
  * \brief  Structure to hold information about a file
  *
  * Public file information structure containing an easy-to-access
- * representation of all important details about a file
+ * representation of all important details about a file.
  */
 typedef struct stegfs_file_t
 {
@@ -155,20 +169,37 @@ typedef struct stegfs_file_t
 }
 stegfs_file_t;
 
-typedef struct _stegfs_cache2
+/*!
+ * \brief  Cache structure
+ *
+ * A cache tree element. If the element represents a directory it will
+ * have a name and number of entries, as well as pointers to all child
+ * elements. Whereas a file will (mostly) just fill out the file
+ * structure.
+ */
+typedef struct _stegfs_cache
 {
-	char *name;
-	uint64_t ents;
-	struct _stegfs_cache2 **child;
-	stegfs_file_t *file;
+	char *name;                   /*!< The name of the directory/file */
+	uint64_t ents;                /*!< The number of child elements */
+	struct _stegfs_cache **child; /*!< Array of pointers to child elements */
+	stegfs_file_t *file;          /*!< File details (if applicable) */
 }
-stegfs_cache2_t;
+stegfs_cache_t;
 
+/*!
+ * \brief  A "bitmap" of in-use blocks
+ *
+ * A structure to keep track of blocks currently in use by files on the
+ * file system. When debugging, keep track of which file a particular
+ * block is being used by.
+ */
 typedef struct stegfs_blocks_t
 {
 	uint64_t used; /*!< Count of used blocks */
 	bool *in_use;  /*!< Used block tracker */
+#ifdef USE_PROC
 	char **file;   /*!< File using the given block */
+#endif
 }
 stegfs_blocks_t;
 
@@ -176,7 +207,7 @@ stegfs_blocks_t;
  * \brief  Structure to hold file system information
  *
  * Static data structure stored in the backend, which holds information
- * about the currently mounted file system
+ * about the currently mounted file system.
  */
 typedef struct stegfs_t
 {
@@ -191,7 +222,7 @@ typedef struct stegfs_t
 	size_t                 blocksize;   /*!< File system block size; if it needs to be bigger than 4,294,967,295 we have issues */
 	off_t                  head_offset; /*!< Start location of file data in header blocks; only 32 bits (like blocksize) */
 	stegfs_blocks_t        blocks;      /*!< In use block tracker */
-	stegfs_cache2_t        cache2;      /*!< File cache version 2 */
+	stegfs_cache_t         cache;       /*!< File cache version 2 */
 	version_e              version;     /*!< File system version */
 }
 stegfs_t;
@@ -199,7 +230,8 @@ stegfs_t;
 /*!
  * \brief  Structure for each file system block
  *
- * Simple structure which represents an individual file system data block
+ * Simple structure which represents an individual file system data
+ * block.
  */
 typedef struct stegfs_block_t
 {
@@ -211,57 +243,133 @@ typedef struct stegfs_block_t
 stegfs_block_t;
 
 /*!
- * \brief          Initialise stegfs library, set internal data structures
- * \param[in]  fs  Name and path to file system
- * \param[in]  p   Paranoid mode
- * \param[in]  c   Cipher algorithm
- * \param[in]  m   Cipher mode
- * \param[in]  h   Hash algorithm
- * \param[in]  a   MAC algorithm
- * \param[in]  x   Duplication copies
- * \returns        The initialisation status
+ * \brief         Initialise stegfs library, set internal data structures
+ * \param[in]  f  Name and path to file system
+ * \param[in]  p  Paranoid mode
+ * \param[in]  c  Cipher algorithm
+ * \param[in]  m  Cipher mode
+ * \param[in]  h  Hash algorithm
+ * \param[in]  a  MAC algorithm
+ * \param[in]  x  Duplication copies
+ * \returns       The initialisation status
  *
  * Initialise the file system and popular static information structures,
- * making note whether to cache file details
+ * making note whether to cache file details.
  */
-extern stegfs_init_e stegfs_init(const char * const restrict fs, bool p, enum gcry_cipher_algos c, enum gcry_cipher_modes m, enum gcry_md_algos h, enum gcry_mac_algos a, uint32_t x);
+extern stegfs_init_e stegfs_init(const char * const restrict f, bool p, enum gcry_cipher_algos c, enum gcry_cipher_modes m, enum gcry_md_algos h, enum gcry_mac_algos a, uint32_t x);
 
 /*!
- * \brief                Retrieve information about the file system
- * \returns              The file system data information structure
+ * \brief         Retrieve information about the file system
+ * \returns       The file system data information structure
  *
  * Retrieve useful information about the file system from the backend.
  * Details returned are the file system ID, size in bytes, and size in
- * blocks
+ * blocks.
  */
 extern stegfs_t stegfs_info(void);
 
 /*
  * \brief         Deinitialise the file system
  *
- * Unmount the file system, sync all data, clear all memory
+ * Unmount the file system, sync all data, clear all memory.
  */
 extern void stegfs_deinit(void);
 
-extern bool stegfs_files_equal(stegfs_file_t, stegfs_file_t);
-extern bool stegfs_file_will_fit(stegfs_file_t *);
+/*!
+ * \brief         Check if a file will fit
+ * \param[in]  f  File info structure
+ * \return        True if the file will fit
+ *
+ * Check if there is likely enough remaining capacity of the file system
+ * for the given file to fit. It takes in to account the size of the
+ * file, duplicated and all known files and their duplicates.
+ */
+extern bool stegfs_file_will_fit(stegfs_file_t *f);
 
-extern void stegfs_file_create(const char * const restrict, bool);
+/*!
+ * \brief         Create a new file
+ * \param[in]  p  The files path
+ * \param[in]  w  Is the file opened with write access
+ *
+ * Create a new file. This doesn't actually allocate any space but
+ * rather just adds an entry to the internal cache.
+ */
+extern void stegfs_file_create(const char * const restrict p, bool w);
 
-#define STEGFS_FILE_STAT_ARGS_COUNT(...) STEGFS_FILE_STAT_ARGS_COUNT2(__VA_ARGS__, 2, 1)
-#define STEGFS_FILE_STAT_ARGS_COUNT2(_1, _2, _, ...) _
+#define STEGFS_FILE_STAT_ARGS_COUNT(...) STEGFS_FILE_STAT_ARGS_COUNT2(__VA_ARGS__, 2, 1) /*!< Function overloading argument count (part 1) */
+#define STEGFS_FILE_STAT_ARGS_COUNT2(_1, _2, _, ...) _                                   /*!< Function overloading argument count (part 2) */
 
-#define stegfs_file_stat_1(A)     stegfs_file_stat_aux(A, false)
-#define stegfs_file_stat_2(A, B)  stegfs_file_stat_aux(A, B)
-#define stegfs_file_stat(...) CONCAT(stegfs_file_stat_, STEGFS_FILE_STAT_ARGS_COUNT(__VA_ARGS__))(__VA_ARGS__)
+#define stegfs_file_stat_1(A)     stegfs_file_stat_aux(A, false) /*!< Call stegfs_file_stat_aux with value of false for second parameter */
+#define stegfs_file_stat_2(A, B)  stegfs_file_stat_aux(A, B)     /*!< Call stegfs_file_stat_aux with both user supplied parameters */
+#define stegfs_file_stat(...) CONCAT(stegfs_file_stat_, STEGFS_FILE_STAT_ARGS_COUNT(__VA_ARGS__))(__VA_ARGS__) /*!< Decide how to call stegfs_file_stat */
+
+/*!
+ * \brief         Primary stat function
+ * \param[in]  f  File structure for the file being stat'd
+ * \param[in]  q  Whether to stop as soon as a complete copy has been found
+ * \return        True if the file was found
+ *
+ * Attempt to find details about a file. If the file does exist and
+ * q==true then tis function will return as soon as one copy has been
+ * found. Otherwise it will keep going to attempt to find all blocks
+ * used by all copies of the file.
+ */
 extern bool stegfs_file_stat_aux(stegfs_file_t *f, bool q);
 
-extern bool stegfs_file_read(stegfs_file_t *);
-extern bool stegfs_file_write(stegfs_file_t *);
-extern void stegfs_file_delete(stegfs_file_t *);
+/*!
+ * \brief         Read a file from the file system
+ * \param[in]  f  File structure for the file being read
+ * \return        True if the file was read successfully
+ *
+ * Read a file from the file system.
+ */
+extern bool stegfs_file_read(stegfs_file_t *f);
 
-extern void stegfs_cache2_add(const char * const restrict, stegfs_file_t *);
-extern stegfs_cache2_t *stegfs_cache2_exists(const char * const restrict, stegfs_cache2_t *) __attribute__((nonnull(1)));
-extern void stegfs_cache2_remove(const char * const restrict) __attribute__((nonnull(1)));
+/*!
+ * \brief         Write a file to the file system
+ * \param[in]  f  File structure for the file being written
+ *
+ * Write a file to the file system.
+ */
+extern bool stegfs_file_write(stegfs_file_t *f);
+
+/*!
+ * \brief         Delete a file from the file system
+ * \param[in]  f  File structure for the file being deleted
+ *
+ * Delete a file from the file system.
+ */
+extern void stegfs_file_delete(stegfs_file_t *f);
+
+/*!
+ * \brief         Add a entry to the cache
+ * \param[in]  p  The path of the file to add
+ * \param[in]  f  The file info structure of the file to add
+ *
+ * Add an entry to the in-memory file system cache. This allows things
+ * like directory look-ups to work.
+ */
+extern void stegfs_cache_add(const char * const restrict p, stegfs_file_t *f);
+
+/*!
+ * \brief         Check the cache for an particular entry
+ * \param[in]  p  The path of the file to look for
+ * \param[out] f  Caller allocated memory for found cache entry
+ * \return        Pointer to the cache entry (do not modify)
+ *
+ * Check whether a particular path exists in the file systems in-memory
+ * cache. If you want a modifiable cache structure use the parameter f
+ * as the return value points to the one used by the caching code - do
+ * not modify.
+ */
+extern stegfs_cache_t *stegfs_cache_exists(const char * const restrict p, stegfs_cache_t *f) __attribute__((nonnull(1)));
+
+/*!
+ * \brief         Remove an entry from the cache
+ * \param[in]  p  The path of the entry to remove
+ *
+ * Remove a path from the in-memory cache.
+ */
+extern void stegfs_cache_remove(const char * const restrict p) __attribute__((nonnull(1)));
 
 #endif /* ! _STEGFS_H_ */

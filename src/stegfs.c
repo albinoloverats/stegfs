@@ -66,12 +66,12 @@ extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid, 
 	if ((file_system.memory = mmap(NULL, file_system.size, PROT_READ | PROT_WRITE, MAP_SHARED, file_system.handle, 0)) == MAP_FAILED)
 		return STEGFS_INIT_UNKNOWN;
 
-	file_system.cache2.name = strdup(DIR_SEPARATOR);
-	file_system.cache2.ents = 0;
-	file_system.cache2.child = NULL;
-	file_system.cache2.file = NULL;
+	file_system.cache.name = strdup(DIR_SEPARATOR);
+	file_system.cache.ents = 0;
+	file_system.cache.child = NULL;
+	file_system.cache.file = NULL;
 #ifdef USE_PROC
-	stegfs_cache2_add(PATH_PROC, NULL);
+	stegfs_cache_add(PATH_PROC, NULL);
 #endif
 	if (paranoid)
 	{
@@ -143,7 +143,7 @@ extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid, 
 	/* get cipher info */
 	if (tlv_has_tag(tlv, TAG_CIPHER))
 	{
-		char *c = strndup((char *)tlv_value_of(tlv, TAG_CIPHER), tlv_size_of(tlv, TAG_CIPHER));
+		char *c = strndup((char *)tlv_value_of(tlv, TAG_CIPHER), tlv_length_of(tlv, TAG_CIPHER));
 		file_system.cipher = cipher_id_from_name(c);
 		free(c);
 	}
@@ -151,7 +151,7 @@ extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid, 
 		file_system.cipher = DEFAULT_CIPHER;
 	if (tlv_has_tag(tlv, TAG_MODE))
 	{
-		char *m = strndup((char *)tlv_value_of(tlv, TAG_MODE), tlv_size_of(tlv, TAG_MODE));
+		char *m = strndup((char *)tlv_value_of(tlv, TAG_MODE), tlv_length_of(tlv, TAG_MODE));
 		file_system.mode = mode_id_from_name(m);
 		free(m);
 	}
@@ -160,7 +160,7 @@ extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid, 
 	/* get hash info */
 	if (tlv_has_tag(tlv, TAG_HASH))
 	{
-		char *h = strndup((char *)tlv_value_of(tlv, TAG_HASH), tlv_size_of(tlv, TAG_HASH));
+		char *h = strndup((char *)tlv_value_of(tlv, TAG_HASH), tlv_length_of(tlv, TAG_HASH));
 		file_system.hash = hash_id_from_name(h);
 		free(h);
 	}
@@ -169,7 +169,7 @@ extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid, 
 	/* get mac info */
 	if (tlv_has_tag(tlv, TAG_MAC))
 	{
-		char *a = strndup((char *)tlv_value_of(tlv, TAG_MAC), tlv_size_of(tlv, TAG_MAC));
+		char *a = strndup((char *)tlv_value_of(tlv, TAG_MAC), tlv_length_of(tlv, TAG_MAC));
 		file_system.mac = mac_id_from_name(a);
 		free(a);
 	}
@@ -185,7 +185,7 @@ extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid, 
 
 	/* get number of copies */
 	if (tlv_has_tag(tlv, TAG_DUPLICATION))
-		memcpy(&file_system.copies, tlv_value_of(tlv, TAG_DUPLICATION), tlv_size_of(tlv, TAG_DUPLICATION));
+		memcpy(&file_system.copies, tlv_value_of(tlv, TAG_DUPLICATION), tlv_length_of(tlv, TAG_DUPLICATION));
 	else
 		file_system.copies = COPIES_DEFAULT;
 	if (file_system.version < VERSION_2018_XX)
@@ -194,13 +194,13 @@ extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid, 
 	/* get fs block size */
 	if (!tlv_has_tag(tlv, TAG_BLOCKSIZE))
 		return STEGFS_INIT_MISSING_TAG;
-	memcpy(&file_system.blocksize, tlv_value_of(tlv, TAG_BLOCKSIZE), tlv_size_of(tlv, TAG_BLOCKSIZE));
+	memcpy(&file_system.blocksize, tlv_value_of(tlv, TAG_BLOCKSIZE), tlv_length_of(tlv, TAG_BLOCKSIZE));
 	file_system.blocksize = ntohl(file_system.blocksize);
 
 	/* get number of bytes file data in file header */
 	if (!tlv_has_tag(tlv, TAG_HEADER_OFFSET))
 		return STEGFS_INIT_MISSING_TAG;
-	memcpy(&file_system.head_offset, tlv_value_of(tlv, TAG_HEADER_OFFSET), tlv_size_of(tlv, TAG_HEADER_OFFSET));
+	memcpy(&file_system.head_offset, tlv_value_of(tlv, TAG_HEADER_OFFSET), tlv_length_of(tlv, TAG_HEADER_OFFSET));
 	file_system.head_offset = ntohl(file_system.head_offset);
 
 	if (ntohll(block.next) != file_system.size / file_system.blocksize)
@@ -215,7 +215,9 @@ extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid, 
 done:
 	file_system.blocks.used = 1;
 	file_system.blocks.in_use = calloc(file_system.size / file_system.blocksize, sizeof( bool ));
+#ifdef USE_PROC
 	file_system.blocks.file = calloc(file_system.size / file_system.blocksize, sizeof( char * ));
+#endif
 
 	init_crypto();
 	return STEGFS_INIT_OKAY;
@@ -244,13 +246,15 @@ extern void stegfs_deinit(void)
 	close(file_system.handle);
 
 	free(file_system.blocks.in_use);
+#ifdef USE_PROC
 	for (uint64_t i = 0; i < file_system.blocks.used; i++)
 		if (file_system.blocks.file[i])
 			free(file_system.blocks.file[i]);
 	free(file_system.blocks.file);
+#endif
 
-	stegfs_cache2_remove(DIR_SEPARATOR);
-	free(file_system.cache2.name);
+	stegfs_cache_remove(DIR_SEPARATOR);
+	free(file_system.cache.name);
 
 	return;
 }
@@ -258,15 +262,6 @@ extern void stegfs_deinit(void)
 extern stegfs_t stegfs_info(void)
 {
 	return file_system;
-}
-
-extern bool stegfs_files_equal(stegfs_file_t a, stegfs_file_t b)
-{
-	if (!a.path || !b.path || !path_equals(a.path, b.path))
-		return false;
-	if (!a.name || !b.name || strcmp(a.name, b.name))
-		return false;
-	return true;
 }
 
 extern bool stegfs_file_will_fit(stegfs_file_t *file)
@@ -292,19 +287,20 @@ extern bool stegfs_file_will_fit(stegfs_file_t *file)
 extern void stegfs_file_create(const char * const restrict path, bool write)
 {
 	stegfs_file_t file;
-	memset(&file, 0x00, sizeof file);
+	//memset(&file, 0x00, sizeof file);
 	file.path = dir_get_path(path);
 	file.name = dir_get_name(path, PASSWORD_SEPARATOR);
 	file.pass = dir_get_pass(path);
 	file.write = write;
+	file.size = 0;
 	file.time = time(NULL);
-	stegfs_cache2_add(NULL, &file);
+	stegfs_cache_add(NULL, &file);
 	return;
 }
 
 extern void stegfs_directory_create(const char * const restrict path)
 {
-	stegfs_cache2_add(path, NULL);
+	stegfs_cache_add(path, NULL);
 }
 
 extern bool stegfs_file_stat_aux(stegfs_file_t *file, bool quick)
@@ -342,7 +338,7 @@ extern bool stegfs_file_stat_aux(stegfs_file_t *file, bool quick)
 	{
 		gcry_cipher_hd_t cipher_handle = init_cipher(file, i);
 		stegfs_block_t inode;
-		memset(&inode, 0x00, sizeof inode);
+		//memset(&inode, 0x00, sizeof inode);
 		if (block_read(file->inodes[i], &inode, cipher_handle, file->path))
 		{
 			if ((file->size = ntohll(inode.next)) > file_system.size)
@@ -352,12 +348,14 @@ extern bool stegfs_file_stat_aux(stegfs_file_t *file, bool quick)
 				continue;
 			}
 			file_system.blocks.in_use[normalize(file->inodes[i])] = true;
+#ifdef USE_PROC
 			asprintf(&file_system.blocks.file[normalize(file->inodes[i])], "../%s/%s", file->path, file->name);
+#endif
 			file_system.blocks.used++;
 			if (!quick && found)
 				continue;
 
-			uint64_t first[SIZE_LONG_DATA] = { 0x0 };
+			uint64_t first[SIZE_LONG_DATA];
 			memcpy(first, inode.data, sizeof first);
 			file->time = htonll(first[0]);
 			for (unsigned j = 0, l = 1; j < file_system.copies; j++, l++)
@@ -366,14 +364,16 @@ extern bool stegfs_file_stat_aux(stegfs_file_t *file, bool quick)
 				lldiv_t d = lldiv(file->size - (file->size < (sizeof inode.data - file_system.head_offset) ? file->size : (sizeof inode.data - file_system.head_offset)), SIZE_BYTE_DATA);
 				uint64_t blocks = d.quot + (d.rem > 0);
 				file->blocks[j] = realloc(file->blocks[j], (blocks + 2) * sizeof blocks);
-				memset(file->blocks[j], 0x00, blocks * sizeof blocks);
+				//memset(file->blocks[j], 0x00, blocks * sizeof blocks);
 				file->blocks[j][0] = blocks;
 				if (blocks)
 				{
 					/* first full block of file data */
 					file->blocks[j][1] = htonll(first[l]);
 					file_system.blocks.in_use[normalize(file->blocks[j][1])] = true;
+#ifdef USE_PROC
 					asprintf(&file_system.blocks.file[normalize(file->inodes[i])], "../%s/%s", file->path, file->name);
+#endif
 					file_system.blocks.used++;
 				}
 				/*
@@ -384,11 +384,13 @@ extern bool stegfs_file_stat_aux(stegfs_file_t *file, bool quick)
 				for (uint64_t k = 2 ; k <= blocks; k++)
 				{
 					stegfs_block_t block;
-					memset(&block, 0x00, sizeof block);
+					//memset(&block, 0x00, sizeof block);
 					if (block_read(file->blocks[j][k - 1], &block, another_cipher, file->path))
 					{
 						file_system.blocks.in_use[normalize(file->blocks[j][k - 1])] = true;
+#ifdef USE_PROC
 						asprintf(&file_system.blocks.file[normalize(file->inodes[i])], "../%s/%s", file->path, file->name);
+#endif
 						file_system.blocks.used++;
 						file->blocks[j][k] = ntohll(block.next);
 					}
@@ -415,7 +417,7 @@ extern bool stegfs_file_stat_aux(stegfs_file_t *file, bool quick)
 	 */
 	if (available_inodes && corrupt_copies < file_system.copies)
 	{
-		stegfs_cache2_add(NULL, file);
+		stegfs_cache_add(NULL, file);
 		return true;
 	}
 	for (unsigned i = 0; i < file_system.copies; i++)
@@ -424,8 +426,10 @@ extern bool stegfs_file_stat_aux(stegfs_file_t *file, bool quick)
 			for (uint64_t j = 1; j < file->blocks[i][0]; j++)
 			{
 				file_system.blocks.in_use[normalize(file->blocks[i][j])] = false;
+#ifdef USE_PROC
 				free(file_system.blocks.file[normalize(file->blocks[i][j])]);
 				file_system.blocks.file[normalize(file->blocks[i][j])] = NULL;
+#endif
 				file_system.blocks.used--;
 			}
 			free(file->blocks[i]);
@@ -448,7 +452,7 @@ extern bool stegfs_file_read(stegfs_file_t *file)
 	{
 		gcry_cipher_hd_t cipher_handle = init_cipher(file, i);
 		stegfs_block_t inode;
-		memset(&inode, 0x00, sizeof inode);
+		//memset(&inode, 0x00, sizeof inode);
 		if (block_read(file->inodes[i], &inode, cipher_handle, file->path))
 		{
 			memcpy(file->data, inode.data + file_system.head_offset, file->size < (sizeof inode.data - file_system.head_offset) ? file->size : (sizeof inode.data - file_system.head_offset));
@@ -477,7 +481,7 @@ extern bool stegfs_file_read(stegfs_file_t *file)
 			 * able to read the complete file as otherwise the
 			 * stat would have failed
 			 */
-			memset(&block, 0x00, sizeof block);
+			//memset(&block, 0x00, sizeof block);
 			if (block_read(file->blocks[i][j], &block, cipher_handle, file->path))
 			{
 				size_t l = sizeof block.data;
@@ -501,7 +505,7 @@ extern bool stegfs_file_read(stegfs_file_t *file)
 		gcry_free(mac_data);
 		if (failed)
 			continue;
-		stegfs_cache2_add(NULL, file);
+		stegfs_cache_add(NULL, file);
 		return corrupt_copies < file_system.copies;
 	}
 	/*
@@ -529,7 +533,9 @@ extern bool stegfs_file_write(stegfs_file_t *file)
 			 * are calculated in stegfs_file_stat)
 			 */
 			file_system.blocks.in_use[normalize(file->inodes[i])] = true;
+#ifdef USE_PROC
 			asprintf(&file_system.blocks.file[normalize(file->inodes[i])], "../%s/%s", file->path, file->name);
+#endif
 			file_system.blocks.used++;
 			/*
 			 * note-to-self: allocate 2 more blocks than is
@@ -546,16 +552,20 @@ extern bool stegfs_file_write(stegfs_file_t *file)
 					for (unsigned k = 0; k <= i; k++)
 					{
 						file_system.blocks.in_use[normalize(file->inodes[i])] = false;
+#ifdef USE_PROC
 						free(file_system.blocks.file[normalize(file->inodes[i])]);
 						file_system.blocks.file[normalize(file->inodes[i])] = NULL;
+#endif
 						file_system.blocks.used--;
 						if (file->blocks[k])
 						{
 							for (uint64_t l = 1; l <= j; l++)
 							{
 								file_system.blocks.in_use[normalize(file->blocks[k][l])] = false;
+#ifdef USE_PROC
 								free(file_system.blocks.file[normalize(file->blocks[k][l])]);
 								file_system.blocks.file[normalize(file->blocks[k][l])] = NULL;
+#endif
 								file_system.blocks.used--;
 							}
 							free(file->blocks[k]);
@@ -564,8 +574,10 @@ extern bool stegfs_file_write(stegfs_file_t *file)
 					}
 					return errno = ENOSPC, false;
 				}
+#ifdef USE_PROC
 				else
 					asprintf(&file_system.blocks.file[normalize(file->blocks[i][j])], "../%s/%s", file->path, file->name);
+#endif
 		}
 	}
 	file->size = z; /* stat can cause size to be reset to 0 */
@@ -582,14 +594,18 @@ extern bool stegfs_file_write(stegfs_file_t *file)
 						for (uint64_t l = file->blocks[k][0]; l <= j; l++)
 						{
 							file_system.blocks.in_use[normalize(file->blocks[k][l])] = false;
+#ifdef USE_PROC
 							free(file_system.blocks.file[normalize(file->blocks[k][l])]);
 							file_system.blocks.file[normalize(file->blocks[k][l])] = NULL;
+#endif
 							file_system.blocks.used--;
 						}
 					return errno = ENOSPC, false;
 				}
+#ifdef USE_PROC
 				else
 					asprintf(&file_system.blocks.file[normalize(file->blocks[i][j])], "../%s/%s", file->path, file->name);
+#endif
 		}
 		for (unsigned i = 0; i < file_system.copies; i++)
 			file->blocks[i][0] = blocks;
@@ -641,7 +657,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
 	 */
 	stegfs_block_t inode;
 	gcry_create_nonce(&inode, sizeof inode);
-	uint64_t first[SIZE_LONG_DATA] = { 0x0 };
+	uint64_t first[SIZE_LONG_DATA];
 	if (blocks)
 		for (unsigned i = 0, j = 1; i < file_system.copies; i++, j++)
 			first[j] = htonll(file->blocks[i][1]);
@@ -676,7 +692,7 @@ extern bool stegfs_file_write(stegfs_file_t *file)
 		gcry_cipher_close(cipher_handle);
 	}
 
-	stegfs_cache2_add(NULL, file);
+	stegfs_cache_add(NULL, file);
 	return true;
 }
 
@@ -696,7 +712,7 @@ extern void stegfs_file_delete(stegfs_file_t *file)
 	}
 rfc:
 	asprintf(&p, "%s/%s", path_equals(file->path, DIR_SEPARATOR) ? "" : file->path, file->name);
-	stegfs_cache2_remove(p);
+	stegfs_cache_remove(p);
 	free(p);
 	return;
 }
@@ -795,8 +811,10 @@ static void block_delete(uint64_t bid)
 	memcpy(file_system.memory + (bid * file_system.blocksize), &block, sizeof block);
 	//msync(file_system.memory + (bid * file_system.blocksize), sizeof block, MS_SYNC);
 	file_system.blocks.in_use[bid] = false;
+#ifdef USE_PROC
 	free(file_system.blocks.file[bid]);
 	file_system.blocks.file[bid] = NULL;
+#endif
 	file_system.blocks.used--;
 	return;
 }
@@ -986,18 +1004,18 @@ static gcry_mac_hd_t init_mac(const stegfs_file_t * const restrict file, uint8_t
  * add path (directory) or file to the cache; if adding a file, the path
  * can be null as it will be taken from the file object
  */
-extern void stegfs_cache2_add(const char * const restrict path, stegfs_file_t *file)
+extern void stegfs_cache_add(const char * const restrict path, stegfs_file_t *file)
 {
-	stegfs_cache2_t *ptr = NULL;//&(file_system.cache2);
+	stegfs_cache_t *ptr = NULL;//&(file_system.cache);
 	char *p = NULL;
 	if (path)
 		p = strdup(path);
 	else
 		asprintf(&p, "%s/%s", path_equals(file->path, DIR_SEPARATOR) ? "" : file->path, file->name);
-	if ((ptr = stegfs_cache2_exists(p, NULL)))
+	if ((ptr = stegfs_cache_exists(p, NULL)))
 		goto c2a3; /* already in cache */
 
-	ptr = &file_system.cache2;
+	ptr = &file_system.cache;
 	char *name = dir_get_name(p, PASSWORD_SEPARATOR);
 	uint16_t hierarchy = dir_get_deep(p);
 	for (uint16_t i = 1; i < hierarchy; i++)
@@ -1023,10 +1041,10 @@ extern void stegfs_cache2_add(const char * const restrict path, stegfs_file_t *f
 					k = j;
 					goto c2a1;
 				}
-			ptr->child = realloc(ptr->child, (k + 1) * sizeof(stegfs_cache2_t *));
+			ptr->child = realloc(ptr->child, (k + 1) * sizeof(stegfs_cache_t *));
 			ptr->ents++;
 c2a1:
-			ptr->child[k] = calloc(sizeof( stegfs_cache2_t ), sizeof( uint8_t ));
+			ptr->child[k] = calloc(sizeof( stegfs_cache_t ), sizeof( uint8_t ));
 			ptr->child[k]->name = strdup(e);
 			ptr = ptr->child[k];
 		}
@@ -1040,10 +1058,10 @@ c2a1:
 			j = i;
 			goto c2a2;
 		}
-	ptr->child = realloc(ptr->child, (j + 1) * sizeof(stegfs_cache2_t *));
+	ptr->child = realloc(ptr->child, (j + 1) * sizeof(stegfs_cache_t *));
 	ptr->ents++;
 c2a2:
-	ptr->child[j] = calloc(sizeof( stegfs_cache2_t ), sizeof( uint8_t ));
+	ptr->child[j] = calloc(sizeof( stegfs_cache_t ), sizeof( uint8_t ));
 	ptr = ptr->child[j];
 	ptr->name = name;
 c2a3:
@@ -1059,7 +1077,7 @@ c2a3:
 		for (unsigned i = 0; i < file_system.copies; i++)
 			ptr->file->inodes[i] = file->inodes[i];
 		/* set time and size */
-			ptr->file->write = file->write;
+		ptr->file->write = file->write;
 		ptr->file->time = file->time;
 		ptr->file->size = file->size;
 		if (ptr->file->size)
@@ -1077,7 +1095,7 @@ c2a3:
 			for (unsigned i = 0; i < file_system.copies; i++)
 			{
 				ptr->file->blocks[i] = realloc(ptr->file->blocks[i], (blocks + 1) * sizeof blocks);
-				memset(ptr->file->blocks[i], 0x00, blocks * sizeof blocks);
+				//memset(ptr->file->blocks[i], 0x00, blocks * sizeof blocks);
 				ptr->file->blocks[i][0] = blocks;
 				for (uint64_t j = 1 ; j <= blocks && file->blocks[i] && file->blocks[i][j]; j++)
 					ptr->file->blocks[i][j] = file->blocks[i][j];
@@ -1094,9 +1112,9 @@ c2a3:
  * Check whether a given path is in the cache, copy the file object if it’s
  * a file, and return a pointer to the original
  */
-extern stegfs_cache2_t *stegfs_cache2_exists(const char * const restrict path, stegfs_cache2_t *entry)
+extern stegfs_cache_t *stegfs_cache_exists(const char * const restrict path, stegfs_cache_t *entry)
 {
-	stegfs_cache2_t *ptr = &(file_system.cache2);
+	stegfs_cache_t *ptr = &(file_system.cache);
 	char *name = dir_get_name(path, PASSWORD_SEPARATOR);
 	uint16_t hierarchy = dir_get_deep(path);
 	for (uint16_t i = 1; i < hierarchy; i++)
@@ -1119,7 +1137,7 @@ extern stegfs_cache2_t *stegfs_cache2_exists(const char * const restrict path, s
 		{
 			free(name);
 			if (entry)
-				memcpy(entry, ptr->child[i], sizeof( stegfs_cache2_t ));
+				memcpy(entry, ptr->child[i], sizeof( stegfs_cache_t ));
 			return ptr->child[i];
 		}
 done:
@@ -1128,9 +1146,9 @@ done:
 	return NULL;
 }
 
-extern void stegfs_cache2_remove(const char * const restrict path)
+extern void stegfs_cache_remove(const char * const restrict path)
 {
-	stegfs_cache2_t *ptr = &(file_system.cache2);
+	stegfs_cache_t *ptr = &(file_system.cache);
 	char *name = dir_get_name(path, PASSWORD_SEPARATOR);
 	uint16_t hierarchy = dir_get_deep(path);
 	for (uint16_t i = 1; i < hierarchy; i++)
@@ -1180,7 +1198,7 @@ extern void stegfs_cache2_remove(const char * const restrict path)
 			{
 				char *c = NULL;
 				asprintf(&c, "%s/%s", path, ptr->child[i]->name);
-				stegfs_cache2_remove(c);
+				stegfs_cache_remove(c);
 				free(c);
 			}
 		free(ptr->child);
