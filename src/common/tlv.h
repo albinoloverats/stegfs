@@ -34,13 +34,6 @@
 #include <stdint.h> /*!< Necessary include as c99 standard integer types are referenced in this header */
 #include <stdbool.h> /*!< Necessary include as c99 standard boolean type is referenced in this header */
 
-#define TLV_EXPORT_ARGS_COUNT(...) TLV_EXPORT_ARGS_COUNT2(__VA_ARGS__, 2, 1) /*!< Function overloading argument count (part 1) */
-#define TLV_EXPORT_ARGS_COUNT2(_1, _2, _, ...) _                             /*!< Function overloading argument count (part 2) */
-
-#define tlv_export_1(A)       tlv_export_aux(A, true) /*<! Call tlv_export_aux with value of true for second parameter */
-#define tlv_export_2(A, B)    tlv_export_aux(A, B)    /*<! Call tlv_export_aux with both user supplied parameters */
-#define tlv_export(...) CONCAT(tlv_export_, TLV_EXPORT_ARGS_COUNT(__VA_ARGS__))(__VA_ARGS__) /*!< Decide how to call tlv_export */
-
 typedef void * TLV_HANDLE; /*<! Handle type for TLV functions */
 
 /*!
@@ -88,6 +81,17 @@ extern void tlv_deinit(TLV_HANDLE *h) __attribute__((nonnull(1)));
 extern void tlv_append(TLV_HANDLE *h, tlv_t t) __attribute__((nonnull(1)));
 
 /*!
+ * \brief         Get TLV structure for tag
+ * \param[in]  h  The TLV array to check
+ * \param[in]  t  The tag value to look for
+ * \return        The individual TLV structure
+ *
+ * Return the TLV structure for the given tag value. NB Do not free the
+ * returned TLV pointer: bad things will happen.
+ */
+extern tlv_t *tlv_get(TLV_HANDLE h, uint8_t t) __attribute__((nonnull(1)));
+
+/*!
  * \brief         Check whether a TLV array has a particular tag
  * \param[in]  h  The TLV array to check
  * \param[in]  t  The tag value to look for
@@ -97,12 +101,12 @@ extern void tlv_append(TLV_HANDLE *h, tlv_t t) __attribute__((nonnull(1)));
  */
 extern bool tlv_has_tag(TLV_HANDLE h, uint8_t t) __attribute__((nonnull(1)));
 
-#define TLV_VALUE_OF_ARGS_COUNT(...) TLV_VALUE_OF_ARGS_COUNT2(__VA_ARGS__, 3, 2, 1)
-#define TLV_VALUE_OF_ARGS_COUNT2(_1, _2, _3, _, ...) _
+#define TLV_VALUE_OF_ARGS_COUNT(...) TLV_VALUE_OF_ARGS_COUNT2(__VA_ARGS__, 3, 2, 1) /*!< Function overloading argument count (part 1) */
+#define TLV_VALUE_OF_ARGS_COUNT2(_1, _2, _3, _, ...) _                              /*!< Function overloading argument count (part 2) */
 
-#define tlv_value_of_2(A, B)     tlv_value_of_aux(A, B, NULL)
-#define tlv_value_of_3(A, B, C)  tlv_value_of_aux(A, B, C)
-#define tlv_value_of(...) CONCAT(tlv_value_of_, TLV_VALUE_OF_ARGS_COUNT(__VA_ARGS__))(__VA_ARGS__)
+#define tlv_value_of_2(A, B)     tlv_value_of_aux(A, B, NULL) /*<! Call tlv_value_of_aux with NULL for third parameter */
+#define tlv_value_of_3(A, B, C)  tlv_value_of_aux(A, B, C)    /*<! Call tlv_value_of_aux with both user supplied parameters */
+#define tlv_value_of(...) CONCAT(tlv_value_of_, TLV_VALUE_OF_ARGS_COUNT(__VA_ARGS__))(__VA_ARGS__) /*!< Decide how to call tlv_value_of */
 
 /*!
  * \brief         Get value for tag
@@ -116,8 +120,22 @@ extern bool tlv_has_tag(TLV_HANDLE h, uint8_t t) __attribute__((nonnull(1)));
  */
 extern byte_t *tlv_value_of_aux(TLV_HANDLE h, uint8_t t, uint8_t *d) __attribute__((nonnull(1)));
 
+/*!
+ * \brief         Get length for tag
+ * \param[in]  h  The TLV array to check
+ * \param[in]  t  The tag length to get
+ * \return        The length for the given tag
+ *
+ * Retrieve the length for the TLV entry with the given tag value.
+ */
+extern uint16_t tlv_length_of(TLV_HANDLE ptr, uint8_t t) __attribute__((nonnull(1)));
 
-extern uint16_t tlv_size_of(TLV_HANDLE ptr, uint8_t t) __attribute__((nonnull(1)));
+#define TLV_EXPORT_ARGS_COUNT(...) TLV_EXPORT_ARGS_COUNT2(__VA_ARGS__, 2, 1) /*!< Function overloading argument count (part 1) */
+#define TLV_EXPORT_ARGS_COUNT2(_1, _2, _, ...) _                             /*!< Function overloading argument count (part 2) */
+
+#define tlv_export_1(A)       tlv_export_aux(A, true) /*<! Call tlv_export_aux with value of true for second parameter */
+#define tlv_export_2(A, B)    tlv_export_aux(A, B)    /*<! Call tlv_export_aux with both user supplied parameters */
+#define tlv_export(...) CONCAT(tlv_export_, TLV_EXPORT_ARGS_COUNT(__VA_ARGS__))(__VA_ARGS__) /*!< Decide how to call tlv_export */
 
 /*!
  * \brief         Export the TLV array
