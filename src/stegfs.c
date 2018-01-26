@@ -126,12 +126,6 @@ extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid, 
 		tlv_append(&tlv, t);
 		free(t.value);
 	}
-#if 0
-	if (!tlv_has_tag(tlv, TAG_STEGFS) || !tlv_has_tag(tlv, TAG_VERSION) ||
-			!tlv_has_tag(tlv, TAG_CIPHER) || !tlv_has_tag(tlv, TAG_MODE) || !tlv_has_tag(tlv, TAG_HASH) || !tlv_has_tag(tlv, TAG_MAC) ||
-			!tlv_has_tag(tlv, TAG_BLOCKSIZE) || !tlv_has_tag(tlv, TAG_HEADER_OFFSET) || !tlv_has_tag(tlv, TAG_DUPLICATION))
-		return STEGFS_INIT_MISSING_TAG;
-#endif
 
 	if (strncmp(STEGFS_NAME, (char *)tlv_value_of(tlv, TAG_STEGFS), strlen(STEGFS_NAME)))
 		return STEGFS_INIT_INVALID_TAG;
@@ -349,7 +343,6 @@ extern bool stegfs_file_stat_aux(stegfs_file_t *file, bool quick)
 		gcry_cipher_hd_t cipher_handle = init_cipher(file, i);
 		stegfs_block_t inode;
 		memset(&inode, 0x00, sizeof inode);
-		fprintf(stderr, "Checking inode %u at %lu --> %lu\n", i, file->inodes[i], normalize(file->inodes[i]));
 		if (block_read(file->inodes[i], &inode, cipher_handle, file->path))
 		{
 			if ((file->size = ntohll(inode.next)) > file_system.size)
@@ -392,7 +385,6 @@ extern bool stegfs_file_stat_aux(stegfs_file_t *file, bool quick)
 				{
 					stegfs_block_t block;
 					memset(&block, 0x00, sizeof block);
-					fprintf(stderr, "Checking copy %u for block %lu at %lu --> %lu\n", j, k - 1, file->blocks[j][k - 1], normalize(file->blocks[j][k - 1]));
 					if (block_read(file->blocks[j][k - 1], &block, another_cipher, file->path))
 					{
 						file_system.blocks.in_use[normalize(file->blocks[j][k - 1])] = true;

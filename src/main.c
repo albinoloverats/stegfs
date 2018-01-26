@@ -440,25 +440,12 @@ static int fuse_stegfs_open(const char *path, struct fuse_file_info *info)
 
 	(void)info;
 
-	if (path_starts_with(PATH_PROC, path))
+	stegfs_cache2_t *c = NULL;
+	if ((c = stegfs_cache2_exists(path, NULL)) && c->file)
 	{
-		stegfs_t file_system = stegfs_info();
-		char *b = dir_get_name(path, PASSWORD_SEPARATOR);
-		uint64_t ino = strtol(b, NULL, 0);
-		char *f = file_system.blocks.file[ino];
-		if (f)
-			fprintf(stderr, "%s", f);
-		free(b);
-	}
-	else
-	{
-		stegfs_cache2_t *c = NULL;
-		if ((c = stegfs_cache2_exists(path, NULL)) && c->file)
-		{
-			c->file->pass = dir_get_pass(path);
-			if (!stegfs_file_read(c->file))
-				errno = EACCES;
-		}
+		c->file->pass = dir_get_pass(path);
+		if (!stegfs_file_read(c->file))
+			errno = EACCES;
 	}
 
 	return -errno;
