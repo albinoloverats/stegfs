@@ -100,7 +100,7 @@ extern bool tlv_has_tag(TLV_HANDLE ptr, uint8_t tag)
 	return tlv_get(ptr, tag) != NULL;
 }
 
-extern byte_t *tlv_value_of(TLV_HANDLE ptr, uint8_t tag, uint8_t *def)
+extern byte_t *tlv_value_of_aux(TLV_HANDLE ptr, uint8_t tag, uint8_t *def)
 {
 	tlv_private_t *tlv_ptr = (tlv_private_t *)ptr;
 	if (!tlv_ptr)

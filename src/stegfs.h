@@ -31,25 +31,25 @@
 
 
 /* size (in bytes) for various blocks of data */
-#define SIZE_BYTE_BLOCK       0x0800       /*!< 2,048 bytes */
-#define SIZE_BYTE_PATH        0x0020       /*!<    32 bytes */
-#define SIZE_BYTE_DATA_201508 0x07B8 /*!< 1,976 bytes */
-//#define SIZE_BYTE_DATA_2018XX 0x0780 /*!< 1,920 bytes */
+#define SIZE_BYTE_BLOCK       0x0800    /*!< 2,048 bytes */
+#define SIZE_BYTE_PATH        0x0020    /*!<    32 bytes */
+#define SIZE_BYTE_DATA_201508 0x07B8    /*!< 1,976 bytes */
+//#define SIZE_BYTE_DATA_2018XX 0x0780    /*!< 1,920 bytes */
 #define SIZE_BYTE_DATA  SIZE_BYTE_DATA_201508
 
-#define SIZE_BYTE_HASH  0x0020       /*!<    32 bytes */
-#define SIZE_BYTE_NEXT  0x0008       /*!<     8 bytes */
+#define SIZE_BYTE_HASH        0x0020    /*!<    32 bytes */
+#define SIZE_BYTE_NEXT        0x0008    /*!<     8 bytes */
 /* next block (not defined) */
 
-#define SIZE_BYTE_HEAD  0x0400      /*!< 1,024 bytes (data in header block) */
+#define SIZE_BYTE_HEAD        0x0400    /*!< 1,024 bytes (data in header block) */
 #define OFFSET_BYTE_HEAD  (SIZE_BYTE_DATA-SIZE_BYTE_HEAD) /*!< Offset of file data in header block */
 
 /* size in 64 bit ints of parts of block */
-#define SIZE_LONG_PATH         0x04
-#define SIZE_LONG_DATA_201508  0xF7
-//#define SIZE_LONG_DATA_2018XX  0xF0
-#define SIZE_LONG_DATA         SIZE_LONG_DATA_201508
-#define SIZE_LONG_HASH         0x04
+#define SIZE_LONG_PATH          0x04
+#define SIZE_LONG_DATA_201508   0xF7
+//#define SIZE_LONG_DATA_2018XX   0xF0
+#define SIZE_LONG_DATA          SIZE_LONG_DATA_201508
+#define SIZE_LONG_HASH          0x04
 /* next block (not defined) */
 
 #define COPIES_MAX 64
@@ -61,7 +61,7 @@
 #define KEY_ITERATIONS 32768
 
 /*
- * File system header for unsupported first attempt.
+ * File system header for unsupported first attempt at a file system.
  */
 #define HASH_MAGIC_201001_0 0xa157afa602cc9d1bllu
 #define HASH_MAGIC_201001_1 0x33be2b298b76f2acllu
