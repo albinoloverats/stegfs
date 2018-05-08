@@ -38,12 +38,10 @@
 #include "non-gnu.h"
 
 #ifdef BUILD_GUI
-	static void error_gui_alert(const char * const restrict);
+static void error_gui_alert(const char * const restrict);
 
-	static GtkWidget *error_gui_window;
-	static GtkWidget *error_gui_message;
-#else
-	#define error_gui_alert(X) (void)(X)
+static GtkWidget *error_gui_window;
+static GtkWidget *error_gui_message;
 #endif
 
 extern void die(const char * const restrict s, ...)
@@ -54,20 +52,18 @@ extern void die(const char * const restrict s, ...)
 	va_start(ap, s);
 #ifndef _WIN32
 	vasprintf(&d, s, ap);
-	fprintf(stderr, "%s", d);
-	error_gui_alert(d);
 #else
 	uint8_t l = 0xFF;
-	d = calloc(l, sizeof( uint8_t ));
-	if (d)
+	if ((d = calloc(l, sizeof l)))
 		vsnprintf(d, l - 1, s, ap);
-	fprintf(stderr, "%s", d);
-	error_gui_alert(d);
-	if (d)
-		free(d);
 #endif
+	fprintf(stderr, "%s", d);
 	va_end(ap);
 	fprintf(stderr, "\n");
+#ifdef BUILD_GUI
+	error_gui_alert(d);
+#endif
+	free(d);
 	if (ex)
 	{
 		char * const restrict e = strdup(strerror(ex));
@@ -82,7 +78,10 @@ extern void die(const char * const restrict s, ...)
 		if (sym)
 		{
 			for (int i = 0; i < c; i++)
+			{
 				fprintf(stderr, "%s\n", sym[i]);
+				free(sym[i]);
+			}
 			free(sym);
 		}
 #endif
@@ -97,12 +96,12 @@ extern void error_gui_init(GtkWidget *w, GtkWidget *m)
 	error_gui_message = m;
 }
 
-extern void *error_gui_close(void *w, void *d)
+G_MODULE_EXPORT gboolean error_gui_close(void *w, void *d)
 {
 	(void)w;
 	(void)d;
 	gtk_widget_hide(error_gui_window);
-	return NULL;
+	return TRUE;
 }
 
 static void error_gui_alert(const char * const restrict msg)
