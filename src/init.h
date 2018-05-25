@@ -27,8 +27,8 @@
 
 #define MKFS_NAME "mkstegfs"
 
-#define STEGFS_USAGE "<file system> <mount point> [FUSE options ...]"
-#define MKFS_USAGE "<file system> [-s size] [-f] [-r]"
+#define STEGFS_USAGE "<file system> <mount point> [stegfs / FUSE options ...]"
+#define MKFS_USAGE "<file system> [-z size] [-f] [-r] [cipher options ...]"
 
 /*!
  * \brief  Structure of expected options
@@ -49,6 +49,7 @@ typedef struct
 
 	uint64_t size;                 /*!< File system size (mkfs) */
 
+	bool show_bloc:1;              /*!< Expose /bloc/ block list */
 	bool paranoid:1;               /*!< Paranoid mode */
 
 	bool force:1;                  /*!< Force file system creation (mkfs) */

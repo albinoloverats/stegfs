@@ -44,7 +44,13 @@ static char *extract_long_option(char *);
 
 extern args_t init(int argc, char **argv, char **fuse)
 {
-	args_t a = { NULL, NULL, DEFAULT_CIPHER, DEFAULT_MODE, DEFAULT_HASH, DEFAULT_MAC, COPIES_DEFAULT, 0, false, false, false, false, false };
+	if (argc == 1)
+	{
+		print_usage();
+		exit(EXIT_FAILURE);
+	}
+
+	args_t a = { NULL, NULL, DEFAULT_CIPHER, DEFAULT_MODE, DEFAULT_HASH, DEFAULT_MAC, COPIES_DEFAULT, 0, false, false, false, false, false, false };
 	/*
 	 * parse commandline arguments
 	 */
@@ -124,6 +130,8 @@ extern args_t init(int argc, char **argv, char **fuse)
 			if (a.duplicates <= 0 || a.duplicates > COPIES_MAX)
 				die("unsupported value for file duplication %d", a.duplicates);
 		}
+		else if (is_stegfs() && (!strcmp("--show_bloc", argv[i]) || !strcmp("-b", argv[i])))
+			a.show_bloc = true;
 		else if (!is_stegfs() && (!strcmp("--size", argv[i]) || !strcmp("-z", argv[i])))
 		{
 			char *s = NULL;
@@ -179,11 +187,19 @@ extern args_t init(int argc, char **argv, char **fuse)
 				case S_IFLNK:
 				case S_IFREG:
 					a.fs = strdup(argv[i]);
-					if (is_stegfs())
-						argv[i] = "-s";
+					if (is_stegfs() && fuse)
+					{
+						fuse[j] = "-s";
+						j++;
+					}
 					break;
 				case S_IFDIR:
 					a.mount = strdup(argv[i]);
+					if (is_stegfs() && fuse)
+					{
+						fuse[j] = argv[i];
+						j++;
+					}
 					break;
 				default:
 					if (!is_stegfs())
@@ -243,7 +259,9 @@ static void print_help(void)
 	fprintf(stderr, _("  -a, --mace=<mac>           The MAC algorithm to use\n"));
 	fprintf(stderr, _("  -p, --paranoid             Enable paranoia mode\n"));
 	fprintf(stderr, _("  -x, --duplicates=<#>       Number of times each file should be duplicated\n"));
-	if (!is_stegfs())
+	if (is_stegfs())
+		fprintf(stderr, _("  -b, --show_bloc            Expose the /bloc/ in-use block list directory\n"));
+	else
 	{
 		fprintf(stderr, _("  -z, --size=<size>  Desired file system size, required when creating\n"));
 		fprintf(stderr, _("                     a file system in a normal file\n"));

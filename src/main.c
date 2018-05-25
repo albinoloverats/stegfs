@@ -162,14 +162,13 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
 			if (file_system.cache.child[i] && !file_system.cache.child[i]->file)
 				stbuf->st_nlink++;
 	}
-#ifdef USE_PROC
-	else if (path_equals(PATH_PROC, path))
-		/* if path == /proc */
+	else if (file_system.show_bloc && path_equals(PATH_BLOC, path))
+		/* if path == /bloc/ */
 		stbuf->st_mode = S_IFDIR | S_IRUSR | S_IXUSR;
-	else if (path_starts_with(PATH_PROC, path))
+	else if (file_system.show_bloc && path_starts_with(PATH_BLOC, path))
 	{
 		/*
-		 * if we’re looking at files in /proc treat them as blocks (as
+		 * if we’re looking at files in /bloc/ treat them as blocks (as
 		 * that’s what we’re representing)
 		 */
 		//stbuf->st_mode  = S_IFBLK | S_IRUSR;
@@ -183,7 +182,6 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
 			stbuf->st_size = strlen(f);
 		free(b);
 	}
-#endif
 	else
 	{
 		stegfs_cache_t c;
@@ -277,10 +275,9 @@ static int fuse_stegfs_rmdir(const char *path)
 {
 	errno = EXIT_SUCCESS;
 
-#ifdef USE_PROC
-	if (path_equals(path, PATH_PROC))
+	stegfs_t file_system = stegfs_info();
+	if (file_system.show_bloc && path_equals(path, PATH_BLOC))
 		return errno = EBUSY, -errno;
-#endif
 
 	stegfs_cache_t *c = NULL;
 	if ((c = stegfs_cache_exists(path, NULL)))
@@ -321,8 +318,7 @@ static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t fill
 			if (file_system.cache.child[i]->name)
 				filler(buf, file_system.cache.child[i]->name, NULL, 0);
 	}
-#ifdef USE_PROC
-	else if (path_equals(PATH_PROC, path))
+	else if (file_system.show_bloc && path_equals(PATH_BLOC, path))
 	{
 		for (uint64_t i = 0; i < file_system.size / SIZE_BYTE_BLOCK; i++)
 			if (file_system.blocks.in_use[i])
@@ -332,7 +328,6 @@ static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t fill
 				filler(buf, b, NULL, 0);
 			}
 	}
-#endif
 	else
 	{
 		stegfs_cache_t c;
@@ -602,10 +597,9 @@ static int fuse_stegfs_readlink(const char *path, char *buf, size_t size)
 {
 	errno = EXIT_SUCCESS;
 
-#ifdef USE_PROC
-	if (path_starts_with(PATH_PROC, path))
+	stegfs_t file_system = stegfs_info();
+	if (file_system.show_bloc && path_starts_with(PATH_BLOC, path))
 	{
-		stegfs_t file_system = stegfs_info();
 		char *b = dir_get_name(path, PASSWORD_SEPARATOR);
 		uint64_t ino = strtol(b, NULL, 0);
 		char *f = file_system.blocks.file[ino];
@@ -614,12 +608,12 @@ static int fuse_stegfs_readlink(const char *path, char *buf, size_t size)
 		free(b);
 	}
 	else
-#else
-	(void)path;
-	(void)buf;
-	(void)size;
-#endif
+	{
+		(void)path;
+		(void)buf;
+		(void)size;
 		errno = ENOTSUP;
+	}
 
 	return -errno;
 }
@@ -655,10 +649,13 @@ static int fuse_stegfs_chown(const char *path, uid_t uid, gid_t gid)
 
 int main(int argc, char **argv)
 {
-	char **fuse = calloc(argc, sizeof( char * ));
-	fuse[0] = argv[0];
+	char **fargs = calloc(argc, sizeof( char * ));
+	fargs[0] = argv[0];
 
-	args_t args = init(argc, argv, fuse);
+	args_t args = init(argc, argv, fargs);
+	int fargc;
+	for (fargc = 1; fargs[fargc] && fargc < argc; fargc++)
+		;
 
 	if (!args.help && !(args.fs && args.mount))
 	{
@@ -669,7 +666,7 @@ int main(int argc, char **argv)
 	errno = EXIT_SUCCESS;
 	if (!args.help)
 	{
-		switch (stegfs_init(args.fs, args.paranoid, args.cipher, args.mode, args.hash, args.mac, args.duplicates))
+		switch (stegfs_init(args.fs, args.paranoid, args.cipher, args.mode, args.hash, args.mac, args.duplicates, args.show_bloc))
 		{
 			case STEGFS_INIT_OKAY:
 				goto done;
@@ -697,7 +694,7 @@ int main(int argc, char **argv)
 
 done:
 	init_deinit(args);
-	struct fuse_args fargs = FUSE_ARGS_INIT(argc, argv);
-	fuse_opt_parse(&fargs, NULL, NULL, NULL);
-	return fuse_main(fargs.argc, fargs.argv, &fuse_stegfs_functions, NULL);
+	struct fuse_args f = FUSE_ARGS_INIT(fargc, fargs);
+	fuse_opt_parse(&f, NULL, NULL, NULL);
+	return fuse_main(f.argc, f.argv, &fuse_stegfs_functions, NULL);
 }

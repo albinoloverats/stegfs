@@ -107,7 +107,7 @@ version_e;
 #define DEFAULT_HASH   GCRY_MD_SHA256
 #define DEFAULT_MAC    GCRY_MAC_HMAC_SHA256
 
-#define PATH_PROC DIR_SEPARATOR "proc"
+#define PATH_BLOC DIR_SEPARATOR "bloc"
 
 #define PASSWORD_SEPARATOR ':'
 
@@ -197,9 +197,7 @@ typedef struct stegfs_blocks_t
 {
 	uint64_t used; /*!< Count of used blocks */
 	bool *in_use;  /*!< Used block tracker */
-#ifdef USE_PROC
 	char **file;   /*!< File using the given block */
-#endif
 }
 stegfs_blocks_t;
 
@@ -224,6 +222,7 @@ typedef struct stegfs_t
 	stegfs_blocks_t        blocks;      /*!< In use block tracker */
 	stegfs_cache_t         cache;       /*!< File cache version 2 */
 	version_e              version;     /*!< File system version */
+	bool                   show_bloc;   /*!< Expose the /bloc/ block list */
 }
 stegfs_t;
 
@@ -251,12 +250,18 @@ stegfs_block_t;
  * \param[in]  h  Hash algorithm
  * \param[in]  a  MAC algorithm
  * \param[in]  x  Duplication copies
+ * \param[in]  b  Expose the /bloc/ block list
  * \returns       The initialisation status
  *
  * Initialise the file system and popular static information structures,
  * making note whether to cache file details.
  */
-extern stegfs_init_e stegfs_init(const char * const restrict f, bool p, enum gcry_cipher_algos c, enum gcry_cipher_modes m, enum gcry_md_algos h, enum gcry_mac_algos a, uint32_t x);
+extern stegfs_init_e stegfs_init(const char * const restrict f, bool p,
+		enum gcry_cipher_algos c,
+		enum gcry_cipher_modes m,
+		enum gcry_md_algos h,
+		enum gcry_mac_algos a,
+		uint32_t x, bool b);
 
 /*!
  * \brief         Retrieve information about the file system
