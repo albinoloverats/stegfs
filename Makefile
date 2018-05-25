@@ -22,25 +22,25 @@ all: stegfs mkfs man
 
 stegfs:
 	 @$(CC) $(LIBS) $(CFLAGS) $(CPPFLAGS) -O2 $(SOURCE) $(COMMON) -o $(STEGFS)
-	-@echo "built ‘$(SOURCE)’ --> ‘$(STEGFS)’"
+	-@echo "built ‘$(SOURCE)’ → ‘$(STEGFS)’"
 
 mkfs:
 	 @$(CC) $(LIBS) $(CFLAGS) $(CPPFLAGS) -O2 $(MKSRC) $(COMMON) -o $(MKFS)
-	-@echo "built ‘$(MKSRC) $(COMMON)’ --> ‘$(MKFS)’"
+	-@echo "built ‘$(MKSRC) $(COMMON)’ → ‘$(MKFS)’"
 
 cp:
 	 @$(CC) $(CFLAGS) $(CPPFLAGS) -O0 -ggdb $(CPSRC) src/common/error.c src/common/fs.c -o $(CP)
-	-@echo "built ‘$(CPSRC) $(COMMON)’ --> ‘$(CP)’"
+	-@echo "built ‘$(CPSRC) $(COMMON)’ → ‘$(CP)’"
 
 debug: debug-stegfs debug-mkfs
 
 debug-stegfs:
 	 @$(CC) $(LIBS) $(CFLAGS) $(CPPFLAGS) $(DEBUG) -DUSE_PROC $(SOURCE) $(COMMON) -o $(STEGFS)
-	-@echo "built ‘$(SOURCE)’ --> ‘$(STEGFS)’"
+	-@echo "built ‘$(SOURCE)’ → ‘$(STEGFS)’"
 
 debug-mkfs:
 	 @$(CC) $(LIBS) $(CFLAGS) $(CPPFLAGS) $(DEBUG) $(MKSRC) $(COMMON) -o $(MKFS)
-	-@echo "built ‘$(MKSRC) $(COMMON)’ --> ‘$(MKFS)’"
+	-@echo "built ‘$(MKSRC) $(COMMON)’ → ‘$(MKFS)’"
 
 man:
 	 @gzip -c docs/$(STEGFS).1 > $(STEGFS).1.gz
