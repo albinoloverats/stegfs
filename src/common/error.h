@@ -1,6 +1,6 @@
 /*
  * Common code for error reporting
- * Copyright © 2009-2018, albinoloverats ~ Software Development
+ * Copyright © 2009-2020, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -24,7 +24,7 @@
 /*!
  * \file    error.h
  * \author  albinoloverats ~ Software Development
- * \date    2009-2018
+ * \date    2009-2020
  * \brief   Common logging code shared between projects
  *
  * Common error handling code, currently only fatal end of execution,

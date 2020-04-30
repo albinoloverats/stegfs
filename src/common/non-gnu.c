@@ -1,6 +1,6 @@
 /*
  * Common code which is typically missing on MS Windows
- * Copyright © 2005-2018, albinoloverats ~ Software Development
+ * Copyright © 2005-2020, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -334,4 +334,72 @@ extern FILE *temp_file(void)
 	return t;
 }
 
+#include <VersionHelpers.h>
+
+extern char *windows_version(void)
+{
+	static char version[32];
+
+	if (IsWindows10OrGreater())
+	{
+		strcpy(version, "Windows 10");
+	}
+	else if (IsWindows8Point1OrGreater())
+	{
+		strcpy(version, "Windows 8.1");
+	}
+	else if (IsWindows8OrGreater())
+	{
+		strcpy(version, "Windows 8");
+	}
+	else if (IsWindows7SP1OrGreater())
+	{
+		strcpy(version, "Windows 7 SP1");
+	}
+	else if (IsWindows7OrGreater())
+	{
+		strcpy(version, "Windows 7");
+	}
+	else if (IsWindowsVistaSP2OrGreater())
+	{
+		strcpy(version, "Windows Vista SP2");
+	}
+	else if (IsWindowsVistaSP1OrGreater())
+	{
+		strcpy(version, "Windows Vista SP1");
+	}
+	else if (IsWindowsVistaOrGreater())
+	{
+		strcpy(version, "Windows Vista");
+	}
+	else if (IsWindowsXPSP3OrGreater())
+	{
+		strcpy(version, "Windows XP SP3");
+	}
+	else if (IsWindowsXPSP2OrGreater())
+	{
+		strcpy(version, "Windows XP SP2");
+	}
+	else if (IsWindowsXPSP1OrGreater())
+	{
+		strcpy(version, "Windows XP SP1");
+	}
+	else if (IsWindowsXPOrGreater())
+	{
+		strcpy(version, "Windows XP");
+	}
+
+	if (IsWindowsServer())
+	{
+		strcat(version, " Server");
+	}
+	else
+	{
+		strcat(version, " Client");
+	}
+	return version;
+}
+
 #endif /* _WIN32 */
+
+

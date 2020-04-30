@@ -1,6 +1,6 @@
 /*
  * stegfs ~ a steganographic file system for unix-like systems
- * Copyright © 2007-2018, albinoloverats ~ Software Development
+ * Copyright © 2007-2020, albinoloverats ~ Software Development
  * email: stegfs@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -132,7 +132,7 @@ extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid, 
 	switch (version)
 	{
 		case VERSION_2015_08:
-		case VERSION_2018_XX:
+		case VERSION_202X_XX:
 			file_system.version = version;
 			break;
 		default:
@@ -174,7 +174,7 @@ extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid, 
 	}
 	else
 		file_system.mac = DEFAULT_MAC;
-	if (file_system.version < VERSION_2018_XX)
+	if (file_system.version < VERSION_202X_XX)
 		file_system.mac = DEFAULT_MAC;
 
 	if (file_system.cipher == GCRY_CIPHER_NONE || file_system.hash == GCRY_MD_NONE || file_system.mode == GCRY_CIPHER_MODE_NONE)
@@ -187,7 +187,7 @@ extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid, 
 		memcpy(&file_system.copies, tlv_value_of(tlv, TAG_DUPLICATION), tlv_length_of(tlv, TAG_DUPLICATION));
 	else
 		file_system.copies = COPIES_DEFAULT;
-	if (file_system.version < VERSION_2018_XX)
+	if (file_system.version < VERSION_202X_XX)
 		file_system.copies = ntohl(file_system.copies);
 
 	/* get fs block size */
@@ -228,7 +228,7 @@ static version_e parse_version(const char *v)
 		"Unknown",
 		"2010.01", /* unsupported */
 		"2015.08",
-		"2018.XX",
+		"202X.XX",
 		"Current"
 	};
 	for (version_e i = VERSION_CURRENT; i > VERSION_UNKNOWN; i--)
@@ -496,7 +496,7 @@ extern bool stegfs_file_read(stegfs_file_t *file)
 		}
 		gcry_cipher_close(cipher_handle);
 		/* compare generated MAC with stored MAC */
-		if (file_system.version >= VERSION_2018_XX && gcry_mac_verify(mac_handle, mac_data, mac_length) == GPG_ERR_CHECKSUM)
+		if (file_system.version >= VERSION_202X_XX && gcry_mac_verify(mac_handle, mac_data, mac_length) == GPG_ERR_CHECKSUM)
 			failed = true;
 		gcry_mac_close(mac_handle);
 		gcry_free(mac_data);
@@ -900,7 +900,7 @@ static gcry_cipher_hd_t init_cipher(const stegfs_file_t * const restrict file, u
 	size_t key_length = gcry_cipher_get_algo_keylen(file_system.cipher);
 	/* allocate space for whichever is larger */
 	uint8_t *key_data = gcry_calloc_secure(key_length > hash_length ? key_length : hash_length, sizeof( uint8_t ));
-	if (file_system.version < VERSION_2018_XX)
+	if (file_system.version < VERSION_202X_XX)
 	{
 		gcry_md_write(hash, file->path, strlen(file->path));
 		gcry_md_write(hash, file->name, strlen(file->name));

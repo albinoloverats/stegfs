@@ -1,6 +1,6 @@
 /*
  * stegfs ~ a steganographic file system for unix-like systems
- * Copyright © 2007-2018, albinoloverats ~ Software Development
+ * Copyright © 2007-2020, albinoloverats ~ Software Development
  * email: stegfs@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -27,14 +27,14 @@
 #include <gcrypt.h>
 
 #define STEGFS_NAME    "stegfs"
-#define STEGFS_VERSION "2018.XX"
+#define STEGFS_VERSION "202X.XX"
 
 
 /* size (in bytes) for various blocks of data */
 #define SIZE_BYTE_BLOCK       0x0800    /*!< 2,048 bytes */
 #define SIZE_BYTE_PATH        0x0020    /*!<    32 bytes */
 #define SIZE_BYTE_DATA_201508 0x07B8    /*!< 1,976 bytes */
-//#define SIZE_BYTE_DATA_2018XX 0x0780    /*!< 1,920 bytes */
+//#define SIZE_BYTE_DATA_202XXX 0x0780    /*!< 1,920 bytes */
 #define SIZE_BYTE_DATA  SIZE_BYTE_DATA_201508
 
 #define SIZE_BYTE_HASH        0x0020    /*!<    32 bytes */
@@ -47,7 +47,7 @@
 /* size in 64 bit ints of parts of block */
 #define SIZE_LONG_PATH          0x04
 #define SIZE_LONG_DATA_201508   0xF7
-//#define SIZE_LONG_DATA_2018XX   0xF0
+//#define SIZE_LONG_DATA_202XXX   0xF0
 #define SIZE_LONG_DATA          SIZE_LONG_DATA_201508
 #define SIZE_LONG_HASH          0x04
 /* next block (not defined) */
@@ -96,7 +96,7 @@ typedef enum
 	VERSION_2010_01,
 	VERSION_2015_08,
 
-	VERSION_2018_XX,
+	VERSION_202X_XX,
 	VERSION_CURRENT
 }
 version_e;

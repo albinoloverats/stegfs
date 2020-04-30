@@ -1,6 +1,6 @@
 /*
  * Common code which is typically missing on Apple OS X
- * Copyright © 2005-2018, albinoloverats ~ Software Development
+ * Copyright © 2005-2020, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -97,6 +97,8 @@ extern char *strndup(const char *s, size_t l) __attribute__((nonnull(1)));
 extern int scandir(const char *path, struct dirent ***res, int (*sel)(const struct dirent *), int (*cmp)(const struct dirent **, const struct dirent **)) __attribute__((nonnull(1, 2)));
 
 extern FILE *temp_file(void);
+
+extern char *windows_version(void);
 
 #endif /* _WIN32 */
 

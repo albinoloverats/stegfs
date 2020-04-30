@@ -1,5 +1,5 @@
 /*
- * Copyright © 2005-2018, albinoloverats ~ Software Development
+ * Copyright © 2005-2020, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -23,7 +23,7 @@
 /*!
  * \file    common.h
  * \author  albinoloverats ~ Software Development
- * \date    2009-2018
+ * \date    2009-2020
  * \brief   Mostly common macros, useful when dealing with different OS’s
  *
  * Various macros which help with the transition from one OS to another.
@@ -70,6 +70,18 @@
 	#define htonll(x) (x) /*!< No need to swap bytes to network byte order */
 #else
 	#error "Unknown endianness!"
+#endif
+
+#if defined(__clang__)
+	#define COMPILER "clang " __VERSION__
+#elif defined(__GNUC__)
+	#define COMPILER "gcc " __VERSION__
+#else
+	#ifdef __VERSION__
+		#define COMPILER "other" __VERSION__
+	#else
+		#define COMPILER "other unknown"
+	#endif
 #endif
 
 //#if !defined _WIN32 && !defined __CYGWIN__ && !defined __APPLE__

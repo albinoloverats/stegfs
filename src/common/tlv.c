@@ -1,6 +1,6 @@
 /*
  * Common code for dealing with tag, length, value arrays
- * Copyright © 2009-2018, albinoloverats ~ Software Development
+ * Copyright © 2009-2020, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -97,7 +97,13 @@ extern tlv_t *tlv_get(TLV_HANDLE ptr, uint8_t tag)
 
 extern bool tlv_has_tag(TLV_HANDLE ptr, uint8_t tag)
 {
-	return tlv_get(ptr, tag) != NULL;
+	tlv_private_t *tlv_ptr = (tlv_private_t *)ptr;
+	if (!tlv_ptr)
+		return NULL;
+	for (unsigned i = 0; i < tlv_ptr->tags; i++)
+		if (tlv_ptr->buffer[i].tag == tag)
+			return true;
+	return false;
 }
 
 extern byte_t *tlv_value_of_aux(TLV_HANDLE ptr, uint8_t tag, uint8_t *def)
