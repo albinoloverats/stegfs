@@ -111,7 +111,7 @@ extern args_t init(int argc, char **argv, char **fuse)
 			if (argv[i][1] == '-')
 			{
 				char *x = extract_long_option(argv[i]);
-				a.mode = mac_id_from_name(x);
+				a.mac = mac_id_from_name(x);
 				free(x);
 			}
 			else
@@ -256,20 +256,20 @@ static void print_help(void)
 	fprintf(stderr, _("  -c, --cipher=<algorithm>   Algorithm to use to encrypt data\n"));
 	fprintf(stderr, _("  -s, --hash=<algorithm>     Hash algorithm to generate key\n"));
 	fprintf(stderr, _("  -m, --mode=<mode>          The encryption mode to use\n"));
-	fprintf(stderr, _("  -a, --mace=<mac>           The MAC algorithm to use\n"));
+	fprintf(stderr, _("  -a, --mac=<mac>            The MAC algorithm to use\n"));
 	fprintf(stderr, _("  -p, --paranoid             Enable paranoia mode\n"));
 	fprintf(stderr, _("  -x, --duplicates=<#>       Number of times each file should be duplicated\n"));
 	if (is_stegfs())
 		fprintf(stderr, _("  -b, --show_bloc            Expose the /bloc/ in-use block list directory\n"));
 	else
 	{
-		fprintf(stderr, _("  -z, --size=<size>  Desired file system size, required when creating\n"));
-		fprintf(stderr, _("                     a file system in a normal file\n"));
-		fprintf(stderr, _("  -f, --force        Force overwrite existing file, required when\n"));
-		fprintf(stderr, _("                     overwriting a file system in a normal file\n"));
-		fprintf(stderr, _("  -r, --rewrite-sb   Rewrite the superblock (perhaps it became corrupt)\n"));
-		fprintf(stderr, _("  -d, --dry-run      Dry run - print details about the file system that\n"));
-		fprintf(stderr, _("                     would have been created\n"));
+		fprintf(stderr, _("  -z, --size=<size>          Desired file system size, required when creating\n"));
+		fprintf(stderr, _("                             a file system in a normal file\n"));
+		fprintf(stderr, _("  -f, --force                Force overwrite existing file, required when\n"));
+		fprintf(stderr, _("                             overwriting a file system in a normal file\n"));
+		fprintf(stderr, _("  -r, --rewrite-sb           Rewrite the superblock (perhaps it became corrupt)\n"));
+		fprintf(stderr, _("  -d, --dry-run              Dry run - print details about the file system that\n"));
+		fprintf(stderr, _("                             would have been created\n"));
 	}
 	fprintf(stderr, _("\nNotes:\n"));
 	if (is_stegfs())

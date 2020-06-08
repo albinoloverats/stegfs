@@ -1,5 +1,14 @@
 stegfs - 2015.08.1                                        21st July 2016
-================
+==================
+
+Quick Usage
+-----------
+
+    $ mkstegfs /dev/sda
+    $ stegfs /dev/sda /mnt/stegfs
+    $ mkdir /mnt/stegfs/docs
+    $ touch /mnt/stegfs/docs/file:password
+
 
 About stegfs
 ------------
@@ -64,6 +73,7 @@ modern chipsets have it implemented in hardware. The reason for choosing
 SHA-2 256 is so that the path and data checksum make use of all of the
 available space within their locations of each file system block.
 
+
 About mkstegfs
 --------------
 
@@ -103,8 +113,6 @@ commands:
 Changelog
 ---------
 
-### Fixed For Latest Release
-
 * Fix FUSE initialisation bug (caused by update to FUSE library that was
   stricter than before)
 * Update documentation and man pages
@@ -112,8 +120,6 @@ Changelog
 
 TODO
 ----
-
-### Add
 
 * Bring back multi-threaded support
 * Cache time limit (force forget if a file isn’t accessed)
