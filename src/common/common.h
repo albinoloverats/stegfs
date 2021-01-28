@@ -1,5 +1,5 @@
 /*
- * Copyright © 2005-2020, albinoloverats ~ Software Development
+ * Copyright © 2005-2021, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -23,7 +23,7 @@
 /*!
  * \file    common.h
  * \author  albinoloverats ~ Software Development
- * \date    2009-2020
+ * \date    2009-2021
  * \brief   Mostly common macros, useful when dealing with different OS’s
  *
  * Various macros which help with the transition from one OS to another.
@@ -72,17 +72,26 @@
 	#error "Unknown endianness!"
 #endif
 
+#ifndef BUILD_OS
+	#define BUILD_OS "(unknown)"
+#endif
+
 #if defined(__clang__)
 	#define COMPILER "clang " __VERSION__
 #elif defined(__GNUC__)
 	#define COMPILER "gcc " __VERSION__
 #else
 	#ifdef __VERSION__
-		#define COMPILER "other" __VERSION__
+		#define COMPILER "(unknown) " __VERSION__
 	#else
-		#define COMPILER "other unknown"
+		#define COMPILER "(unknown) (unknown)"
 	#endif
 #endif
+
+#ifndef GIT_COMMIT
+	#define GIT_COMMIT "(unknown)"
+#endif
+#define GIT_COMMIT_LENGTH 7
 
 //#if !defined _WIN32 && !defined __CYGWIN__ && !defined __APPLE__
 //    #define _(s) gettext(s) /*!< Allow use of _() to refer to gettext() */
