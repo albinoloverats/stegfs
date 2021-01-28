@@ -1,6 +1,6 @@
 /*
  * Common code for working with libgcrypt
- * Copyright © 2005-2020, albinoloverats ~ Software Development
+ * Copyright © 2005-2021, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -29,6 +29,8 @@
 #include "non-gnu.h"
 #include "error.h"
 #include "ccrypt.h"
+
+#define NEED_LIBGCRYPT_VERSION "1.8.6"
 
 static int algorithm_compare(const void *, const void *);
 
@@ -65,8 +67,8 @@ extern void init_crypto(void)
 	/*
 	 * initialise GNU Crypt library
 	 */
-	if (!gcry_check_version(GCRYPT_VERSION))
-		die(_("Could not find GNU Crypt library"));
+	if (!gcry_check_version(NEED_LIBGCRYPT_VERSION))
+		die(_("libgcrypt is too old (need %s, have %s)"), NEED_LIBGCRYPT_VERSION, gcry_check_version(NULL));
 	gcry_control(GCRYCTL_SUSPEND_SECMEM_WARN);
 	gcry_control(GCRYCTL_INIT_SECMEM, MEGABYTE, 0);
 	gcry_control(GCRYCTL_RESUME_SECMEM_WARN);
