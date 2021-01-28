@@ -1,9 +1,5 @@
 stegfs
 mkstegfs
-src/common/cli.c
-src/common/cli.h
-src/common/version.c
-src/common/version.h
 src/common/win32_ext.c
 src/common/win32_ext.h
 src/common/ecc.c
