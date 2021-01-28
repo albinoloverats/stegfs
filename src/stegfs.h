@@ -1,6 +1,6 @@
 /*
  * stegfs ~ a steganographic file system for unix-like systems
- * Copyright © 2007-2020, albinoloverats ~ Software Development
+ * Copyright © 2007-2021, albinoloverats ~ Software Development
  * email: stegfs@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -29,6 +29,7 @@
 #define STEGFS_NAME    "stegfs"
 #define STEGFS_VERSION "202X.XX"
 
+#define PROJECT_URL "https://albinoloverats.net/projects/encrypt"
 
 /* size (in bytes) for various blocks of data */
 #define SIZE_BYTE_BLOCK       0x0800    /*!< 2,048 bytes */
