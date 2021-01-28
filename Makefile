@@ -7,16 +7,16 @@ CP       = cp_tree
 SOURCE   = src/main.c src/stegfs.c src/init.c
 MKSRC    = src/mkfs.c src/init.c
 CPSRC    = src/cp.c
-COMMON   = src/common/error.c src/common/ccrypt.c src/common/tlv.c src/common/dir.c src/common/non-gnu.c
+COMMON   = src/common/error.c src/common/ccrypt.c src/common/tlv.c src/common/dir.c src/common/cli.c src/common/version.c src/common/non-gnu.c
 
-CFLAGS   = -Wall -Wextra -Werror -std=gnu99 `pkg-config --cflags fuse` -pipe -I/usr/local/include
-CPPFLAGS = -Isrc -D_GNU_SOURCE -DGCRYPT_NO_DEPRECATED -D_FILE_OFFSET_BITS=64 -DGIT_COMMIT=\"`git log | head -n1 | cut -f2 -d' '`\"
+CFLAGS   = ${CFLAGS} -Wall -Wextra -Werror -std=gnu99 $(shell pkg-config --cflags fuse) -pipe -I/usr/local/include
+CPPFLAGS = ${CPPFLAGS} -Isrc -D_GNU_SOURCE -DGCRYPT_NO_DEPRECATED -D_FILE_OFFSET_BITS=64 -DGIT_COMMIT=\"`git log | head -n1 | cut -f2 -d' '`\"
 
-PROFILE  = -O0 -ggdb -D__DEBUG__ -pg -lc
 DEBUG    = -O0 -ggdb -D__DEBUG__
+PROFILE  = ${DEBUG} -pg -lc
 
 # -lpthread
-LIBS     = -lgcrypt `pkg-config --libs fuse`
+LIBS     = $(shell libgcrypt-config --libs) -lcurl $(shell pkg-config --libs fuse)
 
 all: stegfs mkfs man
 
