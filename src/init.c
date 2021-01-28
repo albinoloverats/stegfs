@@ -1,6 +1,6 @@
 /*
  * stegfs ~ a steganographic file system for unix-like systems
- * Copyright © 2007-2020, albinoloverats ~ Software Development
+ * Copyright © 2007-2021, albinoloverats ~ Software Development
  * email: stegfs@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -32,11 +32,12 @@
 #include "common/common.h"
 #include "common/error.h"
 #include "common/ccrypt.h"
+#include "common/version.h"
+#include "common/cli.h"
 
 #include "stegfs.h"
 #include "init.h"
 
-static void print_version(void);
 static void print_usage(void);
 static void print_help(void);
 
@@ -226,12 +227,9 @@ extern void init_deinit(args_t args)
 	return;
 }
 
-static void print_version(void)
+inline static void format_section(char *s)
 {
-	char *name = is_stegfs() ? STEGFS_NAME : MKFS_NAME;
-	char *git = strndup(GIT_COMMIT, GIT_COMMIT_LENGTH);
-	fprintf(stderr, _("%s version: %s\n%*s built on: %s %s\n%*s git commit: %s\n"), name, STEGFS_VERSION, (int)strlen(name) - 1, "", __DATE__, __TIME__, (int)strlen(name) - 3, "", git);
-	free(git);
+	cli_fprintf(stderr, "\n" ANSI_COLOUR_CYAN "%s" ANSI_COLOUR_RESET ":\n", s);
 	return;
 }
 
@@ -239,39 +237,38 @@ static void print_usage(void)
 {
 	char *name = is_stegfs() ? STEGFS_NAME : MKFS_NAME;
 	char *usage = is_stegfs() ? STEGFS_USAGE : MKFS_USAGE;
-	fprintf(stderr, _("Usage:\n  %s %s\n"), name, usage);
+	format_section(_("Usage"));
+	cli_fprintf(stderr, "  " ANSI_COLOUR_GREEN "%s " ANSI_COLOUR_MAGENTA " %s" ANSI_COLOUR_RESET "\n", name, usage);
 	return;
 }
 
 static void print_help(void)
 {
-	print_version();
-	fprintf(stderr, "\n");
+	version_print(is_stegfs() ? STEGFS_NAME : MKFS_NAME, STEGFS_VERSION, PROJECT_URL);
 	print_usage();
-	fprintf(stderr, "\n");
-	fprintf(stderr, _("Options:\n"));
-	fprintf(stderr, _("  -h, --help                 Display this message\n"));
-	fprintf(stderr, _("  -l, --licence              Display GNU GPL v3 licence header\n"));
-	fprintf(stderr, _("  -v, --version              Display application version\n"));
-	fprintf(stderr, _("  -c, --cipher=<algorithm>   Algorithm to use to encrypt data\n"));
-	fprintf(stderr, _("  -s, --hash=<algorithm>     Hash algorithm to generate key\n"));
-	fprintf(stderr, _("  -m, --mode=<mode>          The encryption mode to use\n"));
-	fprintf(stderr, _("  -a, --mac=<mac>            The MAC algorithm to use\n"));
-	fprintf(stderr, _("  -p, --paranoid             Enable paranoia mode\n"));
-	fprintf(stderr, _("  -x, --duplicates=<#>       Number of times each file should be duplicated\n"));
+
+	format_section(_("Options"));
+	cli_format_help('h', "help",        NULL,         _("Display this message"));
+	cli_format_help('l', "licence",     NULL,         _("Display GNU GPL v3 licence header"));
+	cli_format_help('v', "version",     NULL,         _("Display application version"));
+	cli_format_help('c', "cipher",      "algorithm",  _("Algorithm to use to encrypt data"));
+	cli_format_help('s', "hash",        "algorithm",  _("Hash algorithm to generate key"));
+	cli_format_help('m', "mode",        "mode",       _("The encryption mode to use"));
+	cli_format_help('a', "mac",         "mac",        _("The MAC algorithm to use"));
+
+	cli_format_help('p', "paranoid",    NULL,        _("Enable paranoia mode"));
+	cli_format_help('x', "duplicates",  "#",         _("Number of times each file should be duplicated"));
 	if (is_stegfs())
-		fprintf(stderr, _("  -b, --show_bloc            Expose the /bloc/ in-use block list directory\n"));
+		cli_format_help('b', "show-bloc",   NULL,        _("Expose the /bloc/ in-use block list directory"));
 	else
 	{
-		fprintf(stderr, _("  -z, --size=<size>          Desired file system size, required when creating\n"));
-		fprintf(stderr, _("                             a file system in a normal file\n"));
-		fprintf(stderr, _("  -f, --force                Force overwrite existing file, required when\n"));
-		fprintf(stderr, _("                             overwriting a file system in a normal file\n"));
-		fprintf(stderr, _("  -r, --rewrite-sb           Rewrite the superblock (perhaps it became corrupt)\n"));
-		fprintf(stderr, _("  -d, --dry-run              Dry run - print details about the file system that\n"));
-		fprintf(stderr, _("                             would have been created\n"));
+		cli_format_help('z', "size",        "size",      _("Desired file system size, required when creating a file system in a normal file"));
+		cli_format_help('f', "force",       NULL,        _("Force overwrite existing file, required when overwriting a file system in a normal file"));
+		cli_format_help('r', "rewrite-sb",  NULL,        _("Rewrite the superblock (perhaps it became corrupt)"));
+		cli_format_help('d', "dry-run",     NULL,        _("Dry run - print details about the file system that would have been created"));
 	}
-	fprintf(stderr, _("\nNotes:\n"));
+	format_section(_("Notes"));
+	// TODO wrap these lines, as necessary
 	if (is_stegfs())
 	{
 		fprintf(stderr, _("  • It doesn't matter which order the file system and mount point are specified\n"));
@@ -281,7 +278,7 @@ static void print_help(void)
 	fprintf(stderr, _("    system header. This will also disable the checks when mounting and thus\n"));
 	fprintf(stderr, _("    anything could happen ;-)\n"));
 	if (is_stegfs())
-		fprintf(stderr, "\n");
+		fprintf(stderr, "\n"); //empty line before fuse options
 	return;
 }
 
@@ -305,7 +302,7 @@ extern void show_usage(void)
 
 extern void show_version(void)
 {
-	print_version();
+	version_print(is_stegfs() ? STEGFS_NAME : MKFS_NAME, STEGFS_VERSION, PROJECT_URL);
 	exit(EXIT_SUCCESS);
 }
 
