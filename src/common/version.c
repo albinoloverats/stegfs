@@ -144,7 +144,7 @@ extern void version_check_for_update(char *current_version, char *check_url, cha
 	info->current    = strdup(current_version);
 	info->check_url  = strdup(check_url);
 	info->update_url = download_url ? strdup(download_url) : NULL;
-#ifndef __DEBUG__
+//#ifndef __DEBUG__
 	pthread_t vt;
 	pthread_attr_t a;
 	pthread_attr_init(&a);
@@ -152,14 +152,17 @@ extern void version_check_for_update(char *current_version, char *check_url, cha
 
 	pthread_create(&vt, &a, version_check, info);
 	pthread_attr_destroy(&a);
-#else
-	version_check(info);
-#endif
+//#else
+	//version_check(info);
+//#endif
 	return;
 }
 
 static void *version_check(void *n)
 {
+	struct timespec vc = { 1, 0 };
+	nanosleep(&vc, NULL);
+
 	version_check_t *info = n;
 	curl_global_init(CURL_GLOBAL_ALL);
 	CURL *ccheck = curl_easy_init();
@@ -183,14 +186,14 @@ static void *version_check(void *n)
 	free(info->current);
 	free(info);
 	version_is_checking = false;
-#ifndef __DEBUG__
+//#ifndef __DEBUG__
 	pthread_exit(NULL);
 	#ifdef _WIN32
 	return NULL;
 	#endif
-#else
-	return NULL;
-#endif
+//#else
+	//return NULL;
+//#endif
 }
 
 static void version_download_latest(char *update_url)
@@ -288,7 +291,7 @@ static size_t version_verify(void *p, size_t s, size_t n, void *v)
 
 static void version_format(int i, char *id, char *value)
 {
-	cli_fprintf(stderr, ANSI_COLOUR_GREEN "%*s" ANSI_COLOUR_RESET ": " ANSI_COLOUR_YELLOW, i, id);
+	cli_fprintf(stderr, ANSI_COLOUR_GREEN "%*s" ANSI_COLOUR_RESET ": " ANSI_COLOUR_MAGENTA, i, id);
 #ifndef _WIN32
 	struct winsize ws;
 	ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
