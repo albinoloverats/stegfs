@@ -40,14 +40,13 @@
 #include "common/error.h"
 #include "common/ccrypt.h"
 #include "common/tlv.h"
+#include "common/config.h"
 
 #include "stegfs.h"
-#include "init.h"
 
-extern bool is_stegfs(void)
-{
-	return false;
-}
+
+#define MKFS "mkstegfs"
+
 
 static int64_t open_filesystem(const char * const restrict path, uint64_t *size, bool force, bool recreate, bool dry)
 {
@@ -62,7 +61,10 @@ static int64_t open_filesystem(const char * const restrict path, uint64_t *size,
 			 * use a device as the file system
 			 */
 			if ((fs = open(path, O_RDWR /*| F_WRLCK*/, S_IRUSR | S_IWUSR)) < 0)
-				die("could not open the block device");
+			{
+				fprintf(stderr, "Could not open the block device\n");
+				exit(EXIT_FAILURE);
+			}
 			*size = lseek(fs, 0, SEEK_END);
 			break;
 		case S_IFDIR:
@@ -70,20 +72,30 @@ static int64_t open_filesystem(const char * const restrict path, uint64_t *size,
 		case S_IFLNK:
 		case S_IFSOCK:
 		case S_IFIFO:
-			die("unable to create file system on specified device \"%s\"", path);
+			fprintf(stderr, "Unable to create file system on specified device \"%s\"\n", path);
+			exit(EXIT_FAILURE);
 		case S_IFREG:
 			if (!force && !recreate && !dry)
-				die("file by that name already exists - use -f to force");
+			{
+				fprintf(stderr, "File by that name already exists - use -f to force\n");
+				exit(EXIT_FAILURE);
+			}
 			/*
 			 * file does exist; use its current size as the desired capacity
 			 * (unless the user has specified a new size)
 			 */
 			if ((fs = open(path, O_RDWR /*| F_WRLCK*/, S_IRUSR | S_IWUSR)) < 0)
-				die("could not open file system %s", path);
+			{
+				fprintf(stderr, "Could not open file system \"%s\"\n", path);
+				exit(EXIT_FAILURE);
+			}
 			{
 				uint64_t z = lseek(fs, 0, SEEK_END);
 				if (!z && !*size)
-					die("missing required file system size");
+				{
+					fprintf(stderr, "Missing required file system size\n");
+					exit(EXIT_FAILURE);
+				}
 				if (!*size)
 					*size = z;
 			}
@@ -93,7 +105,10 @@ static int64_t open_filesystem(const char * const restrict path, uint64_t *size,
 			 * file doesn't exist - good, lets create it...
 			 */
 			if (!dry && (fs = open(path, O_RDWR /*| F_WRLCK*/ | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR)) < 0)
-				die("could not open file system %s", path);
+			{
+				fprintf(stderr, "Could not open file system \"%s\"\n", path);
+				exit(EXIT_FAILURE);
+			}
 		break;
 	}
 	if (dry)
@@ -124,6 +139,38 @@ static void adjust_units(double *size, char *units)
 		strcpy(units, "EB");
 	}
 	return;
+}
+
+static uint64_t adjust_size(char *z)
+{
+	if (!z)
+		return 0;
+	char *f = NULL;
+	uint64_t size = strtol(z, &f, 0);
+	switch (toupper(f[0]))
+	{
+		case 'E':
+			size *= KILOBYTE; /* Ratio between EB and PB (ditto below) */
+			__attribute__((fallthrough));
+		case 'P':
+			size *= KILOBYTE;
+			__attribute__((fallthrough));
+		case 'T':
+			size *= KILOBYTE;
+			__attribute__((fallthrough));
+		case 'G':
+			size *= KILOBYTE;
+			__attribute__((fallthrough));
+		case 'M':
+			__attribute__((fallthrough));
+		case '\0':
+			size *= MEGABYTE;
+			break;
+		default:
+			fprintf(stderr, "unknown size suffix %c\n", f[0]);
+			exit(EXIT_FAILURE);
+	}
+	return size;
 }
 
 static gcry_cipher_hd_t crypto_init(enum gcry_cipher_algos c, enum gcry_cipher_modes m)
@@ -209,38 +256,116 @@ static void superblock_info(stegfs_block_t *sb, const char *cipher, const char *
 
 int main(int argc, char **argv)
 {
-	args_t args = init(argc, argv, NULL);
 
-	char path[PATH_MAX + 1] = "";
+	char **extra = NULL;
+	extra = calloc(2, sizeof (char *));
+	extra[0] = strdup("+device");
+	config_arg_t args[] =
+	{
+		{ 'c', "cipher",         _("algorithm"),  _("Algorithm to use to encrypt data"),                                                        CONFIG_ARG_REQ_STRING,  { 0x0 }, false, false, false },
+		{ 's', "hash",           _("algorithm"),  _("Hash algorithm to generate key"),                                                          CONFIG_ARG_REQ_STRING,  { 0x0 }, false, false, false },
+		{ 'm', "mode",           _("mode"),       _("The encryption mode to use"),                                                              CONFIG_ARG_REQ_STRING,  { 0x0 }, false, false, false },
+		{ 'a', "mac",            _("mac"),        _("The MAC algorithm to use"),                                                                CONFIG_ARG_REQ_STRING,  { 0x0 }, false, false, false },
+		{ 'i', "kdf-iterations", _("iterations"), _("Number of iterations the KDF should use"),                                                 CONFIG_ARG_REQ_NUMBER,  { 0x0 }, false, false, false },
+		{ 'p', "paranoid",       NULL,            _("Enable paranoia mode"),                                                                    CONFIG_ARG_REQ_BOOLEAN, { 0x0 }, false, false, false },
+		{ 'x', "duplicates",     "#",             _("Number of times each file should be duplicated"),                                          CONFIG_ARG_REQ_NUMBER,  { 0x0 }, false, false, false },
+		{ 'z', "size",           _("size"),       _("Desired file system size, required when creating a file system in a normal file"),         CONFIG_ARG_REQ_STRING,  { 0x0 }, false, false, false },
+		{ 'f', "force",          NULL,            _("Force overwrite existing file, required when overwriting a file system in a normal file"), CONFIG_ARG_REQ_BOOLEAN, { 0x0 }, false, false, false },
+		{ 'r', "rewrite-sb",     NULL,            _("Rewrite the superblock (perhaps it became corrupt)"),                                      CONFIG_ARG_REQ_BOOLEAN, { 0x0 }, false, false, false },
+		{ 'd', "dry-run",        NULL,            _("Dry run - print details about the file system that would have been created"),              CONFIG_ARG_REQ_BOOLEAN, { 0x0 }, false, false, false },
+		{ 0x0, NULL, NULL, NULL, CONFIG_ARG_REQ_BOOLEAN, { 0x0 }, false, false, false }
+	};
+	char *notes[] =
+	{
+		"If you’re feeling extra paranoid you can now disable to stegfs file system header. This will also disable the checks when mounting; therefore anything could happen ;-)",
+		NULL
+	};
+	config_about_t about =
+	{
+		MKFS,
+		STEGFS_VERSION,
+		PROJECT_URL,
+		NULL
+	};
+	config_init(about);
+	int e = config_parse(argc, argv, args, &extra, notes);
 
-	realpath(args.fs, path);
-	if (!strlen(path))
+	char *path = e > 0 ? extra[0] : NULL;
+	if (!path)
 	{
 		fprintf(stderr, "Missing file system target!\n");
+		char *x[] = { "+device", NULL };
+		config_show_usage(args, x);
 		return EXIT_FAILURE;
 	}
 
-	if (!(args.size || args.rewrite_sb))
+	char *c         = args[ 0].response_value.string;
+	char *h         = args[ 1].response_value.string;
+	char *m         = args[ 2].response_value.string;
+	char *a         = args[ 3].response_value.string;
+	uint64_t kdf    = args[ 4].response_value.number; // TODO add KDF iterations
+	bool paranoid   = args[ 5].response_value.boolean;
+	uint32_t copies = (uint32_t)args[6].response_value.number ? : COPIES_DEFAULT;
+	char *s         = args[ 7].response_value.string;
+	bool force      = args[ 8].response_value.boolean;
+	bool rewrite    = args[ 9].response_value.boolean;
+	bool dry_run    = args[10].response_value.boolean;
+
+	enum gcry_cipher_algos cipher = c ? cipher_id_from_name(c) : DEFAULT_CIPHER;
+	if (cipher == GCRY_CIPHER_NONE)
 	{
-		fprintf(stderr, "Invalid file system size!\n");
+		fprintf(stderr, "Unknown cipher \"%s\"\n", c);
 		return EXIT_FAILURE;
 	}
+	enum gcry_md_algos hash = h ? hash_id_from_name(h) : DEFAULT_HASH;
+	if (hash == GCRY_MD_NONE)
+	{
+		fprintf(stderr, "Unknown hash \"%s\"\n", h);
+		return EXIT_FAILURE;
+	}
+	enum gcry_cipher_modes mode = m ? mode_id_from_name(m) : DEFAULT_MODE;
+	if (mode == GCRY_CIPHER_MODE_NONE)
+	{
+		fprintf(stderr, "Unknown cipher mode \"%s\"\n", m);
+		return EXIT_FAILURE;
+	}
+	enum gcry_mac_algos mac = a ? mac_id_from_name(a) : DEFAULT_MAC;
+	if (mac == GCRY_MAC_NONE)
+	{
+		fprintf(stderr, "Unknown MAC \"%s\"\n", a);
+		return EXIT_FAILURE;
+	}
+	if (c)
+		free(c);
+	if (h)
+		free(h);
+	if (m)
+		free(m);
+	if (a)
+		free(a);
 
-	int64_t fs = open_filesystem(path, &args.size, args.force, args.rewrite_sb, args.dry_run);
+	uint64_t size = s ? adjust_size(s) : 0;
 
-	uint64_t blocks = args.size / SIZE_BYTE_BLOCK;
+	int64_t fs = open_filesystem(path, &size, force, rewrite, dry_run);
+
+	if (!(size || rewrite))
+	{
+		fprintf(stderr, "Invalid file system size \"%" PRIu64 "\" / \"%s\"\n", size, s);
+		return EXIT_FAILURE;
+	}
+	if (s)
+		free(s);
+
+	uint64_t blocks = size / SIZE_BYTE_BLOCK;
 	void *mm = NULL;
-	if (args.dry_run)
+	if (dry_run)
 		printf("Test run     : File system not modified\n");
 	else
 	{
 		lockf(fs, F_LOCK, 0);
-		ftruncate(fs, args.size);
-		if ((mm = mmap(NULL, args.size, PROT_READ | PROT_WRITE, MAP_SHARED, fs, 0)) == MAP_FAILED)
-		{
-			perror(NULL);
-			return errno;
-		}
+		ftruncate(fs, size);
+		if ((mm = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fs, 0)) == MAP_FAILED)
+			die("Could not mmap file system \"%d\"", errno);
 	}
 
 	setlocale(LC_NUMERIC, "");
@@ -260,14 +385,14 @@ int main(int argc, char **argv)
 		r = 7;
 	printf("Blocks       : %*s\n", r, s1);
 
-	double z = args.size / MEGABYTE;
+	double z = size / MEGABYTE;
 	char units[] = "MB";
 	adjust_units(&z, units);
 	sprintf(s1, "%f", z);
 	s2 = strchr(s1, '.');
 	l = s2 - s1;
 	printf("Size         : %'*.*g %s\n", r, (l + 2), z, units);
-	if ((z = ((double)args.size / SIZE_BYTE_BLOCK * SIZE_BYTE_DATA) / MEGABYTE) < 1)
+	if ((z = ((double)size / SIZE_BYTE_BLOCK * SIZE_BYTE_DATA) / MEGABYTE) < 1)
 	{
 		z *= KILOBYTE;
 		strcpy(units, "KB");
@@ -279,14 +404,14 @@ int main(int argc, char **argv)
 	s2 = strchr(s1, '.');
 	l = s2 - s1;
 	printf("Capacity     : %'*.*g %s\n", r, (l + 2), z, units);
-	printf("Largest file : %'*.*g %s\n", r, (l + 2), z / args.duplicates, units);
-	printf("Duplication  : %*d ×\n", args.rewrite_sb ? 0 : r, args.duplicates);
-	printf("Cipher       : %s\n", cipher_name_from_id(args.cipher));
-	printf("Cipher mode  : %s\n", mode_name_from_id(args.mode));
-	printf("Hash         : %s\n", hash_name_from_id(args.hash));
-	printf("MAC          : %s\n", mac_name_from_id(args.mac));
+	printf("Largest file : %'*.*g %s\n", r, (l + 2), z / copies, units);
+	printf("Duplication  : %*d ×\n", rewrite ? 0 : r, copies);
+	printf("Cipher       : %s\n", cipher_name_from_id(cipher));
+	printf("Cipher mode  : %s\n", mode_name_from_id(mode));
+	printf("Hash         : %s\n", hash_name_from_id(hash));
+	printf("MAC          : %s\n", mac_name_from_id(mac));
 
-	if (args.rewrite_sb || args.dry_run)
+	if (rewrite || dry_run)
 		goto superblock;
 	/*
 	 * write “encrypted” blocks
@@ -296,11 +421,11 @@ int main(int argc, char **argv)
 	gcry_create_nonce(rnd, sizeof rnd);
 #endif
 
-	gcry_cipher_hd_t gc = crypto_init(args.cipher, args.mode);
+	gcry_cipher_hd_t gc = crypto_init(cipher, mode);
 	printf("\e[?25l"); /* hide cursor */
-	for (uint64_t i = 0; i < args.size / MEGABYTE; i++)
+	for (uint64_t i = 0; i < size / MEGABYTE; i++)
 	{
-		printf("\rWriting      : %'*.3f %%", r, PERCENT * i / (args.size / MEGABYTE));
+		printf("\rWriting      : %'*.3f %%", r, PERCENT * i / (size / MEGABYTE));
 #ifndef __DEBUG__
 		gcry_cipher_encrypt(gc, rnd, sizeof rnd, NULL, 0);
 #else
@@ -312,14 +437,14 @@ int main(int argc, char **argv)
 	printf("\rWriting      : %'*.3f %%\n", r, PERCENT);
 
 superblock:
-	if (args.dry_run)
+	if (dry_run)
 	{
 		printf("\nTest run     : File system not modified\n\n");
 		return EXIT_SUCCESS;
 	}
 
 	printf("Superblock   : ");
-	if (args.paranoid)
+	if (paranoid)
 		goto done;
 
 	stegfs_block_t sb;
@@ -327,7 +452,7 @@ superblock:
 	sb.path[0] = htonll(PATH_MAGIC_0);
 	sb.path[1] = htonll(PATH_MAGIC_1);
 
-	superblock_info(&sb, cipher_name_from_id(args.cipher), mode_name_from_id(args.mode), hash_name_from_id(args.hash), mac_name_from_id(args.mac), args.duplicates);
+	superblock_info(&sb, cipher_name_from_id(cipher), mode_name_from_id(mode), hash_name_from_id(hash), mac_name_from_id(mac), copies);
 
 	sb.hash[0] = htonll(HASH_MAGIC_0);
 	sb.hash[1] = htonll(HASH_MAGIC_1);
@@ -336,9 +461,9 @@ superblock:
 	memcpy(mm, &sb, sizeof sb);
 	msync(mm, sizeof sb, MS_SYNC);
 done:
-	munmap(mm, args.size);
+	munmap(mm, size);
 	close(fs);
-	printf("%s\n\e[?25h", args.paranoid ? "Ignored" : "Done"); /* show cursor again */
+	printf("%s\n\e[?25h", paranoid ? "Ignored" : "Done"); /* show cursor again */
 
 	return EXIT_SUCCESS;
 }
