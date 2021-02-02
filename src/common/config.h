@@ -76,11 +76,11 @@ typedef struct
 	char *long_option;
 	char *option_type;
 	char *description;
-	bool required;
-	bool advanced;
-	bool hidden;
 	config_arg_e response_type;
 	config_arg_u response_value;
+	bool required:1;
+	bool advanced:1;
+	bool hidden:1;
 }
 config_arg_t;
 

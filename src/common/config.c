@@ -59,21 +59,28 @@ static void show_licence(void);
 static bool parse_config_boolean(const char *, const char *, bool);
 static char *parse_config_tail(const char *, const char *);
 
+static bool init = false;
 static config_about_t about = { 0x0 };
 
 
 extern void config_init(config_about_t a)
 {
+	init = true;
 	memcpy(&about, &a, sizeof about);
 	return;
 }
 
 extern int config_parse(int argc, char **argv, config_arg_t *args, char ***extra, char **notes)
 {
+	if (!init)
+	{
+		fprintf(stderr, _("Call config_init() first\n"));
+		return -1;
+	}
 	/*
 	 * check for options in rc file
 	 */
-	if (about.config != NULL)
+	if (args && about.config != NULL)
 	{
 		char *rc = NULL;
 #ifndef _WIN32
@@ -135,111 +142,114 @@ end_line:
 		free(rc);
 	}
 
-	/*
-	 * build and populate the getopt structure
-	 */
-	char *short_options;
-	int optlen = 4;
-	for (int i = 0; args[i].short_option; i++, optlen += 1)
-		;
-	if (!(short_options = calloc(optlen * 2, sizeof (char))))
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, 4 * sizeof (char));
-	struct option *long_options;
-	if (!(long_options = calloc(optlen, sizeof (struct option))))
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, 4 * sizeof (struct option));
-
-	strcat(short_options, "h");
-	long_options[0].name    = "help";
-	long_options[0].has_arg = no_argument;
-	long_options[0].flag    = NULL;
-	long_options[0].val     = 'h';
-
-	strcat(short_options, "v");
-	long_options[1].name    = "version";
-	long_options[1].has_arg = no_argument;
-	long_options[1].flag    = NULL;
-	long_options[1].val     = 'v';
-
-	strcat(short_options, "l");
-	long_options[2].name    = "licence";
-	long_options[2].has_arg = no_argument;
-	long_options[2].flag    = NULL;
-	long_options[2].val     = 'l';
-
-	for (int i = 0; args[i].short_option; i++)
+	if (args)
 	{
-		char S[1] = "X";
-		S[0] = args[i].short_option;
-		strcat(short_options, S);
-		if (args[i].response_type != CONFIG_ARG_REQ_BOOLEAN && args[i].response_type != CONFIG_ARG_OPT_BOOLEAN)
-			strcat(short_options, ":");
-		long_options[i + 3].name = args[i].long_option;
+		/*
+		 * build and populate the getopt structure
+		 */
+		char *short_options;
+		int optlen = 4;
+		for (int i = 0; args[i].short_option; i++, optlen += 1)
+			;
+		if (!(short_options = calloc(optlen * 2, sizeof (char))))
+			die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, 4 * sizeof (char));
+		struct option *long_options;
+		if (!(long_options = calloc(optlen, sizeof (struct option))))
+			die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, 4 * sizeof (struct option));
 
-		if (args[i].response_type == CONFIG_ARG_REQ_BOOLEAN || args[i].response_type == CONFIG_ARG_OPT_BOOLEAN)
-			long_options[i + 3].has_arg = no_argument;
-		else if (args[i].response_type & CONFIG_ARG_REQUIRED)
-			long_options[i + 3].has_arg = required_argument;
-		else
-			long_options[i + 3].has_arg = optional_argument;
-		long_options[i + 3].flag = NULL;
-		long_options[i + 3].val  = args[i].short_option;
-	}
+		strcat(short_options, "h");
+		long_options[0].name    = "help";
+		long_options[0].has_arg = no_argument;
+		long_options[0].flag    = NULL;
+		long_options[0].val     = 'h';
 
-	/*
-	 * parse command line options
-	 */
-	while (true)
-	{
-		int index = 0;
-		int c = getopt_long(argc, argv, short_options, long_options, &index);
-		if (c == -1)
-			break;
-		bool unknown = true;
-		if (c == 'h')
-			show_help(args, notes, *extra);
-		else if (c == 'v')
-			show_version();
-		else if (c == 'l')
-			show_licence();
-		else if (c == '?')
-			config_show_usage(args, *extra);
-		else
-			for (int i = 0; args[i].short_option; i++)
-				if (c == args[i].short_option)
-				{
-					unknown = false;
-					switch (args[i].response_type)
+		strcat(short_options, "v");
+		long_options[1].name    = "version";
+		long_options[1].has_arg = no_argument;
+		long_options[1].flag    = NULL;
+		long_options[1].val     = 'v';
+
+		strcat(short_options, "l");
+		long_options[2].name    = "licence";
+		long_options[2].has_arg = no_argument;
+		long_options[2].flag    = NULL;
+		long_options[2].val     = 'l';
+
+		for (int i = 0; args[i].short_option; i++)
+		{
+			char S[1] = "X";
+			S[0] = args[i].short_option;
+			strcat(short_options, S);
+			if (args[i].response_type != CONFIG_ARG_REQ_BOOLEAN && args[i].response_type != CONFIG_ARG_OPT_BOOLEAN)
+				strcat(short_options, ":");
+			long_options[i + 3].name = args[i].long_option;
+
+			if (args[i].response_type == CONFIG_ARG_REQ_BOOLEAN || args[i].response_type == CONFIG_ARG_OPT_BOOLEAN)
+				long_options[i + 3].has_arg = no_argument;
+			else if (args[i].response_type & CONFIG_ARG_REQUIRED)
+				long_options[i + 3].has_arg = required_argument;
+			else
+				long_options[i + 3].has_arg = optional_argument;
+			long_options[i + 3].flag = NULL;
+			long_options[i + 3].val  = args[i].short_option;
+		}
+
+		/*
+		 * parse command line options
+		 */
+		while (true)
+		{
+			int index = 0;
+			int c = getopt_long(argc, argv, short_options, long_options, &index);
+			if (c == -1)
+				break;
+			bool unknown = true;
+			if (c == 'h')
+				show_help(args, notes, *extra);
+			else if (c == 'v')
+				show_version();
+			else if (c == 'l')
+				show_licence();
+			else if (c == '?')
+				config_show_usage(args, *extra);
+			else
+				for (int i = 0; args[i].short_option; i++)
+					if (c == args[i].short_option)
 					{
-						case CONFIG_ARG_OPT_NUMBER:
-							if (!optarg)
+						unknown = false;
+						switch (args[i].response_type)
+						{
+							case CONFIG_ARG_OPT_NUMBER:
+								if (!optarg)
+									break;
+								__attribute__((fallthrough)); /* allow fall-through; argument was seen and has a value */
+							case CONFIG_ARG_REQ_NUMBER:
+								args[i].response_value.number = strtoull(optarg, NULL, 0);
 								break;
-							__attribute__((fallthrough)); /* allow fall-through; argument was seen and has a value */
-						case CONFIG_ARG_REQ_NUMBER:
-							args[i].response_value.number = strtoull(optarg, NULL, 0);
-							break;
-						case CONFIG_ARG_OPT_STRING:
-							if (!optarg)
+							case CONFIG_ARG_OPT_STRING:
+								if (!optarg)
+									break;
+								__attribute__((fallthrough)); /* allow fall-through; argument was seen and has a value */
+							case CONFIG_ARG_REQ_STRING:
+								if (args[i].response_value.string)
+									free(args[i].response_value.string);
+								args[i].response_value.string = strdup(optarg);
 								break;
-							__attribute__((fallthrough)); /* allow fall-through; argument was seen and has a value */
-						case CONFIG_ARG_REQ_STRING:
-							if (args[i].response_value.string)
-								free(args[i].response_value.string);
-							args[i].response_value.string = strdup(optarg);
-							break;
-						case CONFIG_ARG_OPT_BOOLEAN:
-							__attribute__((fallthrough)); /* allow fall-through; argument was seen */
-						case CONFIG_ARG_REQ_BOOLEAN:
-							__attribute__((fallthrough)); /* allow fall-through; argument was seen */
-						default:
-							args[i].response_value.boolean = !args[i].response_value.boolean;
-							break;
+							case CONFIG_ARG_OPT_BOOLEAN:
+								__attribute__((fallthrough)); /* allow fall-through; argument was seen */
+							case CONFIG_ARG_REQ_BOOLEAN:
+								__attribute__((fallthrough)); /* allow fall-through; argument was seen */
+							default:
+								args[i].response_value.boolean = !args[i].response_value.boolean;
+								break;
+						}
 					}
-				}
-		if (unknown)
-			config_show_usage(args, *extra);
+			if (unknown)
+				config_show_usage(args, *extra);
+		}
+		free(short_options);
+		free(long_options);
 	}
-	free(short_options);
-	free(long_options);
 	int x = 0;
 	if (extra)
 	{
@@ -292,21 +302,22 @@ inline static void print_usage(config_arg_t *args, char **extra)
 				cli_fprintf(stderr, ANSI_COLOUR_YELLOW " [%s]" ANSI_COLOUR_RESET, extra[i] + o);
 			}
 	}
-	for (int i = 0, j = 0; args[i].short_option; i++)
-	{
-		if (j + 4 + (args[i].option_type ? strlen(args[i].option_type) : 0) > x)
+	if (args)
+		for (int i = 0, j = 0; args[i].short_option; i++)
 		{
-			cli_fprintf(stderr, "\n%*s  ", (int)strlen(about.name), " ");
-			j = 2;
+			if (j + 4 + (args[i].option_type ? strlen(args[i].option_type) : 0) > x)
+			{
+				cli_fprintf(stderr, "\n%*s  ", (int)strlen(about.name), " ");
+				j = 2;
+			}
+			if (args[i].required)
+				j += cli_fprintf(stderr, ANSI_COLOUR_RED " <-%c", args[i].short_option);
+			else
+				j += cli_fprintf(stderr, ANSI_COLOUR_YELLOW " [-%c", args[i].short_option);
+			if (args[i].option_type)
+				j += cli_fprintf(stderr, " %s", args[i].option_type);
+			j += cli_fprintf(stderr, "%c" ANSI_COLOUR_RESET, args[i].required ? '>' : ']');
 		}
-		if (args[i].required)
-			j += cli_fprintf(stderr, ANSI_COLOUR_RED " <-%c", args[i].short_option);
-		else
-			j += cli_fprintf(stderr, ANSI_COLOUR_YELLOW " [-%c", args[i].short_option);
-		if (args[i].option_type)
-			j += cli_fprintf(stderr, " %s", args[i].option_type);
-		j += cli_fprintf(stderr, "%c" ANSI_COLOUR_RESET, args[i].required ? '>' : ']');
-	}
 	cli_fprintf(stderr, ANSI_COLOUR_RESET "\n");
 	return;
 }
@@ -462,6 +473,11 @@ static void show_licence(void)
 
 extern void update_config(const char * const restrict o, const char * const restrict v)
 {
+	if (!init)
+	{
+		fprintf(stderr, _("Call config_init() first\n"));
+		return;
+	}
 	char *rc = NULL;
 #ifndef _WIN32
 	if (!asprintf(&rc, "%s/%s", getenv("HOME") ? : ".", about.config))

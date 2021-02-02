@@ -78,10 +78,7 @@ extern void die(const char * const restrict s, ...)
 		if (sym)
 		{
 			for (int i = 0; i < c; i++)
-			{
 				fprintf(stderr, "%s\n", sym[i]);
-				free(sym[i]);
-			}
 			free(sym);
 		}
 #endif
