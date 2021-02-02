@@ -30,6 +30,9 @@
 #include "common/common.h"
 #include "common/error.h"
 #include "common/fs.h"
+#include "common/config.h"
+
+#include "stegfs.h"
 
 static void copy(const char *from_prefix, const char *from, const char *to_prefix, const char *to)
 {
@@ -70,14 +73,29 @@ static void copy(const char *from_prefix, const char *from, const char *to_prefi
 
 int main(int argc, char **argv)
 {
-	if (argc != 3)
+	char **extra = NULL;
+	extra = calloc(2, sizeof (char *));
+	extra[0] = strdup("+source");
+	extra[0] = strdup("+destination");
+
+	config_about_t about =
 	{
-		fprintf(stderr, "Usage: %s <source> <destination>\n", argv[0]);
+		"stegfs-cp-tree",
+		STEGFS_VERSION,
+		PROJECT_URL,
+		NULL
+	};
+	config_init(about);
+	int e = config_parse(argc, argv, NULL, &extra, NULL);
+
+	char *in = e > 0 ? extra[0] : NULL;
+	char *to = e > 1 ? extra[1] : NULL;
+	if (!in || !to)
+	{
+		char *x[] = { "+source", "+destination", NULL };
+		config_show_usage(NULL, x);
 		return EXIT_FAILURE;
 	}
-
-	char *in = strdup(argv[1]);
-	char *to = strdup(argv[2]);
 
 	char ps = in[strlen(in) - 1];
 	if (ps == '/')
