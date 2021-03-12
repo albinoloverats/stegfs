@@ -49,7 +49,6 @@
 	extern char *program_invocation_short_name;
 #endif
 
-#include "crypt.h"
 
 
 static void show_version(void);

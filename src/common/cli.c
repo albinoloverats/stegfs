@@ -135,6 +135,36 @@ extern int cli_fprintf(FILE *f, const char * const restrict s, ...)
 	return x;
 }
 
+extern int cli_printx(const uint8_t * const restrict x, size_t z)
+{
+	return cli_fprintx(stdout, x, z);
+}
+
+extern int cli_fprintx(FILE *f, const uint8_t * const restrict x, size_t z)
+{
+#define CLI_PRINTX_W 16
+	// TODO allow variable width lines
+	int l = 0, o = 0;
+	char r[CLI_PRINTX_W * 2 + CLI_PRINTX_W] = { 0x0 };
+	for (size_t i = 0; i < z; i++)
+	{
+		char c[4] = { 0x0 };
+		sprintf(c, "%02x", x[i]);
+		strcat(r, c);
+		if (i % 2 == 1)
+			strcat(r, " ");
+		if (i % CLI_PRINTX_W == (CLI_PRINTX_W - 1))
+		{
+			l += cli_fprintf(f, "%08x: %s\n", o, r);
+			memset(r, 0x00, sizeof r);
+			o += CLI_PRINTX_W;
+		}
+	}
+	if (strlen(r))
+		l += cli_fprintf(f, "%08x: %s\n", o, r);
+	return l;
+}
+
 extern double cli_calc_bps(cli_bps_t *bps)
 {
 	cli_bps_t *copy = calloc(BPS, sizeof( cli_bps_t ));
