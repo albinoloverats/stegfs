@@ -8,12 +8,14 @@ SOURCE   = src/main.c src/stegfs.c
 MKSRC    = src/mkfs.c
 CPSRC    = src/cp.c
 COMMON   = src/common/error.c src/common/ccrypt.c src/common/tlv.c src/common/dir.c src/common/cli.c src/common/version.c src/common/config.c src/common/non-gnu.c
+MISC     = src/common/misc.h
 
-CFLAGS   += -Wall -Wextra -std=gnu99 $(shell pkg-config --cflags fuse) -pipe -I/usr/local/include
-CPPFLAGS += -Isrc -D_GNU_SOURCE -DGCRYPT_NO_DEPRECATED -D_FILE_OFFSET_BITS=64 -DGIT_COMMIT=\"`git log | head -n1 | cut -f2 -d' '`\"
+CFLAGS   += -Wall -Wextra -std=gnu99 $(shell pkg-config --cflags fuse) -pipe -O2 -I/usr/local/include -Isrc
+CPPFLAGS += -D_GNU_SOURCE -DGCRYPT_NO_DEPRECATED -D_FILE_OFFSET_BITS=64 -DGIT_COMMIT=\"`git log | head -n1 | cut -f2 -d' '`\" -DBUILD_OS=\"$(shell grep PRETTY_NAME /etc/os-release | cut -d= -f2)\"
 
-DEBUG    = -O0 -ggdb -D__DEBUG__
-PROFILE  = ${DEBUG} -pg -lc
+DEBUG_CFLAGS   = -O0 -ggdb
+DEBUG_CPPFLAGS = -D__DEBUG__ -DUSE_PROC
+PROFILE        = ${DEBUG} -pg -lc
 
 # -lpthread
 LIBS     = $(shell libgcrypt-config --libs) -lpthread -lcurl $(shell pkg-config --libs fuse)
@@ -21,25 +23,35 @@ LIBS     = $(shell libgcrypt-config --libs) -lpthread -lcurl $(shell pkg-config 
 all: stegfs mkfs man
 
 stegfs:
-	 @${CC} ${LIBS} ${CFLAGS} ${CPPFLAGS} -O2 ${SOURCE} ${COMMON} -o ${STEGFS}
+	 @echo "#define ALL_CFLAGS   \"$(strip $(subst \",\',"${CFLAGS}"))\""    > ${MISC}
+	 @echo "#define ALL_CPPFLAGS \"$(strip $(subst \",\',"${CPPFLAGS}"))\"" >> ${MISC}
+	 @${CC} ${LIBS} ${CFLAGS} ${CPPFLAGS} ${SOURCE} ${COMMON} -o ${STEGFS}
 	-@echo "built ‘${SOURCE}’ → ‘${STEGFS}’"
 
 mkfs:
-	 @${CC} ${LIBS} ${CFLAGS} ${CPPFLAGS} -O2 ${MKSRC} ${COMMON} -o ${MKFS}
+	 @echo "#define ALL_CFLAGS   \"$(strip $(subst \",\',"${CFLAGS}"))\""    > ${MISC}
+	 @echo "#define ALL_CPPFLAGS \"$(strip $(subst \",\',"${CPPFLAGS}"))\"" >> ${MISC}
+	 @${CC} ${LIBS} ${CFLAGS} ${CPPFLAGS} ${MKSRC} ${COMMON} -o ${MKFS}
 	-@echo "built ‘${MKSRC} ${COMMON}’ → ‘${MKFS}’"
 
 cp:
+	 @echo "#define ALL_CFLAGS   \"$(strip $(subst \",\',"${CFLAGS}"))\""    > ${MISC}
+	 @echo "#define ALL_CPPFLAGS \"$(strip $(subst \",\',"${CPPFLAGS}"))\"" >> ${MISC}
 	 @${CC} -lcurl -lpthread ${CFLAGS} ${CPPFLAGS} -O0 -ggdb ${CPSRC} src/common/error.c src/common/cli.c src/common/config.c src/common/version.c src/common/fs.c -o ${CP}
 	-@echo "built ‘${CPSRC} ${COMMON}’ → ‘${CP}’"
 
 debug: debug-stegfs debug-mkfs
 
 debug-stegfs:
-	 @${CC} ${LIBS} ${CFLAGS} ${CPPFLAGS} ${DEBUG} -DUSE_PROC ${SOURCE} ${COMMON} -o ${STEGFS}
+	 @echo "#define ALL_CFLAGS   \"$(strip $(subst \",\',"${CFLAGS}   ${DEBUG_CFLAGS}"))\""    > ${MISC}
+	 @echo "#define ALL_CPPFLAGS \"$(strip $(subst \",\',"${CPPFLAGS} ${DEBUG_CPPFLAGS}"))\"" >> ${MISC}
+	 @${CC} ${LIBS} ${CFLAGS} ${CPPFLAGS} ${DEBUG_CFLAGS} ${DEBUG_CPPFLAGS} ${SOURCE} ${COMMON} -o ${STEGFS}
 	-@echo "built ‘${SOURCE}’ → ‘${STEGFS}’"
 
 debug-mkfs:
-	 @${CC} ${LIBS} ${CFLAGS} ${CPPFLAGS} ${DEBUG} ${MKSRC} ${COMMON} -o ${MKFS}
+	 @echo "#define ALL_CFLAGS   \"$(strip $(subst \",\',"${CFLAGS}   ${DEBUG_CFLAGS}"))\""    > ${MISC}
+	 @echo "#define ALL_CPPFLAGS \"$(strip $(subst \",\',"${CPPFLAGS} ${DEBUG_CPPFLAGS}"))\"" >> ${MISC}
+	 @${CC} ${LIBS} ${CFLAGS} ${CPPFLAGS} ${DEBUG_CFLAGS} ${DEBUG_CPPFLAGS} ${MKFS} ${COMMON} -o ${STEGFS}
 	-@echo "built ‘${MKSRC} ${COMMON}’ → ‘${MKFS}’"
 
 man:
