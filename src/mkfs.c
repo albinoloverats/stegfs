@@ -267,11 +267,11 @@ int main(int argc, char **argv)
 		{ 'm', "mode",           _("mode"),       _("The encryption mode to use"),                                                              CONFIG_ARG_REQ_STRING,  { 0x0 }, false, false, false },
 		{ 'a', "mac",            _("mac"),        _("The MAC algorithm to use"),                                                                CONFIG_ARG_REQ_STRING,  { 0x0 }, false, false, false },
 		{ 'i', "kdf-iterations", _("iterations"), _("Number of iterations the KDF should use"),                                                 CONFIG_ARG_REQ_NUMBER,  { 0x0 }, false, false, false },
-		{ 'p', "paranoid",       NULL,            _("Enable paranoia mode"),                                                                    CONFIG_ARG_REQ_BOOLEAN, { 0x0 }, false, false, false },
-		{ 'x', "duplicates",     "#",             _("Number of times each file should be duplicated"),                                          CONFIG_ARG_REQ_NUMBER,  { 0x0 }, false, false, false },
+		{ 'p', "paranoid",       NULL,            _("Enable paranoia mode"),                                                                    CONFIG_ARG_REQ_BOOLEAN, { 0x0 }, false, true,  false },
+		{ 'x', "duplicates",     "#",             _("Number of times each file should be duplicated"),                                          CONFIG_ARG_REQ_NUMBER,  { 0x0 }, false, true,  false },
 		{ 'z', "size",           _("size"),       _("Desired file system size, required when creating a file system in a normal file"),         CONFIG_ARG_REQ_STRING,  { 0x0 }, false, false, false },
-		{ 'f', "force",          NULL,            _("Force overwrite existing file, required when overwriting a file system in a normal file"), CONFIG_ARG_REQ_BOOLEAN, { 0x0 }, false, false, false },
-		{ 'r', "rewrite-sb",     NULL,            _("Rewrite the superblock (perhaps it became corrupt)"),                                      CONFIG_ARG_REQ_BOOLEAN, { 0x0 }, false, false, false },
+		{ 'f', "force",          NULL,            _("Force overwrite existing file, required when overwriting a file system in a normal file"), CONFIG_ARG_REQ_BOOLEAN, { 0x0 }, false, true,  false },
+		{ 'r', "rewrite-sb",     NULL,            _("Rewrite the superblock (perhaps it became corrupt)"),                                      CONFIG_ARG_REQ_BOOLEAN, { 0x0 }, false, true,  false },
 		{ 'd', "dry-run",        NULL,            _("Dry run - print details about the file system that would have been created"),              CONFIG_ARG_REQ_BOOLEAN, { 0x0 }, false, false, false },
 		{ 0x0, NULL, NULL, NULL, CONFIG_ARG_REQ_BOOLEAN, { 0x0 }, false, false, false }
 	};
