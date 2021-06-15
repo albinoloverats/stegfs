@@ -6,3 +6,4 @@ src/common/ecc.c
 src/common/ecc.h
 src/common/osx.m
 src/common/osx.h
+src/common/misc.h
