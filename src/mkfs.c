@@ -256,10 +256,6 @@ static void superblock_info(stegfs_block_t *sb, const char *cipher, const char *
 
 int main(int argc, char **argv)
 {
-
-	char **extra = NULL;
-	extra = calloc(2, sizeof (char *));
-	extra[0] = strdup("+device");
 	config_arg_t args[] =
 	{
 		{ 'c', "cipher",         _("algorithm"),  _("Algorithm to use to encrypt data"),                                                        CONFIG_ARG_REQ_STRING,  { 0x0 }, false, false, false },
@@ -275,6 +271,11 @@ int main(int argc, char **argv)
 		{ 'd', "dry-run",        NULL,            _("Dry run - print details about the file system that would have been created"),              CONFIG_ARG_REQ_BOOLEAN, { 0x0 }, false, false, false },
 		{ 0x0, NULL, NULL, NULL, CONFIG_ARG_REQ_BOOLEAN, { 0x0 }, false, false, false }
 	};
+	config_extra_t extra[] =
+	{
+		{ "device", CONFIG_ARG_STRING,  { 0x0 }, true,  false },
+		{ NULL,     CONFIG_ARG_BOOLEAN, { 0x0 }, false, false }
+	};
 	char *notes[] =
 	{
 		"If you’re feeling extra paranoid you can now disable to stegfs file system header. This will also disable the checks when mounting; therefore anything could happen ;-)",
@@ -288,16 +289,9 @@ int main(int argc, char **argv)
 		NULL
 	};
 	config_init(about);
-	int e = config_parse(argc, argv, args, &extra, notes);
+	config_parse(argc, argv, args, extra, notes);
 
-	char *path = e > 0 ? extra[0] : NULL;
-	if (!path)
-	{
-		fprintf(stderr, "Missing file system target!\n");
-		char *x[] = { "+device", NULL };
-		config_show_usage(args, x);
-		return EXIT_FAILURE;
-	}
+	char *path = extra[0].response_value.string;
 
 	char *c         = args[ 0].response_value.string;
 	char *h         = args[ 1].response_value.string;
