@@ -40,9 +40,13 @@
 
 typedef enum
 {
-	CONFIG_ARG_OPT_BOOLEAN,
-	CONFIG_ARG_OPT_NUMBER,
-	CONFIG_ARG_OPT_STRING,
+	CONFIG_ARG_BOOLEAN,
+	CONFIG_ARG_NUMBER,
+	CONFIG_ARG_STRING,
+	// these are for symantic clearity
+	CONFIG_ARG_OPT_BOOLEAN      = CONFIG_ARG_BOOLEAN,
+	CONFIG_ARG_OPT_NUMBER       = CONFIG_ARG_NUMBER,
+	CONFIG_ARG_OPT_STRING       = CONFIG_ARG_STRING,
 
 	CONFIG_ARG_REQ_BOOLEAN      = (CONFIG_ARG_OPT_BOOLEAN | CONFIG_ARG_REQUIRED),
 	CONFIG_ARG_REQ_NUMBER       = (CONFIG_ARG_OPT_NUMBER  | CONFIG_ARG_REQUIRED),
@@ -131,6 +135,16 @@ config_arg_t;
 
 typedef struct
 {
+	char *description;
+	config_arg_e response_type;
+	config_arg_u response_value;
+	bool required:1;
+	bool seen:1;
+}
+config_extra_t;
+
+typedef struct
+{
 	char *name;
 	char *version;
 	char *url;
@@ -141,19 +155,31 @@ config_about_t;
 
 extern void config_init(config_about_t about);
 
-extern void config_show_usage(config_arg_t *args, char **extra);
+extern void config_show_usage(config_arg_t *args, config_extra_t *extra);
+
+#define CONFIG_PARSE_COUNT(...) CONFIG_PARSE_COUNT2(__VA_ARGS__, 6, 5, 4, 3, 2, 1)
+#define CONFIG_PARSE_COUNT2(_1, _2, _3, _4, _5, _6, _, ...) _
+
+#define config_parse_3(A, B, C)           config_parse_aux(A, B, C, NULL, NULL, true)
+#define config_parse_4(A, B, C, D)        config_parse_aux(A, B, C, D, NULL, true)
+#define config_parse_5(A, B, C, D, E)     config_parse_aux(A, B, C, D, E, true)
+#define config_parse_6(A, B, C, D, E, F)  config_parse_aux(A, B, C, D, E, F)
+#define config_parse(...) CONCAT(config_parse_, CONFIG_PARSE_COUNT(__VA_ARGS__))(__VA_ARGS__)
 
 /*!
- * \brief           Application init function
- * \param[in]  argc Number of command line arguments
- * \param[out] argv Command line arguments
- * \return          Any command line options that were set
+ * \brief                Application init function
+ * \param[in]      c  Number of command line arguments
+ * \param[in]      v  Command line arguments
+ * \param[in/out]  a  Expected command line arguments, config options, and their resulting values
+ * \param[in/out]  x  Any arguments without flags (file names, etc)
+ * \param[in]      t  Any additional text to display as notes
+ * \param[in]      w  Whether to warn about unknown arguments
  *
  * Provide simple command line argument parsing, and pass back whatever
  * options where set. Removes a lot of the cruft from the legacy common
  * code that used to exist here.
  */
-extern int config_parse(int argc, char **argv, config_arg_t *args, char ***extra, char **about);
+extern int config_parse_aux(int c, char **v, config_arg_t *a, config_extra_t *x, char **t, bool w);
 
 /*!
  * \brief         Update configuration file

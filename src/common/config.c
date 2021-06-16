@@ -52,7 +52,7 @@
 
 
 static void show_version(void);
-static void show_help(config_arg_t *args, char **about, char **extra);
+static void show_help(config_arg_t *args, char **about, config_extra_t *extra);
 static void show_licence(void);
 
 static bool    parse_config_boolean(const char *, const char *, bool);
@@ -77,7 +77,7 @@ extern void config_init(config_about_t a)
 	return;
 }
 
-extern int config_parse(int argc, char **argv, config_arg_t *args, char ***extra, char **notes)
+extern int config_parse_aux(int argc, char **argv, config_arg_t *args, config_extra_t *extra, char **notes, bool warn)
 {
 	if (!init)
 	{
@@ -113,6 +113,7 @@ extern int config_parse(int argc, char **argv, config_arg_t *args, char ***extra
 				if (len == 0 || line[0] == '#')
 					goto end_line;
 
+				// TODO handle unknown config file settings
 				for (int i = 0; args[i].short_option; i++)
 					if (!strncmp(args[i].long_option, line, strlen(args[i].long_option)) && isspace((unsigned char)line[strlen(args[i].long_option)]))
 						switch (args[i].response_type)
@@ -251,13 +252,13 @@ end_line:
 				break;
 			bool unknown = true;
 			if (c == 'h')
-				show_help(args, notes, extra ? *extra : NULL);
+				show_help(args, notes, extra);
 			else if (c == 'v')
 				show_version();
 			else if (c == 'l')
 				show_licence();
 			else if (c == '?')
-				config_show_usage(args, extra ? *extra : NULL);
+				config_show_usage(args, extra);
 			else
 				for (int i = 0; args[i].short_option; i++)
 					if (c == args[i].short_option)
@@ -293,24 +294,43 @@ end_line:
 								break;
 						}
 					}
-			if (unknown)
-				config_show_usage(args, extra ? *extra : NULL);
+			if (unknown && warn)
+				config_show_usage(args, extra);
 		}
 		free(short_options);
 		free(long_options);
 	}
-	int x = 0;
+	int r = 0;
 	if (extra)
 	{
-		for (int i = 0; (*extra) && (*extra)[i]; i++)
-			free((*extra)[i]);
-		if (!(*extra = realloc(*extra, argc * sizeof (char *))))
-			die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, argc * sizeof (char *));
-		for (; optind < argc; x++, optind++)
-			if (!((*extra)[x] = strdup(argv[optind])))
-				die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(argv[optind]));
+		for (int i = 0; extra[i].description && optind < argc; i++, optind++)
+		{
+			extra[i].seen = true;
+			switch (extra[i].response_type)
+			{
+				case CONFIG_ARG_STRING:
+					if (!(extra[i].response_value.string = strdup(argv[optind])))
+						die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(argv[optind]));
+					break;
+				case CONFIG_ARG_NUMBER:
+					extra[i].response_value.number = strtoull(argv[optind], NULL, 0);
+					break;
+				case CONFIG_ARG_BOOLEAN:
+					__attribute__((fallthrough)); /* allow fall-through; argument was seen */
+				default:
+					extra[i].response_value.boolean = true;
+					break;
+			}
+		}
+		r = argc - optind;
+		for (int i = 0; extra[i].description; i++)
+			if (extra[i].required && !extra[i].seen && warn)
+			{
+				cli_fprintf(stderr, "Missing required argument \"%s\"\n", extra[i].description);
+				config_show_usage(args, extra);
+			}
 	}
-	return x;
+	return r;
 }
 
 inline static void format_section(char *s)
@@ -325,7 +345,7 @@ static void show_version(void)
 	exit(EXIT_SUCCESS);
 }
 
-inline static void print_usage(config_arg_t *args, char **extra)
+inline static void print_usage(config_arg_t *args, config_extra_t *extra)
 {
 #ifndef _WIN32
 	struct winsize ws;
@@ -340,16 +360,11 @@ inline static void print_usage(config_arg_t *args, char **extra)
 	cli_fprintf(stderr, "  " ANSI_COLOUR_GREEN "%s", about.name);
 	if (extra)
 	{
-		for (int i = 0; extra[i]; i++)
-			if (extra[i][0] == '+')
-				cli_fprintf(stderr, ANSI_COLOUR_RED " <%s>" ANSI_COLOUR_RESET, extra[i] + 1);
+		for (int i = 0; extra[i].description; i++)
+			if (extra[i].required)
+				cli_fprintf(stderr, ANSI_COLOUR_RED " <%s>" ANSI_COLOUR_RESET, extra[i].description);
 			else
-			{
-				int o = 0;
-				if (extra[i][0] == '-')
-					o++;
-				cli_fprintf(stderr, ANSI_COLOUR_YELLOW " [%s]" ANSI_COLOUR_RESET, extra[i] + o);
-			}
+				cli_fprintf(stderr, ANSI_COLOUR_YELLOW " [%s]" ANSI_COLOUR_RESET, extra[i].description);
 	}
 	if (args)
 		for (int i = 0, j = 0; args[i].short_option; i++)
@@ -374,7 +389,7 @@ inline static void print_usage(config_arg_t *args, char **extra)
 	return;
 }
 
-extern void config_show_usage(config_arg_t *args, char **extra)
+extern void config_show_usage(config_arg_t *args, config_extra_t *extra)
 {
 	print_usage(args, extra);
 	exit(EXIT_SUCCESS);
@@ -473,7 +488,7 @@ static void print_notes(char *line)
 	return;
 }
 
-static void show_help(config_arg_t *args, char **notes, char **extra)
+static void show_help(config_arg_t *args, char **notes, config_extra_t *extra)
 {
 	version_print(about.name, about.version, about.url);
 	cli_fprintf(stderr, "\n");
