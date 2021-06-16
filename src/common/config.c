@@ -115,7 +115,7 @@ extern int config_parse_aux(int argc, char **argv, config_arg_t *args, config_ex
 
 				// TODO handle unknown config file settings
 				for (int i = 0; args[i].short_option; i++)
-					if (!strncmp(args[i].long_option, line, strlen(args[i].long_option)) && isspace((unsigned char)line[strlen(args[i].long_option)]))
+					if (args[i].long_option && !strncmp(args[i].long_option, line, strlen(args[i].long_option)) && isspace((unsigned char)line[strlen(args[i].long_option)]))
 						switch (args[i].response_type)
 						{
 							case CONFIG_ARG_OPT_BOOLEAN:
@@ -257,7 +257,7 @@ end_line:
 				show_version();
 			else if (c == 'l')
 				show_licence();
-			else if (c == '?')
+			else if (c == '?' && warn)
 				config_show_usage(args, extra);
 			else
 				for (int i = 0; args[i].short_option; i++)
@@ -285,9 +285,30 @@ end_line:
 							case CONFIG_ARG_OPT_BOOLEAN:
 								__attribute__((fallthrough)); /* allow fall-through; argument was seen */
 							case CONFIG_ARG_REQ_BOOLEAN:
-								__attribute__((fallthrough)); /* allow fall-through; argument was seen */
+								args[i].response_value.boolean = !args[i].response_value.boolean;
+								break;
 
-							/* TODO handle lists and pairs and list of pairs... */
+							/* TODO extend hanlding of lists and pairs and list of pairs... */
+
+							case CONFIG_ARG_LIST_STRING:
+								args[i].response_value.list.count++;
+								args[i].response_value.list.items = realloc(args[i].response_value.list.items, args[i].response_value.list.count * sizeof (config_list_u));
+								if (strchr(optarg, ','))
+								{
+									char *s = strdup(optarg);
+									args[i].response_value.list.items[args[i].response_value.list.count - 1].string = strdup(strtok(s, ","));
+									char *t = NULL;
+									while ((t = strtok(NULL, ",")))
+									{
+										args[i].response_value.list.count++;
+										args[i].response_value.list.items = realloc(args[i].response_value.list.items, args[i].response_value.list.count * sizeof (config_list_u));
+										args[i].response_value.list.items[args[i].response_value.list.count - 1].string = strdup(t);
+									}
+									free(s);
+								}
+								else
+									args[i].response_value.list.items[args[i].response_value.list.count - 1].string = strdup(optarg);
+								break;
 
 							default:
 								args[i].response_value.boolean = !args[i].response_value.boolean;
@@ -397,14 +418,30 @@ extern void config_show_usage(config_arg_t *args, config_extra_t *extra)
 
 static void print_option(int width, char sopt, char *lopt, char *type, bool req, char *desc)
 {
-	size_t z = width - 8 - strlen(lopt);
-	cli_fprintf(stderr, "  " ANSI_COLOUR_WHITE "-%c" ANSI_COLOUR_RESET ", " ANSI_COLOUR_WHITE "--%s" ANSI_COLOUR_RESET, sopt, lopt);
+	size_t z = width - 8;
+	if (lopt)
+		z -= strlen(lopt);
+	else
+		z += 4;
+	cli_fprintf(stderr, "  " ANSI_COLOUR_WHITE "-%c" ANSI_COLOUR_RESET, sopt);
+	if (lopt)
+		cli_fprintf(stderr, ", " ANSI_COLOUR_WHITE "--%s" ANSI_COLOUR_RESET, lopt);
 	if (type)
 	{
 		if (req)
-			cli_fprintf(stderr, ANSI_COLOUR_WHITE "=" ANSI_COLOUR_RED "<%s>" ANSI_COLOUR_RESET, type);
+		{
+			if (lopt)
+				cli_fprintf(stderr, ANSI_COLOUR_WHITE "=" ANSI_COLOUR_RED "<%s>" ANSI_COLOUR_RESET, type);
+			else
+				cli_fprintf(stderr, " " ANSI_COLOUR_RED "<%s>" ANSI_COLOUR_RESET, type);
+		}
 		else
-			cli_fprintf(stderr, ANSI_COLOUR_YELLOW "[=%s]" ANSI_COLOUR_RESET, type);
+		{
+			if (lopt)
+				cli_fprintf(stderr, ANSI_COLOUR_YELLOW "[=%s]" ANSI_COLOUR_RESET, type);
+			else
+				cli_fprintf(stderr, ANSI_COLOUR_YELLOW " [%s]" ANSI_COLOUR_RESET, type);
+		}
 		z -= 3 + strlen(type);
 	}
 	fprintf(stderr, "%*s", (int)z, " ");
@@ -498,7 +535,7 @@ static void show_help(config_arg_t *args, char **notes, config_extra_t *extra)
 	bool has_advanced = false;
 	for (int i = 0; args[i].short_option; i++)
 	{
-		int w = 10 + strlen(args[i].long_option);
+		int w = 10 + (args[i].long_option ? strlen(args[i].long_option) : 0);
 		if (args[i].option_type)
 			w += 3 + strlen(args[i].option_type);
 		width = width > w ? width : w;
