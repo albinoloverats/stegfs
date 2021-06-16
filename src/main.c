@@ -40,11 +40,11 @@
 
 #include <gcrypt.h>
 
-#include <common/ccrypt.h>
+#include "common/config.h"
+#include "common/ccrypt.h"
 #include "common/dir.h"
 
 #include "stegfs.h"
-#include "init.h"
 
 
 /*
@@ -652,49 +652,152 @@ int main(int argc, char **argv)
 	char **fargs = calloc(argc, sizeof( char * ));
 	fargs[0] = argv[0];
 
-	args_t args = init(argc, argv, fargs);
-	int fargc;
-	for (fargc = 1; fargs[fargc] && fargc < argc; fargc++)
-		;
-
-	if (!args.help && !(args.fs && args.mount))
+	config_arg_t args[] =
 	{
-		fprintf(stderr, "Missing file system and/or mount point!\n");
-		show_usage();
+		{ 'c', "cipher",         _("algorithm"),  _("Algorithm to use to encrypt data"),                       CONFIG_ARG_REQ_STRING,  { 0x0 }, false, true,  false },
+		{ 's', "hash",           _("algorithm"),  _("Hash algorithm to generate key"),                         CONFIG_ARG_REQ_STRING,  { 0x0 }, false, true,  false },
+		{ 'm', "mode",           _("mode"),       _("The encryption mode to use"),                             CONFIG_ARG_REQ_STRING,  { 0x0 }, false, true,  false },
+		{ 'a', "mac",            _("mac"),        _("The MAC algorithm to use"),                               CONFIG_ARG_REQ_STRING,  { 0x0 }, false, true,  false },
+		{ 'i', "kdf-iterations", _("iterations"), _("Number of iterations the KDF should use"),                CONFIG_ARG_REQ_NUMBER,  { 0x0 }, false, true,  false },
+		{ 'p', "paranoid",       NULL,            _("Enable paranoia mode"),                                   CONFIG_ARG_BOOLEAN,     { 0x0 }, false, true,  false },
+		{ 'x', "duplicates",     "#",             _("Number of times each file should be duplicated"),         CONFIG_ARG_REQ_NUMBER,  { 0x0 }, false, true,  false },
+		{ 'b', "show-bloc",      NULL,            _("Expose the /bloc/ in-use block list directory"),          CONFIG_ARG_BOOLEAN,     { 0x0 }, false, true,  false },
+
+		{ 'd', NULL,             NULL,            _("Enable debug output (implies -f)"),                       CONFIG_ARG_BOOLEAN,     { 0x0 }, false, false, false },
+		{ 'f', NULL,             NULL,            _("Foreground operation"),                                   CONFIG_ARG_BOOLEAN,     { 0x0 }, false, false, false },
+		{ 't', NULL,             NULL,            _("Disable multi-threaded operation (FUSE option -s)"),      CONFIG_ARG_BOOLEAN,     { 0x0 }, false, false, false },
+
+		{ 'o', NULL,             "opt,[opt...]",  _("FUSE mount options--see FUSE documentation for details"), CONFIG_ARG_LIST_STRING, { 0x0 }, false, false, false },
+
+		{ 0x0, NULL, NULL, NULL, CONFIG_ARG_BOOLEAN, { 0x0 }, false, false, false }
+	};
+	config_extra_t extra[] =
+	{
+		{ "file system", CONFIG_ARG_STRING,  { 0x0 }, true,  false },
+		{ "mount point", CONFIG_ARG_STRING,  { 0x0 }, true,  false },
+		{ NULL,          CONFIG_ARG_BOOLEAN, { 0x0 }, false, false }
+	};
+	char *notes[] =
+	{
+		_("It doesn't matter which order the file system and mount point are specified as stegfs will figure that out. All other options are passed to FUSE."),
+		_("If you’re feeling extra paranoid you can now disable to stegfs file system header. This will also disable the checks when mounting and thus anything could happen ;-)"),
+		NULL
+	};
+	config_about_t about =
+	{
+		STEGFS_NAME,
+		STEGFS_VERSION,
+		PROJECT_URL,
+		NULL
+	};
+	config_init(about);
+	config_parse(argc, argv, args, extra, notes, false);
+
+	char *fs  = NULL;
+	char *mnt = NULL;
+	struct stat s = { 0x0 };
+	stat(extra[0].response_value.string, &s);
+	if (S_ISDIR(s.st_mode))
+	{
+		// 1st argument is directory, so it's the mount point
+		mnt = extra[0].response_value.string;
+		fs  = extra[1].response_value.string;
 	}
+	else
+	{
+		fs  = extra[0].response_value.string;
+		mnt = extra[1].response_value.string;
+	}
+
+	// config is actually read from the fs unless paranoid == true
+	enum gcry_cipher_algos cipher = DEFAULT_CIPHER;
+	enum gcry_cipher_modes mode   = DEFAULT_MODE;
+	enum gcry_md_algos     hash   = DEFAULT_HASH;
+	enum gcry_mac_algos    mac    = DEFAULT_MAC;
+	int64_t kdf_iters             = KEY_ITERATIONS;
+	bool paranoid                 = args[5].response_value.boolean;
+	uint8_t duplicates            = COPIES_DEFAULT;
+	bool show_bloc                = args[7].response_value.boolean;
+
+	if (paranoid)
+	{
+		cipher     = cipher_id_from_name(args[0].response_value.string);
+		mode       =   mode_id_from_name(args[1].response_value.string);
+		hash       =   hash_id_from_name(args[2].response_value.string);
+		mac        =    mac_id_from_name(args[3].response_value.string);
+		kdf_iters  = args[4].response_value.number;;
+		duplicates = (uint8_t)args[6].response_value.number;
+	}
+
+	/*
+	 * deal with FUSE options
+	 */
+
+	bool debug                    = args[8].response_value.boolean;
+	bool foreground               = args[9].response_value.boolean;
+	bool single_thread            = args[10].response_value.boolean;
+
+	int fuse_argc = 3;
+	char **fuse_argv = calloc(fuse_argc, sizeof (char *));
+	fuse_argv[0] = argv[0];
+	fuse_argv[1] = mnt;
+	if (debug)
+	{
+		fuse_argc++;
+		fuse_argv = realloc(fuse_argv, fuse_argc * sizeof (char *));
+		fuse_argv[fuse_argc - 2] = "-d";
+	}
+	if (foreground)
+	{
+		fuse_argc++;
+		fuse_argv = realloc(fuse_argv, fuse_argc * sizeof (char *));
+		fuse_argv[fuse_argc - 2] = "-f";
+	}
+	if (single_thread)
+	{
+		fuse_argc++;
+		fuse_argv = realloc(fuse_argv, fuse_argc * sizeof (char *));
+		fuse_argv[fuse_argc - 2] = "-s";
+	}
+	config_list_t fuse_options = args[11].response_value.list;
+	for (size_t i = 0; i < fuse_options.count; i++)
+	{
+		fuse_argc += 2;
+		fuse_argv = realloc(fuse_argv, fuse_argc * sizeof (char *));
+		fuse_argv[fuse_argc - 3] = "-o";
+		fuse_argv[fuse_argc - 2] = fuse_options.items[i].string;
+	}
+	fuse_argc--;
+	fuse_argv[fuse_argc] = NULL;
 
 	errno = EXIT_SUCCESS;
-	if (!args.help)
+	switch (stegfs_init(fs, paranoid, cipher, mode, hash, mac, duplicates, show_bloc))
 	{
-		switch (stegfs_init(args.fs, args.paranoid, args.cipher, args.mode, args.hash, args.mac, args.duplicates, args.show_bloc))
-		{
-			case STEGFS_INIT_OKAY:
-				goto done;
-			case STEGFS_INIT_NOT_STEGFS:
-				fprintf(stderr, "Not a stegfs partition!\n");
-				break;
-			case STEGFS_INIT_OLD_STEGFS:
-				fprintf(stderr, "Previous (unsupported) version of stegfs!\n");
-				break;
-			case STEGFS_INIT_MISSING_TAG:
-				fprintf(stderr, "Missing required stegfs metadata!\n");
-				break;
-			case STEGFS_INIT_INVALID_TAG:
-				fprintf(stderr, "Invalid value for stegfs metadata!\n");
-				break;
-			case STEGFS_INIT_CORRUPT_TAG:
-				fprintf(stderr, "Partition size mismatch! (Resizing not allowed!)\n");
-				break;
-			default:
-				fprintf(stderr, "Unknown error initialising stegfs partition!\n");
-				break;
-		}
-		return EXIT_FAILURE;
+		case STEGFS_INIT_OKAY:
+			goto done;
+		case STEGFS_INIT_NOT_STEGFS:
+			fprintf(stderr, "Not a stegfs partition!\n");
+			break;
+		case STEGFS_INIT_OLD_STEGFS:
+			fprintf(stderr, "Previous (unsupported) version of stegfs!\n");
+			break;
+		case STEGFS_INIT_MISSING_TAG:
+			fprintf(stderr, "Missing required stegfs metadata!\n");
+			break;
+		case STEGFS_INIT_INVALID_TAG:
+			fprintf(stderr, "Invalid value for stegfs metadata!\n");
+			break;
+		case STEGFS_INIT_CORRUPT_TAG:
+			fprintf(stderr, "Partition size mismatch! (Resizing not allowed!)\n");
+			break;
+		default:
+			fprintf(stderr, "Unknown error initialising stegfs partition!\n");
+			break;
 	}
-
+	return EXIT_FAILURE;
 done:
-	init_deinit(args);
-	struct fuse_args f = FUSE_ARGS_INIT(fargc, fargs);
+
+	struct fuse_args f = FUSE_ARGS_INIT(fuse_argc, fuse_argv);
 	fuse_opt_parse(&f, NULL, NULL, NULL);
 	return fuse_main(f.argc, f.argv, &fuse_stegfs_functions, NULL);
 }
