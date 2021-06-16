@@ -51,7 +51,7 @@ debug-stegfs:
 debug-mkfs:
 	 @echo "#define ALL_CFLAGS   \"$(strip $(subst \",\',"${CFLAGS}   ${DEBUG_CFLAGS}"))\""    > ${MISC}
 	 @echo "#define ALL_CPPFLAGS \"$(strip $(subst \",\',"${CPPFLAGS} ${DEBUG_CPPFLAGS}"))\"" >> ${MISC}
-	 @${CC} ${LIBS} ${CFLAGS} ${CPPFLAGS} ${DEBUG_CFLAGS} ${DEBUG_CPPFLAGS} ${MKFS} ${COMMON} -o ${STEGFS}
+	 @${CC} ${LIBS} ${CFLAGS} ${CPPFLAGS} ${DEBUG_CFLAGS} ${DEBUG_CPPFLAGS} ${MKSRC} ${COMMON} -o ${MKFS}
 	-@echo "built ‘${MKSRC} ${COMMON}’ → ‘${MKFS}’"
 
 man:
