@@ -48,8 +48,8 @@
 	#define F_WRLCK NOTSET /*!< Set value to NOTSET */
 #endif
 
-#if !defined __bswap_64 && !defined __sun
-	#define __bswap_64(x) /*!< Define ourselves an 8-byte swap */   \
+#if !defined __bswap_constant_64 && !defined __sun
+	#define __bswap_constant_64(x) /*!< Define ourselves an 8-byte swap */   \
 		( (((x) & 0xff00000000000000ull) >> 56)                 \
 		| (((x) & 0x00ff000000000000ull) >> 40)                 \
 		| (((x) & 0x0000ff0000000000ull) >> 24)                 \
@@ -62,8 +62,8 @@
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN || BYTE_ORDER == LITTLE_ENDIAN || _WIN32
 	#if !defined __APPLE__ && !defined __sun
-		#define ntohll(x) __bswap_64(x) /*!< Do need to swap bytes from network byte order */
-		#define htonll(x) __bswap_64(x) /*!< Do need to swap bytes to network byte order */
+		#define ntohll(x) __bswap_constant_64(x) /*!< Do need to swap bytes from network byte order */
+		#define htonll(x) __bswap_constant_64(x) /*!< Do need to swap bytes to network byte order */
 	#endif
 #elif __BYTE_ORDER == __BIG_ENDIAN || BYTE_ORDER == BIG_ENDIAN
 	#define ntohll(x) (x) /*!< No need to swap bytes from network byte order */

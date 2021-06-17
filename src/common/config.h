@@ -25,6 +25,8 @@
 #include <string.h>
 #include <stdbool.h>
 
+#include "common.h"
+
 
 #define CONF_TRUE     "true"
 #define CONF_ON       "on"
@@ -160,6 +162,7 @@ extern void config_show_usage(config_arg_t *args, config_extra_t *extra);
 #define CONFIG_PARSE_COUNT(...) CONFIG_PARSE_COUNT2(__VA_ARGS__, 6, 5, 4, 3, 2, 1)
 #define CONFIG_PARSE_COUNT2(_1, _2, _3, _4, _5, _6, _, ...) _
 
+#define config_parse_2(A, B)              config_parse_aux(A, B, NULL, NULL, NULL, true)
 #define config_parse_3(A, B, C)           config_parse_aux(A, B, C, NULL, NULL, true)
 #define config_parse_4(A, B, C, D)        config_parse_aux(A, B, C, D, NULL, true)
 #define config_parse_5(A, B, C, D, E)     config_parse_aux(A, B, C, D, E, true)
