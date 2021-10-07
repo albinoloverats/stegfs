@@ -53,6 +53,9 @@ static int cli_width = CLI_DEFAULT;
 
 static void cli_display_bar(double, double, bool, cli_bps_t *);
 static void cli_sigwinch(int);
+#else
+static void cli_init(void);
+static int cli_inited = -1; // -1 (no), 0 (failed), 1 (okay)
 #endif
 
 static int cli_bps_sort(const void *, const void *);
@@ -60,6 +63,9 @@ static int cli_print(FILE *, char *);
 
 extern void cli_format_help(char s, char *l, char *v, char *t)
 {
+#ifdef _WIN32
+	cli_init();
+#endif
 	size_t z = CLI_HELP_FORMAT_RIGHT_COLUMN - 8 - strlen(l);
 	cli_fprintf(stderr, "  " ANSI_COLOUR_WHITE "-%c" ANSI_COLOUR_RESET ", " ANSI_COLOUR_WHITE "--%s" ANSI_COLOUR_RESET, s, l);
 	if (v)
@@ -81,7 +87,7 @@ extern void cli_format_help(char s, char *l, char *v, char *t)
 			int l = w.ws_col - CLI_HELP_FORMAT_RIGHT_COLUMN - 1;
 			while (isspace(t[o]))
 				o++;
-			/* FIXME wrap on word boundry and handle UTF-8 characters properly */
+			/* FIXME wrap on word boundary and handle UTF-8 characters properly */
 			o += fprintf(stderr, "%.*s", l, t + o);
 			if (o >= strlen(t))
 				break;
@@ -101,6 +107,9 @@ extern void cli_format_help(char s, char *l, char *v, char *t)
 
 extern int cli_printf(const char * const restrict s, ...)
 {
+#ifdef _WIN32
+	cli_init();
+#endif
 	va_list ap;
 	va_start(ap, s);
 	char *d = NULL;
@@ -119,6 +128,9 @@ extern int cli_printf(const char * const restrict s, ...)
 
 extern int cli_fprintf(FILE *f, const char * const restrict s, ...)
 {
+#ifdef _WIN32
+	cli_init();
+#endif
 	va_list ap;
 	va_start(ap, s);
 	char *d = NULL;
@@ -137,11 +149,17 @@ extern int cli_fprintf(FILE *f, const char * const restrict s, ...)
 
 extern int cli_printx(const uint8_t * const restrict x, size_t z)
 {
+#ifdef _WIN32
+	cli_init();
+#endif
 	return cli_fprintx(stdout, x, z);
 }
 
 extern int cli_fprintx(FILE *f, const uint8_t * const restrict x, size_t z)
 {
+#ifdef _WIN32
+	cli_init();
+#endif
 #define CLI_PRINTX_W 16
 	// TODO allow variable width lines
 	int l = 0, o = 0;
@@ -167,6 +185,9 @@ extern int cli_fprintx(FILE *f, const uint8_t * const restrict x, size_t z)
 
 extern double cli_calc_bps(cli_bps_t *bps)
 {
+#ifdef _WIN32
+	cli_init();
+#endif
 	cli_bps_t *copy = calloc(BPS, sizeof( cli_bps_t ));
 	for (int i = 0; i < BPS; i++)
 	{
@@ -299,6 +320,12 @@ static int cli_print(FILE *stream, char *text)
 	char *copy = calloc(1, l + 1);
 #ifndef _WIN32
 	bool strip = !((stream == stdout && isatty(STDOUT_FILENO)) || (stream == stderr && isatty(STDERR_FILENO)));
+#else
+	bool strip = cli_inited != 1;
+	#ifndef __DEBUG__
+		strip = false;
+	#endif
+#endif
 	if (strip)
 	{
 		char *ptr = text;
@@ -314,9 +341,37 @@ static int cli_print(FILE *stream, char *text)
 		strcat(copy, ptr);
 	}
 	else
-#endif
 		strcpy(copy, text);
 	int x = fprintf(stream, "%s", copy);
 	free(copy);
 	return x;
 }
+
+#ifdef _WIN32
+static void cli_init(void)
+{
+	if (cli_inited >= 0)
+		return;
+	// Set output mode to handle virtual terminal sequences
+	HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+	if (hOut == INVALID_HANDLE_VALUE)
+	{
+		cli_inited = 0;
+		return;
+	}
+	DWORD dwMode = 0;
+	if (!GetConsoleMode(hOut, &dwMode))
+	{
+		cli_inited = 1;
+		return; // MSYS2 ends up here; so take a chance that everything's going to be okay
+	}
+	dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+	if (!SetConsoleMode(hOut, dwMode))
+	{
+		cli_inited = 0;
+		return; // cmd on Win7 ends up here; looks like the feature is not available until Win10
+	}
+	cli_inited = 1;
+	return;
+}
+#endif

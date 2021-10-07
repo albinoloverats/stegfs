@@ -27,16 +27,16 @@
 #define BPS 128
 
 #define ANSI_COLOUR_RESET          "\x1b[0m"
-#if 0
-	#define ANSI_COLOUR_BLACK          "\x1b[30m"
-	#define ANSI_COLOUR_RED            "\x1b[31m"
-	#define ANSI_COLOUR_GREEN          "\x1b[32m"
-	#define ANSI_COLOUR_YELLOW         "\x1b[33m"
-	#define ANSI_COLOUR_BLUE           "\x1b[34m"
-	#define ANSI_COLOUR_MAGENTA        "\x1b[35m"
-	#define ANSI_COLOUR_CYAN           "\x1b[36m"
-	#define ANSI_COLOUR_WHITE          "\x1b[37m"
-#else /* use bright colours */
+#if _WIN32
+	#define ANSI_COLOUR_BLACK   "\x1b[30m"
+	#define ANSI_COLOUR_RED     "\x1b[31m"
+	#define ANSI_COLOUR_GREEN   "\x1b[32m"
+	#define ANSI_COLOUR_YELLOW  "\x1b[33m"
+	#define ANSI_COLOUR_BLUE    "\x1b[34m"
+	#define ANSI_COLOUR_MAGENTA "\x1b[35m"
+	#define ANSI_COLOUR_CYAN    "\x1b[36m"
+	#define ANSI_COLOUR_WHITE   "\x1b[37m"
+#else /* use bright colours (on MSYS2/Windows there's no difference AFAIK) */
 	#define ANSI_COLOUR_BLACK   "\x1b[90m"
 	#define ANSI_COLOUR_RED     "\x1b[91m"
 	#define ANSI_COLOUR_GREEN   "\x1b[92m"

@@ -23,6 +23,9 @@
 
 #include <gcrypt.h>
 
+#define NEED_LIBGCRYPT_VERSION "1.7.10"
+#define MOSTLY_NEEDED_LIBGCRYPT "1.8.2"
+
 #define NAME_SHA1 "SHA1"
 #define NAME_SHA160 "SHA160"
 #define NAME_TIGER "TIGER"

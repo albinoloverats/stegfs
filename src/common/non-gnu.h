@@ -22,7 +22,19 @@
 #define _NON_GNU_EXT_H_
 
 #if defined __APPLE__ || defined _WIN32
+	/*
+	 * Taken, once upon a time, from:
+	 * https://github.com/lattera/glibc/blob/master/string/strchrnul.c
+	 */
 	extern char *strchrnul(const char *string, int c);
+#endif
+
+#if defined __APPLE__ || defined _WIN32 || defined __FreeBSD__ || defined __sun
+	/*
+	 * Borrowed from:
+	 * https://github.com/lattera/glibc/blob/master/string/strverscmp.c
+	 */
+	extern int strverscmp(const char *s1, const char *s2);
 #endif
 
 #if defined __sun || defined __clang__

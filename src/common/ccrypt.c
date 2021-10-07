@@ -30,8 +30,6 @@
 #include "error.h"
 #include "ccrypt.h"
 
-#define NEED_LIBGCRYPT_VERSION "1.8.6"
-
 static int algorithm_compare(const void *, const void *);
 
 static const char *correct_sha1(const char * const restrict);
@@ -70,8 +68,18 @@ extern void init_crypto(void)
 	if (!gcry_check_version(NEED_LIBGCRYPT_VERSION))
 		die(_("libgcrypt is too old (need %s, have %s)"), NEED_LIBGCRYPT_VERSION, gcry_check_version(NULL));
 	gcry_control(GCRYCTL_SUSPEND_SECMEM_WARN);
-	gcry_control(GCRYCTL_INIT_SECMEM, MEGABYTE, 0);
+	gcry_control(GCRYCTL_INIT_SECMEM, 10 * MEGABYTE, 0);
 	gcry_control(GCRYCTL_RESUME_SECMEM_WARN);
+
+	/*
+	 * See libgcrypt source agent/gpg-agent.c:1293 for why this is.
+	 * It may cause problems with out-of-memory errors with older
+	 * versions, like those on Slaceware and Solaris, but but
+	 * Slackware's 1.7.10 works fine otherwise.
+	 */
+	if (strverscmp(MOSTLY_NEEDED_LIBGCRYPT, gcry_check_version(NULL)) < 0)
+		gcry_control(78/*GCRYCTL_AUTO_EXPAND_SECMEM*/, MEGABYTE, 0);
+
 	gcry_control(GCRYCTL_INITIALIZATION_FINISHED, 0);
 	errno = 0; /* need to reset errno after gcry_check_version() */
 	done = true;

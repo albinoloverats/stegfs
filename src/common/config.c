@@ -119,16 +119,19 @@ extern int config_parse_aux(int argc, char **argv, config_arg_t *args, config_ex
 						switch (args[i].response_type)
 						{
 							case CONFIG_ARG_OPT_BOOLEAN:
+								(void)0; // for Slackware's older GCC
 								__attribute__((fallthrough)); /* allow fall-through */
 							case CONFIG_ARG_REQ_BOOLEAN:
 								args[i].response_value.boolean = parse_config_boolean(args[i].long_option, line, args[i].response_value.boolean);
 								break;
 							case CONFIG_ARG_OPT_NUMBER:
+								(void)0; // for Slackware's older GCC
 								__attribute__((fallthrough)); /* allow fall-through */
 							case CONFIG_ARG_REQ_NUMBER:
 								args[i].response_value.number = parse_config_number(args[i].long_option, line, args[i].response_value.number);
 								break;
 							case CONFIG_ARG_OPT_STRING:
+								(void)0; // for Slackware's older GCC
 								__attribute__((fallthrough)); /* allow fall-through */
 							case CONFIG_ARG_REQ_STRING:
 								args[i].response_value.string = parse_config_string(args[i].long_option, line, args[i].response_value.string);
@@ -199,10 +202,10 @@ end_line:
 		for (int i = 0; args[i].short_option; i++, optlen += 1)
 			;
 		if (!(short_options = calloc(optlen * 2, sizeof (char))))
-			die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, 4 * sizeof (char));
+			die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, optlen * 2 * sizeof (char));
 		struct option *long_options;
-		if (!(long_options = calloc(optlen, sizeof (struct option))))
-			die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, 4 * sizeof (struct option));
+		if (!(long_options = calloc(optlen + 1, sizeof (struct option))))
+			die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, (optlen + 1) * sizeof (struct option));
 
 		strcat(short_options, "h");
 		long_options[0].name    = "help";
@@ -224,7 +227,7 @@ end_line:
 
 		for (int i = 0; args[i].short_option; i++)
 		{
-			char S[1] = "X";
+			char S[] = "X";
 			S[0] = args[i].short_option;
 			strcat(short_options, S);
 			if (args[i].response_type != CONFIG_ARG_REQ_BOOLEAN && args[i].response_type != CONFIG_ARG_OPT_BOOLEAN)
@@ -244,7 +247,7 @@ end_line:
 		/*
 		 * parse command line options
 		 */
-		while (true)
+		while (argc && argv)
 		{
 			int index = 0;
 			int c = getopt_long(argc, argv, short_options, long_options, &index);
@@ -283,12 +286,13 @@ end_line:
 								args[i].response_value.string = strdup(optarg);
 								break;
 							case CONFIG_ARG_OPT_BOOLEAN:
+								(void)0; // for Slackware's older GCC
 								__attribute__((fallthrough)); /* allow fall-through; argument was seen */
 							case CONFIG_ARG_REQ_BOOLEAN:
 								args[i].response_value.boolean = !args[i].response_value.boolean;
 								break;
 
-							/* TODO extend hanlding of lists and pairs and list of pairs... */
+							/* TODO extend handling of lists and pairs and list of pairs... */
 
 							case CONFIG_ARG_LIST_STRING:
 								args[i].response_value.list.count++;
@@ -337,6 +341,7 @@ end_line:
 					extra[i].response_value.number = strtoull(argv[optind], NULL, 0);
 					break;
 				case CONFIG_ARG_BOOLEAN:
+					(void)0; // for Slackware's older GCC
 					__attribute__((fallthrough)); /* allow fall-through; argument was seen */
 				default:
 					extra[i].response_value.boolean = true;
@@ -363,6 +368,8 @@ inline static void format_section(char *s)
 static void show_version(void)
 {
 	version_print(about.name, about.version, about.url);
+	while (version_is_checking)
+		sleep(1);
 	exit(EXIT_SUCCESS);
 }
 
@@ -373,9 +380,12 @@ inline static void print_usage(config_arg_t *args, config_extra_t *extra)
 	ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
 	size_t x = ws.ws_col - strlen(about.name) - 2;
 #else
-	//CONSOLE_SCREEN_BUFFER_INFO csbi;
-	//GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
-	size_t x = 77 - strlen(about.name);// (csbi.srWindow.Right - csbi.srWindow.Left + 1) - width - 2;
+	CONSOLE_SCREEN_BUFFER_INFO csbi;
+	GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
+	int w = (csbi.srWindow.Right - csbi.srWindow.Left + 1) - strlen(about.name) - 2;
+	if (w <= 0)
+		w = 77 - strlen(about.name); // needed for MSYS2
+	size_t x = (size_t)w;
 #endif
 	format_section(_("Usage"));
 	cli_fprintf(stderr, "  " ANSI_COLOUR_GREEN "%s", about.name);
@@ -413,6 +423,8 @@ inline static void print_usage(config_arg_t *args, config_extra_t *extra)
 extern void config_show_usage(config_arg_t *args, config_extra_t *extra)
 {
 	print_usage(args, extra);
+	while (version_is_checking)
+		sleep(1);
 	exit(EXIT_SUCCESS);
 }
 
@@ -451,9 +463,11 @@ static void print_option(int width, char sopt, char *lopt, char *type, bool req,
 	ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
 	int x = ws.ws_col - width - 2;
 #else
-	//CONSOLE_SCREEN_BUFFER_INFO csbi;
-	//GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
-	int x = 77 - width;// (csbi.srWindow.Right - csbi.srWindow.Left + 1) - width - 2;
+	CONSOLE_SCREEN_BUFFER_INFO csbi;
+	GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
+	int x = (csbi.srWindow.Right - csbi.srWindow.Left + 1) - width - 2;
+	if (x <= 0)
+		x = 77 - width; // needed for MSYS2
 #endif
 	for (; isspace(*desc); desc++)
 		;
@@ -486,16 +500,18 @@ static void print_option(int width, char sopt, char *lopt, char *type, bool req,
 
 static void print_notes(char *line)
 {
-	cli_fprintf(stderr, "  • ");
-	//fprintf(stderr, "  • %s\n", notes[i]);
 #ifndef _WIN32
+	cli_fprintf(stderr, "  • ");
 	struct winsize ws;
 	ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
 	int x = ws.ws_col - 5;
 #else
-	//CONSOLE_SCREEN_BUFFER_INFO csbi;
-	//GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
-	int x = 72;// (csbi.srWindow.Right - csbi.srWindow.Left + 1) - width - 2;
+	cli_fprintf(stderr, "  * ");
+	CONSOLE_SCREEN_BUFFER_INFO csbi;
+	GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
+	int x = (csbi.srWindow.Right - csbi.srWindow.Left + 1) - 5;
+	if (x <= 0)
+		x = 72; // needed for MSYS2
 #endif
 	for (; isspace(*line); line++)
 		;
@@ -566,12 +582,16 @@ static void show_help(config_arg_t *args, char **notes, config_extra_t *extra)
 		for (int i = 0; notes[i] ; i++)
 			print_notes(notes[i]);
 	}
+	while (version_is_checking)
+		sleep(1);
 	exit(EXIT_SUCCESS);
 }
 
 static void show_licence(void)
 {
 	fprintf(stderr, _(TEXT_LICENCE));
+	while (version_is_checking)
+		sleep(1);
 	exit(EXIT_SUCCESS);
 }
 

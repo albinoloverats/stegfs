@@ -170,7 +170,7 @@ extern void config_show_usage(config_arg_t *args, config_extra_t *extra);
 #define config_parse(...) CONCAT(config_parse_, CONFIG_PARSE_COUNT(__VA_ARGS__))(__VA_ARGS__)
 
 /*!
- * \brief                Application init function
+ * \brief             Configuration reading/parsing
  * \param[in]      c  Number of command line arguments
  * \param[in]      v  Command line arguments
  * \param[in/out]  a  Expected command line arguments, config options, and their resulting values
