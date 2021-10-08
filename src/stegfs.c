@@ -57,7 +57,7 @@ static gcry_mac_hd_t init_mac(const stegfs_file_t * const restrict, uint8_t);
 
 static stegfs_t file_system;
 
-extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid, enum gcry_cipher_algos cipher, enum gcry_cipher_modes mode, enum gcry_md_algos hash, enum gcry_mac_algos mac, uint32_t dups, bool show_bloc)
+extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid, enum gcry_cipher_algos cipher, enum gcry_cipher_modes mode, enum gcry_md_algos hash, enum gcry_mac_algos mac, uint64_t kdf, uint32_t dups, bool show_bloc)
 {
 	if ((file_system.handle = open(fs, O_RDWR, S_IRUSR | S_IWUSR)) < 0)
 		return STEGFS_INIT_UNKNOWN;
@@ -80,6 +80,7 @@ extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid, 
 		file_system.mac = mac;
 		file_system.blocksize = SIZE_BYTE_BLOCK;
 		file_system.head_offset = OFFSET_BYTE_HEAD;
+		file_system.kdf_iterations = kdf;
 		file_system.copies = dups;
 		goto done;
 	}
@@ -201,6 +202,17 @@ extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid, 
 		return STEGFS_INIT_MISSING_TAG;
 	memcpy(&file_system.head_offset, tlv_value_of(tlv, TAG_HEADER_OFFSET), tlv_length_of(tlv, TAG_HEADER_OFFSET));
 	file_system.head_offset = ntohl(file_system.head_offset);
+
+	/* get mac info */
+	if (tlv_has_tag(tlv, TAG_KDF))
+	{
+		uint64_t *k = (uint64_t *)tlv_value_of(tlv, TAG_KDF);
+		memcpy(&file_system.kdf_iterations, k, sizeof file_system.kdf_iterations);
+		file_system.kdf_iterations = ntohll(file_system.kdf_iterations);
+	}
+	else
+		file_system.kdf_iterations = DEFAULT_KDF_ITERATIONS;
+
 
 	if (ntohll(block.next) != file_system.size / file_system.blocksize)
 		return STEGFS_INIT_CORRUPT_TAG;
@@ -921,7 +933,7 @@ static gcry_cipher_hd_t init_cipher(const stegfs_file_t * const restrict file, u
 		gcry_md_write(salt, file->path, strlen(file->path));
 		const uint8_t *hash_data = gcry_md_read(hash, file_system.hash);
 		const uint8_t *salt_data = gcry_md_read(salt, file_system.hash);
-		gcry_kdf_derive(hash_data, hash_length, GCRY_KDF_PBKDF2, file_system.hash, salt_data, salt_length, KEY_ITERATIONS, key_length, key_data);
+		gcry_kdf_derive(hash_data, hash_length, GCRY_KDF_PBKDF2, file_system.hash, salt_data, salt_length, file_system.kdf_iterations, key_length, key_data);
 	}
 	gcry_cipher_setkey(cipher, key_data, key_length);
 	gcry_free(key_data);
@@ -968,7 +980,7 @@ static gcry_mac_hd_t init_mac(const stegfs_file_t * const restrict file, uint8_t
 	const uint8_t *salt_data = gcry_md_read(salt, file_system.hash);
 	/* initialise the mac */
 	uint8_t *mac_key_data = gcry_calloc_secure(mac_key_length, sizeof( byte_t ));
-	gcry_kdf_derive(hash_data, hash_length, GCRY_KDF_PBKDF2, file_system.hash, salt_data, salt_length, KEY_ITERATIONS, mac_key_length, mac_key_data);
+	gcry_kdf_derive(hash_data, hash_length, GCRY_KDF_PBKDF2, file_system.hash, salt_data, salt_length, file_system.kdf_iterations, mac_key_length, mac_key_data);
 	gcry_mac_setkey(mac, mac_key_data, mac_key_length);
 	gcry_free(mac_key_data);
 	gcry_md_close(salt);

@@ -192,7 +192,7 @@ static gcry_cipher_hd_t crypto_init(enum gcry_cipher_algos c, enum gcry_cipher_m
 	return cipher_handle;
 }
 
-static void superblock_info(stegfs_block_t *sb, const char *cipher, const char *mode, const char *hash, const char *mac, uint8_t copies)
+static void superblock_info(stegfs_block_t *sb, const char *cipher, const char *mode, const char *hash, const char *mac, uint8_t copies, uint64_t kdf)
 {
 	TLV_HANDLE tlv = tlv_init();
 
@@ -247,6 +247,14 @@ static void superblock_info(stegfs_block_t *sb, const char *cipher, const char *
 	tlv_append(&tlv, t);
 	free(t.value);
 
+	t.tag = TAG_KDF;
+	t.length = sizeof kdf;
+	t.value = malloc(sizeof kdf);
+	uint64_t k = htonll(kdf);
+	memcpy(t.value, &k, sizeof kdf);
+	tlv_append(&tlv, t);
+	free(t.value);
+
 	uint64_t tags = htonll(tlv_count(tlv));
 	memcpy(sb->data, &tags, sizeof tags);
 	memcpy(sb->data + sizeof tags, tlv_export(tlv), tlv_size(tlv));
@@ -297,7 +305,7 @@ int main(int argc, char **argv)
 	char *h         = args[ 1].response_value.string;
 	char *m         = args[ 2].response_value.string;
 	char *a         = args[ 3].response_value.string;
-	uint64_t kdf    = args[ 4].response_value.number; // TODO add KDF iterations
+	uint64_t kdf    = args[ 4].response_value.number;
 	bool paranoid   = args[ 5].response_value.boolean;
 	uint32_t copies = (uint32_t)args[6].response_value.number ? : COPIES_DEFAULT;
 	char *s         = args[ 7].response_value.string;
@@ -329,6 +337,8 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Unknown MAC \"%s\"\n", a);
 		return EXIT_FAILURE;
 	}
+	if (!kdf)
+		kdf = DEFAULT_KDF_ITERATIONS;
 	if (c)
 		free(c);
 	if (h)
@@ -446,7 +456,7 @@ superblock:
 	sb.path[0] = htonll(PATH_MAGIC_0);
 	sb.path[1] = htonll(PATH_MAGIC_1);
 
-	superblock_info(&sb, cipher_name_from_id(cipher), mode_name_from_id(mode), hash_name_from_id(hash), mac_name_from_id(mac), copies);
+	superblock_info(&sb, cipher_name_from_id(cipher), mode_name_from_id(mode), hash_name_from_id(hash), mac_name_from_id(mac), copies, kdf);
 
 	sb.hash[0] = htonll(HASH_MAGIC_0);
 	sb.hash[1] = htonll(HASH_MAGIC_1);

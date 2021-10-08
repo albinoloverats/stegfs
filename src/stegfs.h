@@ -59,8 +59,6 @@
 
 #define SUPER_ID STEGFS_NAME " " STEGFS_VERSION
 
-#define KEY_ITERATIONS 32768
-
 /*
  * File system header for unsupported first attempt at a file system.
  */
@@ -103,10 +101,11 @@ typedef enum
 version_e;
 
 
-#define DEFAULT_CIPHER GCRY_CIPHER_RIJNDAEL256
-#define DEFAULT_MODE   GCRY_CIPHER_MODE_CBC
-#define DEFAULT_HASH   GCRY_MD_SHA256
-#define DEFAULT_MAC    GCRY_MAC_HMAC_SHA256
+#define DEFAULT_CIPHER          GCRY_CIPHER_RIJNDAEL256
+#define DEFAULT_MODE            GCRY_CIPHER_MODE_CBC
+#define DEFAULT_HASH            GCRY_MD_SHA256
+#define DEFAULT_MAC             GCRY_MAC_HMAC_SHA256
+#define DEFAULT_KDF_ITERATIONS  32768
 
 #define PATH_BLOC DIR_SEPARATOR "bloc"
 
@@ -128,6 +127,7 @@ typedef enum
 	TAG_HEADER_OFFSET,
 	TAG_DUPLICATION,
 	TAG_MAC,
+	TAG_KDF,
 	TAG_MAX
 }
 stegfs_tag_e;
@@ -210,20 +210,21 @@ stegfs_blocks_t;
  */
 typedef struct stegfs_t
 {
-	int64_t                handle;      /*!< Handle to file system file/device */
-	uint64_t               size;        /*!< Size of file system in bytes (not capacity) */
-	void                  *memory;      /*!< mmap pointer */
-	enum gcry_cipher_algos cipher;      /*!< Cipher algorithm used by the file system */
-	enum gcry_cipher_modes mode;        /*!< Cipher mode used by the file system */
-	enum gcry_md_algos     hash;        /*!< Hash algorithm used by the file system */
-	enum gcry_mac_algos    mac;         /*!< MAC algorithm used by the file system */
-	uint32_t               copies;      /*!< File duplication */
-	size_t                 blocksize;   /*!< File system block size; if it needs to be bigger than 4,294,967,295 we have issues */
-	off_t                  head_offset; /*!< Start location of file data in header blocks; only 32 bits (like blocksize) */
-	stegfs_blocks_t        blocks;      /*!< In use block tracker */
-	stegfs_cache_t         cache;       /*!< File cache version 2 */
-	version_e              version;     /*!< File system version */
-	bool                   show_bloc;   /*!< Expose the /bloc/ block list */
+	int64_t                handle;         /*!< Handle to file system file/device */
+	uint64_t               size;           /*!< Size of file system in bytes (not capacity) */
+	void                  *memory;         /*!< mmap pointer */
+	enum gcry_cipher_algos cipher;         /*!< Cipher algorithm used by the file system */
+	enum gcry_cipher_modes mode;           /*!< Cipher mode used by the file system */
+	enum gcry_md_algos     hash;           /*!< Hash algorithm used by the file system */
+	enum gcry_mac_algos    mac;            /*!< MAC algorithm used by the file system */
+	uint64_t               kdf_iterations; /*!< KDF iterations */
+	uint32_t               copies;         /*!< File duplication */
+	size_t                 blocksize;      /*!< File system block size; if it needs to be bigger than 4,294,967,295 we have issues */
+	off_t                  head_offset;    /*!< Start location of file data in header blocks; only 32 bits (like blocksize) */
+	stegfs_blocks_t        blocks;         /*!< In use block tracker */
+	stegfs_cache_t         cache;          /*!< File cache version 2 */
+	version_e              version;        /*!< File system version */
+	bool                   show_bloc;      /*!< Expose the /bloc/ block list */
 }
 stegfs_t;
 
@@ -262,7 +263,7 @@ extern stegfs_init_e stegfs_init(const char * const restrict f, bool p,
 		enum gcry_cipher_modes m,
 		enum gcry_md_algos h,
 		enum gcry_mac_algos a,
-		uint32_t x, bool b);
+		uint64_t kdf, uint32_t x, bool b);
 
 /*!
  * \brief         Retrieve information about the file system

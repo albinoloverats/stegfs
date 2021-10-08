@@ -714,7 +714,7 @@ int main(int argc, char **argv)
 	enum gcry_cipher_modes mode   = DEFAULT_MODE;
 	enum gcry_md_algos     hash   = DEFAULT_HASH;
 	enum gcry_mac_algos    mac    = DEFAULT_MAC;
-	int64_t kdf_iters             = KEY_ITERATIONS;
+	uint64_t kdf_iters            = DEFAULT_KDF_ITERATIONS;
 	bool paranoid                 = args[5].response_value.boolean;
 	uint8_t duplicates            = COPIES_DEFAULT;
 	bool show_bloc                = args[7].response_value.boolean;
@@ -725,8 +725,8 @@ int main(int argc, char **argv)
 		mode       =   mode_id_from_name(args[1].response_value.string);
 		hash       =   hash_id_from_name(args[2].response_value.string);
 		mac        =    mac_id_from_name(args[3].response_value.string);
-		kdf_iters  = args[4].response_value.number;;
-		duplicates = (uint8_t)args[6].response_value.number;
+		kdf_iters  =                     args[4].response_value.number;
+		duplicates =            (uint8_t)args[6].response_value.number;
 	}
 
 	/*
@@ -771,7 +771,7 @@ int main(int argc, char **argv)
 	fuse_argv[fuse_argc] = NULL;
 
 	errno = EXIT_SUCCESS;
-	switch (stegfs_init(fs, paranoid, cipher, mode, hash, mac, duplicates, show_bloc))
+	switch (stegfs_init(fs, paranoid, cipher, mode, hash, mac, kdf_iters, duplicates, show_bloc))
 	{
 		case STEGFS_INIT_OKAY:
 			goto done;
