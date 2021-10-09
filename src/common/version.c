@@ -176,7 +176,9 @@ extern char *version_build_info(void)
 
 //#ifdef GCRYPT_VERSION
 	char *gcv = NULL;
+#ifdef USE_GCRYPT
 	asprintf(&gcv, "%s (compiled) %s (runtime)", GCRYPT_VERSION, gcry_check_version(NULL));
+#endif
 	//asprintf(&info, "%s%s: %s\n", info, _("libgcrypt"), gcv);
 	version_format_line(&info, AA_GW, AA_GI, _("libgcrypt"), gcv);
 	free(gcv);
