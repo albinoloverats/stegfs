@@ -18,15 +18,18 @@
  *
  */
 
+#include <errno.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <getopt.h>
-#include <errno.h>
 
 #include <ctype.h>
 #include <string.h>
 #include <stdbool.h>
+
+#include <gcrypt.h>
 
 #ifndef _WIN32
 	#include <sys/utsname.h>
@@ -377,36 +380,34 @@ inline static void print_usage(config_arg_t *args, config_extra_t *extra)
 {
 #ifndef _WIN32
 	struct winsize ws;
-	ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
-	size_t x = ws.ws_col - strlen(about.name) - 2;
+	ioctl(STDERR_FILENO, TIOCGWINSZ, &ws);
+	int max_width = ws.ws_col - strlen(about.name) - 2;
 #else
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
 	GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
-	int w = (csbi.srWindow.Right - csbi.srWindow.Left + 1) - strlen(about.name) - 2;
-	if (w <= 0)
-		w = 77 - strlen(about.name); // needed for MSYS2
-	size_t x = (size_t)w;
+	int max_width = (csbi.srWindow.Right - csbi.srWindow.Left + 1) - strlen(about.name) - 2;
 #endif
+	if (max_width <= 0 || !isatty(STDERR_FILENO))
+		max_width = 77 - strlen(about.name); // needed for MSYS2
 	format_section(_("Usage"));
-	cli_fprintf(stderr, "  " ANSI_COLOUR_GREEN "%s", about.name);
+	int j = cli_fprintf(stderr, "  " ANSI_COLOUR_GREEN "%s", about.name) - strlen(ANSI_COLOUR_GREEN) - 2;
 	if (extra)
 	{
 		for (int i = 0; extra[i].description; i++)
 			if (extra[i].required)
-				cli_fprintf(stderr, ANSI_COLOUR_RED " <%s>" ANSI_COLOUR_RESET, extra[i].description);
+				j += cli_fprintf(stderr, ANSI_COLOUR_RED " <%s>" ANSI_COLOUR_RESET, extra[i].description);
 			else
-				cli_fprintf(stderr, ANSI_COLOUR_YELLOW " [%s]" ANSI_COLOUR_RESET, extra[i].description);
+				j+= cli_fprintf(stderr, ANSI_COLOUR_YELLOW " [%s]" ANSI_COLOUR_RESET, extra[i].description);
+		if (isatty(STDERR_FILENO))
+			j -= (strlen(ANSI_COLOUR_RESET) + strlen(ANSI_COLOUR_WHITE));
 	}
 	if (args)
-		for (int i = 0, j = 0; args[i].short_option; i++)
+		for (int i = 0; args[i].short_option; i++)
 		{
 			if (!args[i].hidden)
 			{
-				if (j + 4 + (args[i].option_type ? strlen(args[i].option_type) : 0) > x)
-				{
-					cli_fprintf(stderr, "\n%*s  ", (int)strlen(about.name), " ");
-					j = 2;
-				}
+				if ((int)(j + 4 + (args[i].option_type ? strlen(args[i].option_type) : 0)) > max_width)
+					j = cli_fprintf(stderr, "\n%*s  ", (int)strlen(about.name), " ");
 				if (args[i].required)
 					j += cli_fprintf(stderr, ANSI_COLOUR_RED " <-%c", args[i].short_option);
 				else
@@ -414,6 +415,8 @@ inline static void print_usage(config_arg_t *args, config_extra_t *extra)
 				if (args[i].option_type)
 					j += cli_fprintf(stderr, " %s", args[i].option_type);
 				j += cli_fprintf(stderr, "%c" ANSI_COLOUR_RESET, args[i].required ? '>' : ']');
+				if (isatty(STDERR_FILENO))
+					j -= (strlen(ANSI_COLOUR_RESET) + strlen(ANSI_COLOUR_WHITE));
 			}
 		}
 	cli_fprintf(stderr, ANSI_COLOUR_RESET "\n");
@@ -428,9 +431,9 @@ extern void config_show_usage(config_arg_t *args, config_extra_t *extra)
 	exit(EXIT_SUCCESS);
 }
 
-static void print_option(int width, char sopt, char *lopt, char *type, bool req, char *desc)
+static void print_option(int indent, char sopt, char *lopt, char *type, bool req, char *desc)
 {
-	size_t z = width - 8;
+	size_t z = indent - 8;
 	if (lopt)
 		z -= strlen(lopt);
 	else
@@ -456,39 +459,53 @@ static void print_option(int width, char sopt, char *lopt, char *type, bool req,
 		}
 		z -= 3 + strlen(type);
 	}
-	fprintf(stderr, "%*s", (int)z, " ");
+	cli_fprintf(stderr, "%*s", (int)z, " ");
 
 #ifndef _WIN32
 	struct winsize ws;
-	ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
-	int x = ws.ws_col - width - 2;
+	ioctl(STDERR_FILENO, TIOCGWINSZ, &ws);
+	int max_width = ws.ws_col - 2;
 #else
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
 	GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
-	int x = (csbi.srWindow.Right - csbi.srWindow.Left + 1) - width - 2;
-	if (x <= 0)
-		x = 77 - width; // needed for MSYS2
+	int max_width = (csbi.srWindow.Right - csbi.srWindow.Left + 1) - 2;
 #endif
+	if (max_width <= 0 || !isatty(STDERR_FILENO))
+		max_width = 77; // needed for MSYS2, but also sensible default if output is bein redirected
+	int width = max_width - indent;
 	for (; isspace(*desc); desc++)
 		;
 	int l = strlen(desc);
 	cli_fprintf(stderr, ANSI_COLOUR_BLUE);
-	if (l < x)
+	if (l < width)
 		cli_fprintf(stderr, "%s", desc);
+	else if (width <= indent)
+		cli_fprintf(stderr, "\n  %s\n", desc);
 	else
 	{
 		int s = 0;
 		do
 		{
-			int e = s + x;
+			bool too_long = false;
+			int e = s + width;
 			if (e > l)
 				e = l;
 			else
-				for (; e > s; e--)
+				for (too_long = true; e > s; e--)
 					if (isspace(desc[e]))
+					{
+						too_long = false;
 						break;
-			if (s)
-				cli_fprintf(stderr, "\n%*s", width, " ");
+					}
+			if (too_long)
+			{
+				for (int e2 = s; e2 < s + max_width; e2++)
+					if (isspace(desc[e2]) || desc[e2] == 0x00)
+						e = e2;
+				cli_fprintf(stderr, "\n  ");
+			}
+			else if (s)
+				cli_fprintf(stderr, "\n%*s", indent, " ");
 			cli_fprintf(stderr, "%.*s", e - s, desc + s);
 			s = e + 1;
 		}
@@ -503,34 +520,45 @@ static void print_notes(char *line)
 #ifndef _WIN32
 	cli_fprintf(stderr, "  • ");
 	struct winsize ws;
-	ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
-	int x = ws.ws_col - 5;
+	ioctl(STDERR_FILENO, TIOCGWINSZ, &ws);
+	int max_width = ws.ws_col - 5;
 #else
 	cli_fprintf(stderr, "  * ");
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
 	GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
-	int x = (csbi.srWindow.Right - csbi.srWindow.Left + 1) - 5;
-	if (x <= 0)
-		x = 72; // needed for MSYS2
+	int max_width = (csbi.srWindow.Right - csbi.srWindow.Left + 1) - 5;
 #endif
+	if (max_width <= 0 || !isatty(STDERR_FILENO))
+		max_width = 72; // needed for MSYS2, but also sensible default if output is bein redirected
 	for (; isspace(*line); line++)
 		;
 	int l = strlen(line);
-	if (l < x)
+	if (l < max_width)
 		cli_fprintf(stderr, "%s", line);
 	else
 	{
 		int s = 0;
 		do
 		{
-			int e = s + x;
+			bool too_long = false;
+			int e = s + max_width;
 			if (e > l)
 				e = l;
 			else
-				for (; e > s; e--)
+				for (too_long = true; e > s; e--)
 					if (isspace(line[e]))
+					{
+						too_long = false;
 						break;
-			if (s)
+					}
+			if (too_long)
+			{
+				for (e = s; ; e++)
+					if (isspace(line[e]) || line[e] == 0x00)
+						break;
+				cli_fprintf(stderr, "\n  ");
+			}
+			else if (s)
 				cli_fprintf(stderr, "\n%*s", 4, " ");
 			cli_fprintf(stderr, "%.*s", e - s, line + s);
 			s = e + 1;
@@ -547,33 +575,33 @@ static void show_help(config_arg_t *args, char **notes, config_extra_t *extra)
 	cli_fprintf(stderr, "\n");
 	print_usage(args, extra);
 
-	int width = 10;
+	int indent = 10;
 	bool has_advanced = false;
 	for (int i = 0; args[i].short_option; i++)
 	{
 		int w = 10 + (args[i].long_option ? strlen(args[i].long_option) : 0);
 		if (args[i].option_type)
 			w += 3 + strlen(args[i].option_type);
-		width = width > w ? width : w;
+		indent = indent > w ? indent : w;
 		if (args[i].advanced && !args[i].hidden)
 			has_advanced = true;
 	}
 
 	cli_fprintf(stderr, "\n");
 	format_section(_("Options"));
-	print_option(width, 'h', "help",    NULL, false, "Display this message");
-	print_option(width, 'l', "licence", NULL, false, "Display GNU GPL v3 licence header");
-	print_option(width, 'v', "version", NULL, false, "Display application version");
+	print_option(indent, 'h', "help",    NULL, false, "Display this message");
+	print_option(indent, 'l', "licence", NULL, false, "Display GNU GPL v3 licence header");
+	print_option(indent, 'v', "version", NULL, false, "Display application version");
 	for (int i = 0; args[i].short_option; i++)
 		if (!args[i].hidden && !args[i].advanced)
-			print_option(width, args[i].short_option, args[i].long_option, args[i].option_type ? : NULL, args[i].response_type & CONFIG_ARG_REQUIRED, args[i].description);
+			print_option(indent, args[i].short_option, args[i].long_option, args[i].option_type ? : NULL, args[i].response_type & CONFIG_ARG_REQUIRED, args[i].description);
 	if (has_advanced)
 	{
 		cli_fprintf(stderr, "\n");
 		format_section(_("Advnaced Options"));
 		for (int i = 0; args[i].short_option; i++)
 			if (!args[i].hidden && args[i].advanced)
-				print_option(width, args[i].short_option, args[i].long_option, args[i].option_type ? : NULL, args[i].response_type & CONFIG_ARG_REQUIRED, args[i].description);
+				print_option(indent, args[i].short_option, args[i].long_option, args[i].option_type ? : NULL, args[i].response_type & CONFIG_ARG_REQUIRED, args[i].description);
 	}
 	if (notes)
 	{
@@ -638,7 +666,6 @@ extern void update_config(const char * const restrict o, const char * const rest
 					found = true;
 				}
 				fprintf(t, "%s", line);
-
 				free(line);
 				line = NULL;
 				len = 0;

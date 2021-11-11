@@ -77,8 +77,8 @@
 
 #define TIMEOUT 10
 
-static void version_format(int i, char *id, char *value);
-static void version_format_line(char **buffer, int x, int i, char *id, char *value);
+static void version_format(int indent, char *id, char *value);
+static void version_format_line(char **buffer, int max_width, int indent, char *id, char *value);
 static void version_download_latest(char *);
 static void version_install_latest(char *);
 static void *version_check(void *);
@@ -101,7 +101,7 @@ version_check_t;
 
 extern void version_print(char *name, char *version, char *url)
 {
-	int i = strlen(name) + 8;
+	int indent = strlen(name) + 8;
 	char *av = NULL;
 	asprintf(&av, _("%s version"), name);
 	char *git = strndup(GIT_COMMIT, GIT_COMMIT_LENGTH);
@@ -113,18 +113,18 @@ extern void version_print(char *name, char *version, char *url)
 #else
 	asprintf(&runtime, "%s", windows_version());
 #endif
-	version_format(i, av,              version);
-	version_format(i, _("built on"),   __DATE__ " " __TIME__);
-	version_format(i, _("git commit"), git);
-	version_format(i, _("build os"),   BUILD_OS);
-	version_format(i, _("compiler"),   COMPILER);
-	version_format(i, _("cflags"),     ALL_CFLAGS);
-	version_format(i, _("cppflags"),   ALL_CPPFLAGS);
-	version_format(i, _("runtime"),    runtime);
+	version_format(indent, av,              version);
+	version_format(indent, _("built on"),   __DATE__ " " __TIME__);
+	version_format(indent, _("git commit"), git);
+	version_format(indent, _("build os"),   BUILD_OS);
+	version_format(indent, _("compiler"),   COMPILER);
+	version_format(indent, _("cflags"),     ALL_CFLAGS);
+	version_format(indent, _("cppflags"),   ALL_CPPFLAGS);
+	version_format(indent, _("runtime"),    runtime);
 #ifdef USE_GCRYPT
 	char *gcv = NULL;
 	asprintf(&gcv, "%s (compiled) %s (runtime) %s (required)", GCRYPT_VERSION, gcry_check_version(NULL), NEED_LIBGCRYPT_VERSION);
-	version_format(i, _("libgcrypt"), gcv);
+	version_format(indent, _("libgcrypt"), gcv);
 	free(gcv);
 #endif
 	free(av);
@@ -166,23 +166,13 @@ extern char *version_build_info(void)
 	version_format_line(&info, AA_GW, AA_GI, _("cppflags"),   ALL_CPPFLAGS);
 	version_format_line(&info, AA_GW, AA_GI, _("runtime"),    runtime);
 
-	//asprintf(&info, "%s: %s\n", _("built on"),   __DATE__ " " __TIME__);
-	//asprintf(&info, "%s%s: %s\n", info, _("git commit"), git);
-	//asprintf(&info, "%s%s: %s\n", info, _("build os"),   BUILD_OS);
-	//asprintf(&info, "%s%s: %s\n", info, _("compiler"),   COMPILER);
-	//asprintf(&info, "%s%s: %s\n", info, _("cflags"),     ALL_CFLAGS);
-	//asprintf(&info, "%s%s: %s\n", info, _("cppflags"),   ALL_CPPFLAGS);
-	//asprintf(&info, "%s%s: %s\n", info, _("runtime"),    runtime);
-
-//#ifdef GCRYPT_VERSION
-	char *gcv = NULL;
 #ifdef USE_GCRYPT
+	char *gcv = NULL;
 	asprintf(&gcv, "%s (compiled) %s (runtime)", GCRYPT_VERSION, gcry_check_version(NULL));
-#endif
 	//asprintf(&info, "%s%s: %s\n", info, _("libgcrypt"), gcv);
 	version_format_line(&info, AA_GW, AA_GI, _("libgcrypt"), gcv);
 	free(gcv);
-//#endif
+#endif
 
 	free(git);
 	free(runtime);
@@ -347,39 +337,51 @@ static size_t version_verify(void *p, size_t s, size_t n, void *v)
 	return s * n;
 }
 
-static void version_format(int i, char *id, char *value)
+static void version_format(int indent, char *id, char *value)
 {
-	cli_fprintf(stderr, ANSI_COLOUR_GREEN "%*s" ANSI_COLOUR_RESET ": " ANSI_COLOUR_MAGENTA, i, id);
+	cli_fprintf(stderr, ANSI_COLOUR_GREEN "%*s" ANSI_COLOUR_RESET ": " ANSI_COLOUR_MAGENTA, indent, id);
 #ifndef _WIN32
 	struct winsize ws;
-	ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
-	int x = ws.ws_col - i - 2;
+	ioctl(STDERR_FILENO, TIOCGWINSZ, &ws);
+	int max_width = ws.ws_col - 2;
 #else
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
 	GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
-	int x = (csbi.srWindow.Right - csbi.srWindow.Left + 1) - i - 2;
-	if (x <= 0)
-		x = 77 - i; // needed for MSYS2
+	int max_width = (csbi.srWindow.Right - csbi.srWindow.Left + 1) - 2;
 #endif
+	if (max_width <= 0 || !isatty(STDERR_FILENO))
+		max_width = 77; // needed for MSYS2, but also sensible default if output is bein redirected
+	int width = max_width - indent;
 	for (; isspace(*value); value++)
 		;
 	int l = strlen(value);
-	if (l < x)
+	if (l < width)
 		cli_fprintf(stderr, "%s", value);
 	else
 	{
 		int s = 0;
 		do
 		{
-			int e = s + x;
+			bool too_long = false;
+			int e = s + width;
 			if (e > l)
 				e = l;
 			else
-				for (; e > s; e--)
+				for (too_long = true; e > s; e--)
 					if (isspace(value[e]))
+					{
+						too_long = false;
 						break;
-			if (s)
-				cli_fprintf(stderr, "\n%*s  ", i, " ");
+					}
+			if (too_long)
+			{
+				for (int e2 = s; e2 < s + max_width; e2++)
+					if (isspace(value[e2]) || value[e2] == 0x00)
+						e = e2;
+				cli_fprintf(stderr, "\n  ");
+			}
+			else if (s)
+				cli_fprintf(stderr, "\n%*s  ", indent, " ");
 			cli_fprintf(stderr, "%.*s", e - s, value + s);
 			s = e + 1;
 		}
@@ -390,20 +392,20 @@ static void version_format(int i, char *id, char *value)
 	return;
 }
 
-static void version_format_line(char **buffer, int x, int i, char *id, char *value)
+static void version_format_line(char **buffer, int max_width, int indent, char *id, char *value)
 {
-	asprintf(buffer, "%s%*s: ", *buffer ? *buffer : "", i, id);
+	asprintf(buffer, "%s%*s: ", *buffer ? *buffer : "", indent, id);
 	for (; isspace(*value); value++)
 		;
 	int l = strlen(value);
-	if (l < x)
+	if (l < max_width)
 		asprintf(buffer, "%s%s", *buffer, value);
 	else
 	{
 		int s = 0;
 		do
 		{
-			int e = s + x;
+			int e = s + max_width;
 			if (e > l)
 				e = l;
 			else
@@ -411,7 +413,7 @@ static void version_format_line(char **buffer, int x, int i, char *id, char *val
 					if (isspace(value[e]))
 						break;
 			if (s)
-				asprintf(buffer, "%s\n%*s  ", *buffer, i, " ");
+				asprintf(buffer, "%s\n%*s  ", *buffer, indent, " ");
 			asprintf(buffer, "%s%.*s", *buffer, e - s, value + s);
 			s = e + 1;
 		}

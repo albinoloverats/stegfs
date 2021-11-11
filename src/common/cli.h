@@ -85,17 +85,6 @@ typedef struct
 }
 cli_bps_t;
 
-/*!
- * \brief         Display a line of --help text options/values
- * \param[in]  s  Short option
- * \param[in]  l  Long option
- * \param[in]  v  Option value
- * \param[in]  t  About text
- *
- * Display a line of --help text options/values.
- */
-extern void cli_format_help(char s, char *l, char *v, char *t);
-
 extern void cli_display(cli_t *) __attribute__((nonnull(1)));
 
 extern double cli_calc_bps(cli_bps_t *) __attribute__((nonnull(1)));

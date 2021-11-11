@@ -61,50 +61,6 @@ static int cli_inited = -1; // -1 (no), 0 (failed), 1 (okay)
 static int cli_bps_sort(const void *, const void *);
 static int cli_print(FILE *, char *);
 
-extern void cli_format_help(char s, char *l, char *v, char *t)
-{
-#ifdef _WIN32
-	cli_init();
-#endif
-	size_t z = CLI_HELP_FORMAT_RIGHT_COLUMN - 8 - strlen(l);
-	cli_fprintf(stderr, "  " ANSI_COLOUR_WHITE "-%c" ANSI_COLOUR_RESET ", " ANSI_COLOUR_WHITE "--%s" ANSI_COLOUR_RESET, s, l);
-	if (v)
-	{
-		cli_fprintf(stderr, ANSI_COLOUR_WHITE "=" ANSI_COLOUR_YELLOW "<%s>" ANSI_COLOUR_RESET, v);
-		z -= 3 + strlen(v);
-	}
-	fprintf(stderr, "%*s", (int)z, " ");
-
-	cli_fprintf(stderr, ANSI_COLOUR_BLUE);
-#ifndef _WIN32
-	struct winsize w;
-	ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-	if (w.ws_col)
-	{
-		size_t o = 0;
-		while (true)
-		{
-			int l = w.ws_col - CLI_HELP_FORMAT_RIGHT_COLUMN - 1;
-			while (isspace(t[o]))
-				o++;
-			/* FIXME wrap on word boundary and handle UTF-8 characters properly */
-			o += fprintf(stderr, "%.*s", l, t + o);
-			if (o >= strlen(t))
-				break;
-			if (!isspace(t[o - 1]) && !isspace(t[o]))
-				fprintf(stderr, "-");
-			fprintf(stderr, "\n%*s", CLI_HELP_FORMAT_RIGHT_COLUMN, " ");
-		}
-	}
-	else
-#endif /* ! _WIN32 */
-		fprintf(stderr, "%s", t);
-	cli_fprintf(stderr, ANSI_COLOUR_RESET);
-
-	fprintf(stderr, "\n");
-	return;
-}
-
 extern int cli_printf(const char * const restrict s, ...)
 {
 #ifdef _WIN32
