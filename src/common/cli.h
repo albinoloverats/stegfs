@@ -65,8 +65,9 @@ cli_status_e;
  */
 typedef struct
 {
-	uint64_t offset; /*!< Progress */
-	uint64_t size;   /*!< Maximum */
+	uint64_t offset;  /*!< Progress */
+	uint64_t size;    /*!< Maximum */
+	char    *display; /*!< Extra text to display withni the progress bar */
 }
 cli_progress_t;
 

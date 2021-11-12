@@ -117,15 +117,23 @@
 
 #define PERCENT 100.0f /*!< Floating point 100% */
 
-#define THOUSAND                   1000 /*!< Integer value for 1 thousand */
-#define MILLION                 1000000 /*!< Integer value for 1 million (ideal for timing related things) */
-#define THOUSAND_MILLION     1000000000 /*!< Integer value for 1000 million */
-#define BILLION           1000000000000 /*!< Integer value for 1 billion (ideal for timing in nanoseconds) */
+#define THOUSAND                              1000LLU /*!< Integer value for 1 thousand */
+#define MILLION                            1000000LLU /*!< Integer value for 1 million (ideal for timing related things) */
+#define THOUSAND_MILLION                1000000000LLU /*!< Integer value for 1,000 million */
+#define BILLION                      1000000000000LLU /*!< Integer value for 1 billion (ideal for timing in nanoseconds) */
+#define THOUSAND_BILLION          1000000000000000LLU
+#define TRILLION               1000000000000000000LLU
+//#define THOUSAND_TRILLION   1000000000000000000000LLU // Can't go above 18446744073709551615
+//#define QUADRILLION      1000000000000000000000000LLU
 
-#define KILOBYTE                   1024 /*!< Bytes in a kilobyte */
-#define MEGABYTE                1048576 /*!< Bytes in a megabyte */
-#define GIGABYTE             1073741824 /*!< Bytes in a gigabyte */
-#define TERABYTE          1099511627776 /*!< Bytes in a terabyte */
+#define  KILOBYTE                             1024LLU /*!< Bytes in a kilobyte */
+#define  MEGABYTE                          1048576LLU /*!< Bytes in a megabyte */
+#define  GIGABYTE                       1073741824LLU /*!< Bytes in a gigabyte */
+#define  TERABYTE                    1099511627776LLU /*!< Bytes in a terabyte */
+#define  PETABYTE                 1125899906842624LLU
+#define   EXABYTE              1152921504606846976LLU
+//#define ZETTABYTE           1180591620717411303424LLU
+//#define YOTTABYTE        1208925819614629174706176LLU
 
 typedef unsigned char byte_t; /*!< A byte is just 8 bits, no signedness or an other fancy stuff ;-) */
 
