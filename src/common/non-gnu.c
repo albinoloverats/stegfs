@@ -1,6 +1,6 @@
 /*
  * Common code which is typically missing on MS Windows
- * Copyright © 2005-2021, albinoloverats ~ Software Development
+ * Copyright © 2005-2022, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -440,7 +440,7 @@ extern FILE *temp_file(void)
 	char p[256] = { 0x0 };
 	GetTempPath(sizeof p - 1, p);
 	int o = strlen(p);
-	uint16_t r = (uint16_t)(lrand48() | 0x0000FFFF);
+	uint16_t r = (uint16_t)(lrand48() & 0x0000FFFF);
 	snprintf(p + o, sizeof p - o - 1, "alr-%04x", r);
 	FILE *t = fopen(p, "wb+");
 	return t;
@@ -510,6 +510,44 @@ extern char *windows_version(void)
 		strcat(version, " Client");
 	}
 	return version;
+}
+
+/* Print out on stderr a line consisting of the test in S, a colon, a space,
+   a message describing the meaning of the signal number SIG and a newline.
+   If S is NULL or "", the colon and space are omitted.  */
+extern void psignal(int sig, const char *s)
+{
+	const char *colon, *desc;
+	if (s == NULL || *s == '\0')
+		s = colon = "";
+	else
+		colon = ": ";
+	switch (sig)
+	{
+		case SIGABRT:
+			desc = _("Aborted");
+			break;
+		case SIGFPE:
+			desc = _("Floating point exception");
+			break;
+		case SIGILL:
+			desc = _("Illegal instruction");
+			break;
+		case SIGINT:
+			desc = _("Interrupt");
+			break;
+		case SIGSEGV:
+			desc = _("Segmentation fault");
+			break;
+		case SIGTERM:
+			desc = _("Terminated");
+			break;
+		default:
+			desc = _("Unknown signal");
+			break;
+	}
+	fprintf(stderr, "%s%s%s\n", s, colon, desc);
+	return;
 }
 
 #endif /* _WIN32 */

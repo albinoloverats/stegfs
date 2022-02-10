@@ -1,6 +1,6 @@
 /*
  * Common code for dealing with tag, length, value arrays
- * Copyright © 2009-2021, albinoloverats ~ Software Development
+ * Copyright © 2009-2022, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -24,7 +24,7 @@
 /*!
  * \file    tlv.h
  * \author  albinoloverats ~ Software Development
- * \date    2009-2021
+ * \date    2009-2022
  * \brief   Common TLV code shared between projects
  *
  * Common tag/length/value code, for creating, importing and exporting
@@ -34,7 +34,7 @@
 #include <stdint.h> /*!< Necessary include as c99 standard integer types are referenced in this header */
 #include <stdbool.h> /*!< Necessary include as c99 standard boolean type is referenced in this header */
 
-typedef void * TLV_HANDLE; /*<! Handle type for TLV functions */
+typedef void * TLV; /*<! Handle type for TLV functions */
 
 /*!
  * \brief  A TLV structure
@@ -57,7 +57,7 @@ tlv_t;
  * Create a new TLV array instance; all further operations are then
  * performed against this handle. Returns NULL on error.
  */
-extern TLV_HANDLE tlv_init(void) __attribute__((malloc));
+extern TLV tlv_init(void) __attribute__((malloc));
 
 /*!
  * \brief         Destroy a TLV array
@@ -67,7 +67,7 @@ extern TLV_HANDLE tlv_init(void) __attribute__((malloc));
  * Free the memory and sets h to NULL so all subsequent calls to TLV
  * functions will not result in undefined behaviour.
  */
-extern void tlv_deinit(TLV_HANDLE *h) __attribute__((nonnull(1)));
+extern void tlv_deinit(TLV *h) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Append a new TLV triple to an array
@@ -76,9 +76,9 @@ extern void tlv_deinit(TLV_HANDLE *h) __attribute__((nonnull(1)));
  *
  * Add a new TLV triple to the end of an existing TLV array. Does not
  * (currently) check for duplicates. Potentially modifies the address of
- * the TLV_HANDLE in accordance with the rules of realloc().
+ * the TLV in accordance with the rules of realloc().
  */
-extern void tlv_append(TLV_HANDLE *h, tlv_t t) __attribute__((nonnull(1)));
+extern void tlv_append(TLV *h, tlv_t t) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Get TLV structure for tag
@@ -89,7 +89,7 @@ extern void tlv_append(TLV_HANDLE *h, tlv_t t) __attribute__((nonnull(1)));
  * Return the TLV structure for the given tag value. NB Do not free the
  * returned TLV pointer: bad things will happen.
  */
-extern tlv_t *tlv_get(TLV_HANDLE h, uint8_t t) __attribute__((nonnull(1)));
+extern tlv_t *tlv_get(TLV h, uint8_t t) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Check whether a TLV array has a particular tag
@@ -99,7 +99,7 @@ extern tlv_t *tlv_get(TLV_HANDLE h, uint8_t t) __attribute__((nonnull(1)));
  *
  * Check whether the TLV array has the tag given value.
  */
-extern bool tlv_has_tag(TLV_HANDLE h, uint8_t t) __attribute__((nonnull(1)));
+extern bool tlv_has_tag(TLV h, uint8_t t) __attribute__((nonnull(1)));
 
 #define TLV_VALUE_OF_ARGS_COUNT(...) TLV_VALUE_OF_ARGS_COUNT2(__VA_ARGS__, 3, 2, 1) /*!< Function overloading argument count (part 1) */
 #define TLV_VALUE_OF_ARGS_COUNT2(_1, _2, _3, _, ...) _                              /*!< Function overloading argument count (part 2) */
@@ -118,7 +118,7 @@ extern bool tlv_has_tag(TLV_HANDLE h, uint8_t t) __attribute__((nonnull(1)));
  * Get the value for the given tag. If there are duplicates in the array
  * this will return the value of the first.
  */
-extern byte_t *tlv_value_of_aux(TLV_HANDLE h, uint8_t t, uint8_t *d) __attribute__((nonnull(1)));
+extern byte_t *tlv_value_of_aux(TLV h, uint8_t t, uint8_t *d) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Get length for tag
@@ -128,7 +128,7 @@ extern byte_t *tlv_value_of_aux(TLV_HANDLE h, uint8_t t, uint8_t *d) __attribute
  *
  * Retrieve the length for the TLV entry with the given tag value.
  */
-extern uint16_t tlv_length_of(TLV_HANDLE ptr, uint8_t t) __attribute__((nonnull(1)));
+extern uint16_t tlv_length_of(TLV ptr, uint8_t t) __attribute__((nonnull(1)));
 
 #define TLV_EXPORT_ARGS_COUNT(...) TLV_EXPORT_ARGS_COUNT2(__VA_ARGS__, 2, 1) /*!< Function overloading argument count (part 1) */
 #define TLV_EXPORT_ARGS_COUNT2(_1, _2, _, ...) _                             /*!< Function overloading argument count (part 2) */
@@ -147,7 +147,7 @@ extern uint16_t tlv_length_of(TLV_HANDLE ptr, uint8_t t) __attribute__((nonnull(
  * (defaults to true) specifies wherther to use network byte order for
  * the length value.
  */
-extern byte_t *tlv_export_aux(TLV_HANDLE h, bool e) __attribute__((nonnull(1)));
+extern byte_t *tlv_export_aux(TLV h, bool e) __attribute__((nonnull(1)));
 
 /*!
  * \brief         The number of TLV items in the array
@@ -156,7 +156,7 @@ extern byte_t *tlv_export_aux(TLV_HANDLE h, bool e) __attribute__((nonnull(1)));
  *
  * Count the number of TLV elements in the array.
  */
-extern uint16_t tlv_count(TLV_HANDLE h) __attribute__((nonnull(1)));
+extern uint16_t tlv_count(TLV h) __attribute__((nonnull(1)));
 
 /*!
  * \brief         The size of TLV array
@@ -166,6 +166,6 @@ extern uint16_t tlv_count(TLV_HANDLE h) __attribute__((nonnull(1)));
  * Return the total size of the TLV array in bytes; useful when calling
  * tlv_export().
  */
-extern size_t tlv_size(TLV_HANDLE h) __attribute__((nonnull(1)));
+extern size_t tlv_size(TLV h) __attribute__((nonnull(1)));
 
 #endif /* _COMMON_TLV_H_ */

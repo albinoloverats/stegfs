@@ -111,7 +111,7 @@ extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid, 
 			return STEGFS_INIT_NOT_STEGFS;
 	}
 
-	TLV_HANDLE tlv = tlv_init();
+	TLV tlv = tlv_init();
 	for (uint64_t i = 0, j = tag_off; i < tags; i++)
 	{
 		tlv_t t;

@@ -7,7 +7,7 @@ CP       = cp_tree
 SOURCE   = src/main.c src/stegfs.c
 MKSRC    = src/mkfs.c
 CPSRC    = src/cp.c
-COMMON   = src/common/error.c src/common/ccrypt.c src/common/tlv.c src/common/dir.c src/common/cli.c src/common/version.c src/common/config.c src/common/non-gnu.c
+COMMON   = src/common/error.c src/common/ccrypt.c src/common/tlv.c src/common/list.c src/common/dir.c src/common/cli.c src/common/version.c src/common/config.c
 MISC     = src/common/misc.h
 
 CFLAGS   += -Wall -Wextra -std=gnu99 $(shell pkg-config --cflags fuse) -pipe -O2 -I/usr/local/include -Isrc

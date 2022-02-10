@@ -1,6 +1,6 @@
 /*
  * stegfs ~ a steganographic file system for unix-like systems
- * Copyright © 2007-2021, albinoloverats ~ Software Development
+ * Copyright © 2007-2022, albinoloverats ~ Software Development
  * email: stegfs@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -24,7 +24,7 @@
 /*!
  * \file    dir.h
  * \author  albinoloverats ~ Software Development
- * \date    2009-2021
+ * \date    2009-2022
  * \brief   Directory parsing functions
  * \note    These functions all return newly allocated strings
  *

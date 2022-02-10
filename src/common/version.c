@@ -1,6 +1,6 @@
 /*
  * Version checking functions (non-applications specific)
- * Copyright © 2005-2021, albinoloverats ~ Software Development
+ * Copyright © 2005-2022, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -135,7 +135,7 @@ extern void version_print(char *name, char *version, char *url)
 		nanosleep(&vc, NULL);
 	if (version_new_available)
 	{
-		fprintf(stderr, "\n");
+		cli_fprintf(stderr, "\n");
 		cli_fprintf(stderr, _(NEW_VERSION_URL), version_available, program_invocation_short_name, strlen(new_version_url) ? new_version_url : url);
 	}
 	return;

@@ -1,6 +1,6 @@
 /*
  * Common code for providing a cmomand line progress bar
- * Copyright © 2005-2021, albinoloverats ~ Software Development
+ * Copyright © 2005-2022, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -47,22 +47,19 @@
 
 #define CLI_HELP_FORMAT_RIGHT_COLUMN 37
 
+#define CLI_SMALL   62
 #define CLI_DEFAULT 80 /* Expected default terminal width */
-#define CLI_LARGE  160 /* I like a nice large terminal (so Tmux can split it into 4 regular sized if I so desire) */
+#define CLI_LARGE   75
 
-#define CLI_SINGLE 19
-#define CLI_DOUBLE 14
-
-#define CLI_TRUNCATED_DISPLAY 10
-#define CLI_TRUNCATED_ELLIPSE "...."
-
-#ifndef _WIN32
 static int cli_width = CLI_DEFAULT;
 static int cli_size_width = 0;
 
-static void cli_display_bar(cli_progress_t *, cli_progress_t *, cli_bps_t *);
+static void cli_display_bars(cli_progress_t *, cli_progress_t *, cli_bps_t *);
+#ifndef _WIN32
 static void cli_sigwinch(int);
 #endif
+
+extern void on_quit(int) __attribute__((noreturn));
 
 static void cli_init(void);
 static int cli_inited = -1; // -1 (no), 0 (failed), 1 (okay)
@@ -76,14 +73,21 @@ extern int cli_printf(const char * const restrict s, ...)
 	va_list ap;
 	va_start(ap, s);
 	char *d = NULL;
-#ifndef _WIN32
 	vasprintf(&d, s, ap);
-#else
-	uint8_t l = 0xFF;
-	if ((d = calloc(l, sizeof l)))
-		vsnprintf(d, l - 1, s, ap);
-#endif
 	int x = cli_print(stdout, d);
+	va_end(ap);
+	free(d);
+	return x;
+}
+
+extern int cli_eprintf(const char * const restrict s, ...)
+{
+	cli_init();
+	va_list ap;
+	va_start(ap, s);
+	char *d = NULL;
+	vasprintf(&d, s, ap);
+	int x = cli_print(stderr, d);
 	va_end(ap);
 	free(d);
 	return x;
@@ -95,13 +99,7 @@ extern int cli_fprintf(FILE *f, const char * const restrict s, ...)
 	va_list ap;
 	va_start(ap, s);
 	char *d = NULL;
-#ifndef _WIN32
 	vasprintf(&d, s, ap);
-#else
-	uint8_t l = 0xFF;
-	if ((d = calloc(l, sizeof l)))
-		vsnprintf(d, l - 1, s, ap);
-#endif
 	int x = cli_print(f, d);
 	va_end(ap);
 	free(d);
@@ -112,6 +110,12 @@ extern int cli_printx(const uint8_t * const restrict x, size_t z)
 {
 	cli_init();
 	return cli_fprintx(stdout, x, z);
+}
+
+extern int cli_eprintx(const uint8_t * const restrict x, size_t z)
+{
+	cli_init();
+	return cli_fprintx(stderr, x, z);
 }
 
 extern int cli_fprintx(FILE *f, const uint8_t * const restrict x, size_t z)
@@ -165,17 +169,20 @@ extern double cli_calc_bps(cli_bps_t *bps)
 	return val /= (BPS - 1);
 }
 
-#ifndef _WIN32
+//#ifndef _WIN32
 extern void cli_display(cli_t *p)
 {
+	cli_init();
+#ifndef _WIN32
 	cli_sigwinch(SIGWINCH);
+#endif
 	cli_size_width = 0;
 
 	cli_bps_t bps[BPS];
 	memset(bps, 0x00, BPS * sizeof( cli_bps_t ));
 	int b = 0;
 
-	fprintf(stderr, "\e[?25l"); /* hide cursor */
+	fprintf(stderr, "\e[?25l\n"); /* hide cursor */
 	while (*p->status == CLI_INIT || *p->status == CLI_RUN)
 	{
 		struct timespec s = { 0, 10 * MILLION }; /* 10 milliseconds */
@@ -189,127 +196,109 @@ extern void cli_display(cli_t *p)
 		b++;
 		if (b >= BPS)
 			b = 0;
-		cli_display_bar(p->total, p->current, bps);
+		cli_display_bars(p->total, p->current, bps);
 	}
 	if (*p->status == CLI_DONE)
 	{
 		p->total->offset = p->total->size;
 		p->current->offset = p->current->size;
-		cli_display_bar(p->total, p->current, bps);
+		cli_display_bars(p->total, p->current, bps);
 	}
 	fprintf(stderr, "\e[?25h\n"); /* restore cursor */
 
 	return;
 }
 
-static int cli_display_bar_size(char *prog_bar, cli_progress_t *p, bool use_max)
+static void cli_display_bar(char *name, cli_progress_t *p, double percent)
 {
-	char tmp[0xFF] = { 0x0 };
-	int x = sprintf(tmp, "%'" PRIu64, p->size);
-	if (use_max && x > cli_size_width)
-		cli_size_width = x;
-	if (prog_bar)
-		return sprintf(prog_bar + strlen(prog_bar), "(%'*" PRIu64 "/%-'*" PRIu64 ") ", use_max ? cli_size_width : x, p->offset, use_max ? cli_size_width : x, p->size);
-	return sprintf(tmp, "(%'*" PRIu64 "/%-'*" PRIu64 ") ", use_max ? cli_size_width : x, p->offset, use_max ? cli_size_width : x, p->size);
+	int name_width = CLI_TRUNCATED_DISPLAY_SHORT + strlen(CLI_TRUNCATED_ELLIPSE) + (cli_width > CLI_DEFAULT ? CLI_TRUNCATED_DISPLAY_SHORT : 0);
+	fprintf(stderr, "\r%-*s : ", name_width, name);
+	if (cli_width > CLI_SMALL)
+		fprintf(stderr, "%'13" PRIu64 "/%-'13" PRIu64 " (", p->offset, p->size);
+	fprintf(stderr, "%3.0f%%", isnan(percent) ? 0.0f : (percent > PERCENT ? PERCENT : percent));
+	if (cli_width > CLI_SMALL)
+		fprintf(stderr, ")");
+
+	if (cli_width > CLI_DEFAULT)
+	{
+		int progress_bar_width = cli_width - CLI_LARGE;
+		fprintf(stderr, " [");
+		/*
+		 * display overall progress bar
+		 */
+		for (int i = 0; i < progress_bar_width; i++)
+			fprintf(stderr, "%c", i < progress_bar_width * percent  / PERCENT ? '=' : ' ');
+		fprintf(stderr, "]");
+	}
+	return;
 }
 
-static void cli_display_bar(cli_progress_t *t, cli_progress_t *c, cli_bps_t *bps)
+static void cli_display_bps(cli_bps_t *bps)
 {
-	double total   = (PERCENT * t->offset + PERCENT * c->offset / c->size) / t->size;
-	double current = PERCENT * c->offset / c->size;
-	bool single = t->size == 1;
-
-	int max_width = cli_width; // just in case there's a change...
-	char *progress_bar = calloc(max_width + 1, sizeof( char ));
-	if (!progress_bar)
-		return; // TODO maybe die?
-	sprintf(progress_bar, "%3.0f%% ", isnan(total) ? 0.0f : (total > PERCENT ? PERCENT : total));
-
-	int progress_bar_width = single ? (max_width - CLI_SINGLE) : ((max_width / 2) - CLI_DOUBLE);
-
-	if (max_width >= CLI_LARGE)
-	{
-		if (single)
-			progress_bar_width -= cli_display_bar_size(progress_bar, single ? c : t, single);
-		else
-		{
-			progress_bar_width -= cli_display_bar_size(progress_bar, single ? c : t, single) / 2;
-			progress_bar_width -= cli_display_bar_size(NULL, c, true) / 2;
-		}
-	}
-
-	strcat(progress_bar, "[");
-	/*
-	 * display overall progress bar
-	 */
-	for (int i = 0; i < progress_bar_width; i++)
-		strcat(progress_bar, i < progress_bar_width * total / PERCENT ? "=" : " ");
-	/*
-	 * display current progress (if necessary)
-	 */
-	if (!single)
-	{
-		sprintf(progress_bar + strlen(progress_bar), "] %3.0f%% ", isnan(total) ? 0.0f : (current > PERCENT ? PERCENT : current));
-		if (max_width >= CLI_LARGE)
-			cli_display_bar_size(progress_bar, c, true);
-		strcat(progress_bar, "[");
-		off_t no = strlen(progress_bar);
-		for (int i = 0; i < progress_bar_width; i++)
-			strcat(progress_bar, i < progress_bar_width * current / PERCENT ? "=" : " ");
-		if (c->display)
-		{
-			off_t eq = no + progress_bar_width * current / PERCENT;
-			char *nm = dir_get_name(c->display, '.');
-			if (strlen(nm) < (2 * CLI_TRUNCATED_DISPLAY + strlen(CLI_TRUNCATED_ELLIPSE)))
-				memcpy(progress_bar + no, nm, strlen(nm));
-			else
-			{
-				memcpy(progress_bar + no, nm, CLI_TRUNCATED_DISPLAY);
-				memcpy(progress_bar + no + CLI_TRUNCATED_DISPLAY, CLI_TRUNCATED_ELLIPSE, strlen(CLI_TRUNCATED_ELLIPSE));
-				memcpy(progress_bar + no + CLI_TRUNCATED_DISPLAY + strlen(CLI_TRUNCATED_ELLIPSE), nm + (strlen(nm) - CLI_TRUNCATED_DISPLAY), CLI_TRUNCATED_DISPLAY);
-			}
-			memset(progress_bar + eq, '=', 1);
-			free(nm);
-		}
-	}
-	strcat(progress_bar, "]");
 	/*
 	 * calculate B/s
 	 */
 	double val = cli_calc_bps(bps);
 	if (isnan(val) || val == 0.0f)
-		strcat(progress_bar, "  ---.- B/s");
+		fprintf(stderr, "    0.0 B/s");
 	else
 	{
 		if (val < THOUSAND)
-			sprintf(progress_bar + strlen(progress_bar), "  %5.1f B/s", val);
+			fprintf(stderr, "  %5.1f B/s", val);
 		else if (val < MILLION)
-			sprintf(progress_bar + strlen(progress_bar), " %5.1f KB/s", val / KILOBYTE);
+			fprintf(stderr, " %5.1f KB/s", val / KILOBYTE);
 		else if (val < THOUSAND_MILLION)
-			sprintf(progress_bar + strlen(progress_bar), " %5.1f MB/s", val / MEGABYTE);
+			fprintf(stderr, " %5.1f MB/s", val / MEGABYTE);
 		else if (val < BILLION)
-			sprintf(progress_bar + strlen(progress_bar), " %5.1f GB/s", val / GIGABYTE);
+			fprintf(stderr, " %5.1f GB/s", val / GIGABYTE);
 #if 1           /* if you’re getting these kinds of speeds please, please can I have your machine ;-) */
 		else if (val < THOUSAND_BILLION)
-			sprintf(progress_bar + strlen(progress_bar), " %5.1f TB/s", val / TERABYTE);
+			fprintf(stderr, " %5.1f TB/s", val / TERABYTE);
 		else if (val < TRILLION)
-			sprintf(progress_bar + strlen(progress_bar), " %5.1f PB/s", val / PETABYTE);
-		else //if (val < THOUSAND_TRILLION)
-			sprintf(progress_bar + strlen(progress_bar), " %5.1f EB/s", val / EXABYTE);
+			fprintf(stderr, " %5.1f PB/s", val / PETABYTE);
+//		else // if (val < THOUSAND_TRILLION) // even uint64_t is too small now!
+//			fprintf(progress_bar + strlen(progress_bar), " %5.1f EB/s", val / EXABYTE);
 //		else if (val < QUADRILLION)
-//			sprintf(progress_bar + strlen(progress_bar), " %5.1f ZB/s", val / ZETTABYTE);
+//			fprintf(progress_bar + strlen(progress_bar), " %5.1f ZB/s", val / ZETTABYTE);
 //		else
-//			sprintf(progress_bar + strlen(progress_bar), " %5.1f YB/s", val / YOTTABYTE);
-#else
-		else
-			strcat(progress_bar, "  ---.- B/s");
+//			fprintf(progress_bar + strlen(progress_bar), " %5.1f YB/s", val / YOTTABYTE);
 #endif
+		else
+			fprintf(stderr, "  ---.- B/s");
 	}
-	fprintf(stderr, "\r%s ", progress_bar);
-	free(progress_bar);
 	return;
 }
 
+static void cli_display_bars(cli_progress_t *t, cli_progress_t *c, cli_bps_t *bps)
+{
+	double total   = PERCENT * (t->offset + (1.0f * c->offset / c->size)) / t->size;
+	double current = PERCENT * c->offset / c->size;
+	bool single = t->size == 1;
+
+	if (!single)
+	{
+		char name[CLI_TRUNCATED_DISPLAY_LONG] = { 0x0 };
+		char *nm = c->display ? /*dir_get_name(c->display, '.')*/ : CLI_UNKNOWN;
+		if (strlen(nm) < CLI_TRUNCATED_DISPLAY_LONG)
+			strcpy(name, nm);
+		else
+		{
+			strncpy(name, nm, CLI_TRUNCATED_DISPLAY_SHORT);
+			strcat(name, CLI_TRUNCATED_ELLIPSE);
+			if (cli_width > CLI_DEFAULT)
+				strcat(name, nm + (strlen(nm) - CLI_TRUNCATED_DISPLAY_SHORT));
+		}
+		fprintf(stderr, "\x1B[1F"); // go up 1 line
+		cli_display_bar(name, c, current);
+		cli_display_bps(bps);
+		fprintf(stderr, "\n");
+	}
+	cli_display_bar("Total", single ? c : t, total);
+
+	return;
+}
+
+#ifndef _WIN32
 static void cli_sigwinch(int s)
 {
 	struct winsize ws;
@@ -334,9 +323,10 @@ static int cli_print(FILE *stream, char *text)
 #ifndef _WIN32
 	bool strip = !((stream == stdout && isatty(STDOUT_FILENO)) || (stream == stderr && isatty(STDERR_FILENO)));
 #else
+	#ifdef __DEBUG__
 	bool strip = cli_inited != 1;
-	#ifndef __DEBUG__
-		strip = false;
+	#else
+	bool strip = false;
 	#endif
 #endif
 	if (strip)
@@ -360,13 +350,24 @@ static int cli_print(FILE *stream, char *text)
 	return x;
 }
 
+extern void on_quit(int s)
+{
+	fprintf(stderr, "\e[?25h\n"); /* restore cursor */
+	signal(s, SIG_DFL);
+	raise(s);
+	exit(EXIT_FAILURE); // this shouldn't happen as the raise above will handle things
+}
+
 static void cli_init(void)
 {
 	if (cli_inited >= 0)
 		return;
-#ifndef _WIN32
+	signal(SIGTERM, on_quit);
+	signal(SIGINT,  on_quit);
+	signal(SIGQUIT, on_quit);
+
 	setlocale(LC_NUMERIC, "");
-#else
+#ifdef _WIN32
 	// Set output mode to handle virtual terminal sequences
 	HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
 	if (hOut == INVALID_HANDLE_VALUE)

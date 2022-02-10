@@ -1,6 +1,6 @@
 /*
  * Common code for working with libgcrypt
- * Copyright © 2005-2021, albinoloverats ~ Software Development
+ * Copyright © 2005-2022, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -23,20 +23,9 @@
 
 #include <gcrypt.h>
 
+#include "list.h"
+
 #define NEED_LIBGCRYPT_VERSION "1.7.10"
-#define MOSTLY_NEEDED_LIBGCRYPT "1.8.2"
-
-#define NAME_SHA1 "SHA1"
-#define NAME_SHA160 "SHA160"
-#define NAME_TIGER "TIGER"
-#define NAME_TIGER192 "TIGER192"
-
-#define NAME_AES "AES"
-#define NAME_RIJNDAEL "RIJNDAEL"
-#define NAME_BLOWFISH "BLOWFISH"
-#define NAME_BLOWFISH128 "BLOWFISH128"
-#define NAME_TWOFISH "TWOFISH"
-#define NAME_TWOFISH256 "TWOFISH256"
 
 /*!
  * \brief          Initialise libgcrypt library
@@ -48,13 +37,13 @@ extern void init_crypto(void);
 
 /*!
  * \brief         Get list of usable ciphers
- * \return        An array of char* of cipher names
+ * \return        A list of char* cipher names
  *
- * Get an array of strings which lists the names of usable cipher
- * algorithms. NB: The array is allocated statically and SHOULD NOT be
+ * Get a list of strings which lists the names of usable cipher
+ * algorithms. NB: The list is allocated statically and SHOULD NOT be
  * free’d (or otherwise altered).
  */
-extern const char **list_of_ciphers(void) __attribute__((pure));
+extern LIST list_of_ciphers(void) __attribute__((pure));
 
 /*!
  * \brief         Get list of usable hashes
@@ -64,7 +53,7 @@ extern const char **list_of_ciphers(void) __attribute__((pure));
  * algorithms. NB: The array is allocated statically and SHOULD NOT be
  * free’d (or otherwise altered).
  */
-extern const char **list_of_hashes(void) __attribute__((pure));
+extern LIST list_of_hashes(void) __attribute__((pure));
 
 /*!
  * \brief         Get list of available cipher modes
@@ -74,7 +63,7 @@ extern const char **list_of_hashes(void) __attribute__((pure));
  * modes. NB: The array is allocated statically and SHOULD NOT be
  * free’d (or otherwise altered).
  */
-extern const char **list_of_modes(void) __attribute__((pure));
+extern LIST list_of_modes(void) __attribute__((pure));
 
 /*!
  * \brief         Get list of available MAC algorithms
@@ -84,7 +73,7 @@ extern const char **list_of_modes(void) __attribute__((pure));
  * algorithms. NB: The array is allocated statically and SHOULD NOT be
  * free’d (or otherwise altered).
  */
-extern const char **list_of_macs(void) __attribute__((pure));
+extern LIST list_of_macs(void) __attribute__((pure));
 
 /*!
  * \brief         Get cipher ID, given its name
@@ -173,5 +162,17 @@ extern const char *mac_name_from_id(enum gcry_mac_algos m) __attribute__((pure))
  * here’s a function to get the name from the enum.
  */
 extern const char *mode_name_from_id(enum gcry_cipher_modes m) __attribute__((pure));
+
+/*!
+ * \brief         Verify whether a give cipher and mode are suitable
+ * \param[in]  c  The cipher to check
+ * \param[in]  m  The cipher mode
+ * \return        True if the mode is suitable for the cipher, false
+ *                otherwise
+ *
+ * Check if the given cipher mode is usable for the given cipher. For
+ * instance stream ciphers require a stream capable mode.
+ */
+extern bool mode_valid_for_cipher(enum gcry_cipher_algos c, enum gcry_cipher_modes m);
 
 #endif /* _COMMON_CRYPT_H_ */

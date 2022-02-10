@@ -1,6 +1,6 @@
 /*
  * Common code for working with libgcrypt
- * Copyright © 2005-2021, albinoloverats ~ Software Development
+ * Copyright © 2005-2022, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -29,8 +29,21 @@
 #include "non-gnu.h"
 #include "error.h"
 #include "ccrypt.h"
+#include "list.h"
 
-static int algorithm_compare(const void *, const void *);
+#define MOSTLY_NEEDED_LIBGCRYPT "1.8.2"
+
+#define NAME_SHA1 "SHA1"
+#define NAME_SHA160 "SHA160"
+#define NAME_TIGER "TIGER"
+#define NAME_TIGER192 "TIGER192"
+
+#define NAME_AES "AES"
+#define NAME_RIJNDAEL "RIJNDAEL"
+#define NAME_BLOWFISH "BLOWFISH"
+#define NAME_BLOWFISH128 "BLOWFISH128"
+#define NAME_TWOFISH "TWOFISH"
+#define NAME_TWOFISH256 "TWOFISH256"
 
 static const char *correct_sha1(const char * const restrict);
 static const char *correct_aes_rijndael(const char * const restrict);
@@ -43,17 +56,28 @@ static bool algorithm_is_duplicate(const char * const restrict);
 typedef struct
 {
 	enum gcry_cipher_modes id;
-	const char name[4];
+	const char name[9];
 }
 block_mode_t;
 
 static const block_mode_t MODES[] =
 {
-	{ GCRY_CIPHER_MODE_ECB, "ECB" },
-	{ GCRY_CIPHER_MODE_CBC, "CBC" },
-	{ GCRY_CIPHER_MODE_CFB, "CFB" },
-	{ GCRY_CIPHER_MODE_OFB, "OFB" },
-	{ GCRY_CIPHER_MODE_CTR, "CTR" },
+	//{ GCRY_CIPHER_MODE_AESWRAP,        "AESWRAP"  }, // This will require more work in crypt_io
+	{ GCRY_CIPHER_MODE_CBC,            "CBC"      },
+	//{ GCRY_CIPHER_MODE_CCM,            "CCM"      }, // ditto
+	{ GCRY_CIPHER_MODE_CFB,            "CFB"      },
+	{ GCRY_CIPHER_MODE_CFB8,           "CFB8"     },
+	{ GCRY_CIPHER_MODE_CTR,            "CTR"      },
+	{ 14 /*GCRY_CIPHER_MODE_EAX*/,     "EAX"      }, // available on Arch but nowhere else yet
+	{ GCRY_CIPHER_MODE_ECB,            "ECB"      },
+	{ GCRY_CIPHER_MODE_GCM,            "GCM"      },
+	{ 16 /*GCRY_CIPHER_MODE_GCM_SIV*/, "GCM_SIV"  }, // not available anywhere but in git source
+	//{ GCRY_CIPHER_MODE_OCB,            "OCB"      }, // requires more work
+	{ GCRY_CIPHER_MODE_OFB,            "OFB"      },
+	{ GCRY_CIPHER_MODE_POLY1305,       "POLY1305" },
+	{ 15 /*GCRY_CIPHER_MODE_SIV*/,     "SIV"      }, // ditto
+	{ GCRY_CIPHER_MODE_STREAM,         "STREAM"   },
+	{ 13 /*GCRY_CIPHER_MODE_XTS*/,     "XTS"      }, // not available on Slackware
 };
 
 
@@ -68,9 +92,7 @@ extern void init_crypto(void)
 	if (!gcry_check_version(NEED_LIBGCRYPT_VERSION))
 		die(_("libgcrypt is too old (need %s, have %s)"), NEED_LIBGCRYPT_VERSION, gcry_check_version(NULL));
 	gcry_control(GCRYCTL_SUSPEND_SECMEM_WARN);
-	gcry_control(GCRYCTL_INIT_SECMEM, 10 * MEGABYTE, 0);
-	gcry_control(GCRYCTL_RESUME_SECMEM_WARN);
-
+	gcry_control(GCRYCTL_INIT_SECMEM, 10 * MEGABYTE);
 	/*
 	 * See libgcrypt source agent/gpg-agent.c:1293 for why this is.
 	 * It may cause problems with out-of-memory errors with older
@@ -78,15 +100,15 @@ extern void init_crypto(void)
 	 * Slackware's 1.7.10 works fine otherwise.
 	 */
 	if (strverscmp(MOSTLY_NEEDED_LIBGCRYPT, gcry_check_version(NULL)) < 0)
-		gcry_control(78/*GCRYCTL_AUTO_EXPAND_SECMEM*/, MEGABYTE, 0);
-
-	gcry_control(GCRYCTL_INITIALIZATION_FINISHED, 0);
+		gcry_control(78/*GCRYCTL_AUTO_EXPAND_SECMEM*/, MEGABYTE);
+	gcry_control(GCRYCTL_RESUME_SECMEM_WARN);
+	gcry_control(GCRYCTL_INITIALIZATION_FINISHED);
 	errno = 0; /* need to reset errno after gcry_check_version() */
 	done = true;
 	return;
 }
 
-extern const char **list_of_ciphers(void)
+extern LIST list_of_ciphers(void)
 {
 	init_crypto();
 
@@ -102,27 +124,22 @@ extern const char **list_of_ciphers(void)
 		}
 		id++;
 	}
-	static const char **l = NULL;
+	static LIST *l = NULL;
 	if (!l)
 	{
-		if (!(l = gcry_calloc_secure(len + 1, sizeof( char * ))))
-			die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof( char * ));
-		int j = 0;
+		l = list_init((int (*)(const void *, const void *))strcmp, false, true);
 		for (int i = 0; i < len; i++)
 		{
 			const char *n = cipher_name_from_id(lid[i]);
 			if (!n)
 				continue;
-			l[j] = strdup(n);
-			j++;
+			list_add(l, n);
 		}
-		//l[j] = NULL;
-		qsort(l, j, sizeof( char * ), algorithm_compare);
 	}
-	return (const char **)l;
+	return l;
 }
 
-extern const char **list_of_hashes(void)
+extern LIST list_of_hashes(void)
 {
 	init_crypto();
 
@@ -138,41 +155,45 @@ extern const char **list_of_hashes(void)
 		}
 		id++;
 	}
-	static const char **l = NULL;
+	static LIST *l = NULL;
 	if (!l)
 	{
-		if (!(l = gcry_calloc_secure(len + 1, sizeof( char * ))))
-			die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof( char * ));
-		int j = 0;
+		l = list_init((int (*)(const void *, const void *))strcmp, false, true);
 		for (int i = 0; i < len; i++)
 		{
 			const char *n = hash_name_from_id(lid[i]);
 			if (!n)
 				continue;
-			l[j] = strdup(n);
-			j++;
+			list_add(l, n);
 		}
-		//l[j] = NULL;
-		qsort(l, j, sizeof( char * ), algorithm_compare);
 	}
-	return (const char **)l;
+	return l;
 }
 
-extern const char **list_of_modes(void)
+extern LIST list_of_modes(void)
 {
-	static const char **l = NULL;
+	init_crypto();
+
+	static LIST *l = NULL;
 	if (!l)
 	{
 		unsigned m = sizeof MODES / sizeof( block_mode_t );
-		if (!(l = gcry_calloc_secure(m + 1, sizeof( char * ))))
-			die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof( char * ));
+		l = list_init((int (*)(const void *, const void *))strcmp, false, true);
 		for (unsigned i = 0; i < m; i++)
-			l[i] = MODES[i].name;
+		{
+			gcry_cipher_hd_t c;
+			gcry_error_t e;
+			if ((e = gcry_cipher_open(&c, GCRY_CIPHER_AES, MODES[i].id, 0)) == GPG_ERR_NO_ERROR)
+				list_add(l, MODES[i].name);
+			else if ((e = gcry_cipher_open(&c, GCRY_CIPHER_CHACHA20, MODES[i].id, 0)) == GPG_ERR_NO_ERROR)
+				list_add(l, MODES[i].name);
+			gcry_cipher_close(c);
+		}
 	}
-	return (const char **)l;
+	return l;
 }
 
-extern const char **list_of_macs(void)
+extern LIST list_of_macs(void)
 {
 	init_crypto();
 
@@ -188,24 +209,19 @@ extern const char **list_of_macs(void)
 		}
 		id++;
 	}
-	static const char **l = NULL;
+	static LIST *l = NULL;
 	if (!l)
 	{
-		if (!(l = gcry_calloc_secure(len + 1, sizeof( char * ))))
-			die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof( char * ));
-		int j = 0;
+		l = list_init((int (*)(const void *, const void *))strcmp, false, true);
 		for (int i = 0; i < len; i++)
 		{
 			const char *n = gcry_mac_algo_name(lid[i]);
 			if (!n || !strcmp("?", n))
 				continue;
-			l[j] = strdup(n);
-			j++;
+			list_add(l, n);
 		}
-		//l[j] = NULL;
-		qsort(l, j, sizeof( char * ), algorithm_compare);
 	}
-	return (const char **)l;
+	return l;
 }
 
 extern enum gcry_cipher_algos cipher_id_from_name(const char * const restrict n)
@@ -326,9 +342,89 @@ extern const char *mac_name_from_id(enum gcry_mac_algos m)
 	return gcry_mac_algo_name(m);
 }
 
-static int algorithm_compare(const void *a, const void *b)
+extern bool mode_valid_for_cipher(enum gcry_cipher_algos c, enum gcry_cipher_modes m)
 {
-	return strcmp(*(char **)a, *(char **)b);
+	/*
+	 * The cipher mode to use must be specified via mode. See Available
+	 * cipher modes, for a list of supported cipher modes and the
+	 * according constants.
+	 *
+	 * Note that some modes are incompatible with some algorithms - in
+	 * particular, stream mode (GCRY_CIPHER_MODE_STREAM) only works with
+	 * stream ciphers.
+	 *
+	 * Poly1305 AEAD mode (GCRY_CIPHER_MODE_POLY1305) only works with
+	 * ChaCha20 stream cipher.
+	 *
+	 * The block cipher modes (GCRY_CIPHER_MODE_ECB,
+	 * GCRY_CIPHER_MODE_CBC,GCRY_CIPHER_MODE_CFB, GCRY_CIPHER_MODE_OFB,
+	 * GCRY_CIPHER_MODE_CTR and GCRY_CIPHER_MODE_EAX) will work with any
+	 * block cipher algorithm.
+	 *
+	 * GCM mode (GCRY_CIPHER_MODE_CCM), CCM mode (GCRY_CIPHER_MODE_GCM),
+	 * OCB mode (GCRY_CIPHER_MODE_OCB), and XTS mode
+	 * (GCRY_CIPHER_MODE_XTS) will only work with block cipher
+	 * algorithms which have the block size of 16 bytes.
+	 */
+	if (m == GCRY_CIPHER_MODE_POLY1305)
+		return c == GCRY_CIPHER_CHACHA20;
+	switch (c)
+	{
+		case GCRY_CIPHER_ARCFOUR:
+		case GCRY_CIPHER_SALSA20:
+		case GCRY_CIPHER_SALSA20R12:
+		case GCRY_CIPHER_CHACHA20:
+			return m == GCRY_CIPHER_MODE_STREAM;
+		default:
+			break;
+	}
+	switch (m)
+	{
+		case GCRY_CIPHER_MODE_CCM:
+		case GCRY_CIPHER_MODE_GCM:
+		case GCRY_CIPHER_MODE_OCB:
+		case 13: // GCRY_CIPHER_MODE_XTS: C'mon Slackware :-/
+			return !(gcry_cipher_get_algo_blklen(c) % 16);
+		case GCRY_CIPHER_MODE_STREAM:
+			/*
+			 * Stream mode, only to be used with stream cipher
+			 * algorithms.
+			 */
+			switch (c)
+			{
+				case GCRY_CIPHER_ARCFOUR:
+				case GCRY_CIPHER_SALSA20:
+				case GCRY_CIPHER_SALSA20R12:
+				case GCRY_CIPHER_CHACHA20:
+					return true;
+				default:
+					return false;
+			}
+			break;
+		case GCRY_CIPHER_MODE_AESWRAP:
+			/*
+			 * This mode is used to implement the AES-Wrap algorithm
+			 * according to RFC-3394. It may be used with any 128 bit
+			 * block length algorithm, however the specs require one of
+			 * the 3 AES algorithms.
+			 */
+			switch (c)
+			{
+				case GCRY_CIPHER_AES128:
+				case GCRY_CIPHER_AES192:
+				case GCRY_CIPHER_AES256:
+					return true;
+				default:
+					return false;
+			}
+		default:
+			break;
+	}
+	/*
+	 * Hopefully whatever's left is a block cipher and a block cipher
+	 * mode.
+	 */
+	return true;
 }
 
 static const char *correct_sha1(const char * const restrict n)

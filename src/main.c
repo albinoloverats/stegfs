@@ -652,37 +652,28 @@ int main(int argc, char **argv)
 	char **fargs = calloc(argc, sizeof( char * ));
 	fargs[0] = argv[0];
 
-	config_arg_t args[] =
-	{
-		{ 'c', "cipher",         _("algorithm"),  _("Algorithm to use to encrypt data"),                       CONFIG_ARG_REQ_STRING,  { 0x0 }, false, true,  false },
-		{ 's', "hash",           _("algorithm"),  _("Hash algorithm to generate key"),                         CONFIG_ARG_REQ_STRING,  { 0x0 }, false, true,  false },
-		{ 'm', "mode",           _("mode"),       _("The encryption mode to use"),                             CONFIG_ARG_REQ_STRING,  { 0x0 }, false, true,  false },
-		{ 'a', "mac",            _("mac"),        _("The MAC algorithm to use"),                               CONFIG_ARG_REQ_STRING,  { 0x0 }, false, true,  false },
-		{ 'i', "kdf-iterations", _("iterations"), _("Number of iterations the KDF should use"),                CONFIG_ARG_REQ_NUMBER,  { 0x0 }, false, true,  false },
-		{ 'p', "paranoid",       NULL,            _("Enable paranoia mode"),                                   CONFIG_ARG_BOOLEAN,     { 0x0 }, false, true,  false },
-		{ 'x', "duplicates",     "#",             _("Number of times each file should be duplicated"),         CONFIG_ARG_REQ_NUMBER,  { 0x0 }, false, true,  false },
-		{ 'b', "show-bloc",      NULL,            _("Expose the /bloc/ in-use block list directory"),          CONFIG_ARG_BOOLEAN,     { 0x0 }, false, true,  false },
+	LIST args = list_init(config_arg_comp, false, false);
+	list_add(args, &((config_arg_t){ 'c', "cipher",         _("algorithm"),  _("Algorithm to use to encrypt data; use ‘list’ to show available cipher algorithms"), CONFIG_ARG_REQ_STRING,  { .string  = NULL  }, false, false, false }));
+	list_add(args, &((config_arg_t){ 's', "hash",           _("algorithm"),  _("Hash algorithm to generate key; use ‘list’ to show available hash algorithms"),     CONFIG_ARG_REQ_STRING,  { .string  = NULL  }, false, false, false }));
+	list_add(args, &((config_arg_t){ 'm', "mode",           _("mode"),       _("The encryption mode to use; use ‘list’ to show available cipher modes"),            CONFIG_ARG_REQ_STRING,  { .string  = NULL  }, false, false, false }));
+	list_add(args, &((config_arg_t){ 'a', "mac",            _("mac"),        _("The MAC algorithm to use; use ‘list’ to show available MACs"),                      CONFIG_ARG_REQ_STRING,  { .string  = NULL  }, false, false, false }));
+	list_add(args, &((config_arg_t){ 'i', "kdf-iterations", _("iterations"), _("Number of iterations the KDF should use"),                                          CONFIG_ARG_REQ_NUMBER,  { .number  = 0     }, false, false, false }));
+	list_add(args, &((config_arg_t){ 'p', "paranoid",       NULL,            _("Enable paranoia mode"),                                                             CONFIG_ARG_BOOLEAN,     { .boolean = false }, false, true,  false }));
+	list_add(args, &((config_arg_t){ 'x', "duplicates",     "#",             _("Number of times each file should be duplicated"),                                   CONFIG_ARG_REQ_NUMBER,  { .number  = 0     }, false, true,  false }));
+	list_add(args, &((config_arg_t){ 'b', "show-bloc",      NULL,            _("Expose the /bloc/ in-use block list directory"),                                    CONFIG_ARG_BOOLEAN,     { .boolean = false }, false, true,  false }));
+	list_add(args, &((config_arg_t){ 'd', NULL,             NULL,            _("Enable debug output (implies -f)"),                                                 CONFIG_ARG_BOOLEAN,     { .boolean = false }, false, false, false }));
+	list_add(args, &((config_arg_t){ 'f', NULL,             NULL,            _("Foreground operation"),                                                             CONFIG_ARG_BOOLEAN,     { .boolean = false }, false, false, false }));
+	list_add(args, &((config_arg_t){ 't', NULL,             NULL,            _("Disable multi-threaded operation (FUSE option -s)"),                                CONFIG_ARG_BOOLEAN,     { .boolean = false }, false, false, false }));
+	list_add(args, &((config_arg_t){ 'o', NULL,             "opt,[opt...]",  _("FUSE mount options--see FUSE documentation for details"),                           CONFIG_ARG_LIST_STRING, { .list    = NULL  }, false, false, false }));
 
-		{ 'd', NULL,             NULL,            _("Enable debug output (implies -f)"),                       CONFIG_ARG_BOOLEAN,     { 0x0 }, false, false, false },
-		{ 'f', NULL,             NULL,            _("Foreground operation"),                                   CONFIG_ARG_BOOLEAN,     { 0x0 }, false, false, false },
-		{ 't', NULL,             NULL,            _("Disable multi-threaded operation (FUSE option -s)"),      CONFIG_ARG_BOOLEAN,     { 0x0 }, false, false, false },
+	LIST extra = list_default();
+	list_add(extra, &((config_extra_t){ "file system", CONFIG_ARG_STRING,  { .string = NULL }, true,  false }));
+	list_add(extra, &((config_extra_t){ "mount point", CONFIG_ARG_STRING,  { .string = NULL }, true,  false }));
 
-		{ 'o', NULL,             "opt,[opt...]",  _("FUSE mount options--see FUSE documentation for details"), CONFIG_ARG_LIST_STRING, { 0x0 }, false, false, false },
+	LIST notes = list_default();
+	list_add(notes, _("It doesn't matter which order the file system and mount point are specified as stegfs will figure that out. All other options are passed to FUSE."));
+	list_add(notes, _("If you’re feeling extra paranoid you can now disable to stegfs file system header. This will also disable the checks when mounting and thus anything could happen ;-)"));
 
-		{ 0x0, NULL, NULL, NULL, CONFIG_ARG_BOOLEAN, { 0x0 }, false, false, false }
-	};
-	config_extra_t extra[] =
-	{
-		{ "file system", CONFIG_ARG_STRING,  { 0x0 }, true,  false },
-		{ "mount point", CONFIG_ARG_STRING,  { 0x0 }, true,  false },
-		{ NULL,          CONFIG_ARG_BOOLEAN, { 0x0 }, false, false }
-	};
-	char *notes[] =
-	{
-		_("It doesn't matter which order the file system and mount point are specified as stegfs will figure that out. All other options are passed to FUSE."),
-		_("If you’re feeling extra paranoid you can now disable to stegfs file system header. This will also disable the checks when mounting and thus anything could happen ;-)"),
-		NULL
-	};
 	config_about_t about =
 	{
 		STEGFS_NAME,
@@ -693,21 +684,24 @@ int main(int argc, char **argv)
 	config_init(about);
 	config_parse(argc, argv, args, extra, notes, false);
 
+	list_deinit(&notes);
+
 	char *fs  = NULL;
 	char *mnt = NULL;
 	struct stat s = { 0x0 };
-	stat(extra[0].response_value.string, &s);
+	stat(((config_extra_t *)list_get(extra, 0))->response_value.string, &s);
 	if (S_ISDIR(s.st_mode))
 	{
 		// 1st argument is directory, so it's the mount point
-		mnt = extra[0].response_value.string;
-		fs  = extra[1].response_value.string;
+		mnt = ((config_extra_t *)list_get(extra, 0))->response_value.string;
+		fs  = ((config_extra_t *)list_get(extra, 1))->response_value.string;
 	}
 	else
 	{
-		fs  = extra[0].response_value.string;
-		mnt = extra[1].response_value.string;
+		fs  = ((config_extra_t *)list_get(extra, 0))->response_value.string;
+		mnt = ((config_extra_t *)list_get(extra, 1))->response_value.string;
 	}
+	list_deinit(&extra);
 
 	// config is actually read from the fs unless paranoid == true
 	enum gcry_cipher_algos cipher = DEFAULT_CIPHER;
@@ -715,27 +709,27 @@ int main(int argc, char **argv)
 	enum gcry_md_algos     hash   = DEFAULT_HASH;
 	enum gcry_mac_algos    mac    = DEFAULT_MAC;
 	uint64_t kdf_iters            = DEFAULT_KDF_ITERATIONS;
-	bool paranoid                 = args[5].response_value.boolean;
+	bool paranoid                 = ((config_arg_t *)list_get(args, 5))->response_value.boolean;
 	uint8_t duplicates            = COPIES_DEFAULT;
-	bool show_bloc                = args[7].response_value.boolean;
+	bool show_bloc                = ((config_arg_t *)list_get(args, 7))->response_value.boolean;
 
 	if (paranoid)
 	{
-		cipher     = cipher_id_from_name(args[0].response_value.string);
-		mode       =   mode_id_from_name(args[1].response_value.string);
-		hash       =   hash_id_from_name(args[2].response_value.string);
-		mac        =    mac_id_from_name(args[3].response_value.string);
-		kdf_iters  =                     args[4].response_value.number;
-		duplicates =            (uint8_t)args[6].response_value.number;
+		cipher     = cipher_id_from_name(((config_arg_t *)list_get(args, 0))->response_value.string);
+		mode       =   mode_id_from_name(((config_arg_t *)list_get(args, 1))->response_value.string);
+		hash       =   hash_id_from_name(((config_arg_t *)list_get(args, 2))->response_value.string);
+		mac        =    mac_id_from_name(((config_arg_t *)list_get(args, 3))->response_value.string);
+		kdf_iters  =                     ((config_arg_t *)list_get(args, 4))->response_value.number;
+		duplicates =            (uint8_t)((config_arg_t *)list_get(args, 6))->response_value.number;
 	}
 
 	/*
 	 * deal with FUSE options
 	 */
 
-	bool debug                    = args[8].response_value.boolean;
-	bool foreground               = args[9].response_value.boolean;
-	bool single_thread            = args[10].response_value.boolean;
+	bool debug         = ((config_arg_t *)list_get(args,  8))->response_value.boolean;
+	bool foreground    = ((config_arg_t *)list_get(args,  9))->response_value.boolean;
+	bool single_thread = ((config_arg_t *)list_get(args, 10))->response_value.boolean;
 
 	int fuse_argc = 3;
 	char **fuse_argv = calloc(fuse_argc, sizeof (char *));
@@ -759,13 +753,14 @@ int main(int argc, char **argv)
 		fuse_argv = realloc(fuse_argv, fuse_argc * sizeof (char *));
 		fuse_argv[fuse_argc - 2] = "-s";
 	}
-	config_list_t fuse_options = args[11].response_value.list;
-	for (size_t i = 0; i < fuse_options.count; i++)
+	LIST fuse_options = ((config_arg_t *)list_get(args, 11))->response_value.list;
+	ITER iter = list_iterator(fuse_options);
+	while (list_has_next(iter))
 	{
 		fuse_argc += 2;
 		fuse_argv = realloc(fuse_argv, fuse_argc * sizeof (char *));
 		fuse_argv[fuse_argc - 3] = "-o";
-		fuse_argv[fuse_argc - 2] = fuse_options.items[i].string;
+		fuse_argv[fuse_argc - 2] = (char *)list_get_next(iter);
 	}
 	fuse_argc--;
 	fuse_argv[fuse_argc] = NULL;

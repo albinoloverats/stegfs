@@ -1,6 +1,6 @@
 /*
  * encrypt ~ a simple, multi-OS encryption utility
- * Copyright © 2005-2021, albinoloverats ~ Software Development
+ * Copyright © 2005-2022, albinoloverats ~ Software Development
  * email: encrypt@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -26,6 +26,7 @@
 #include <stdbool.h>
 
 #include "common.h"
+#include "list.h"
 
 
 #define CONF_TRUE     "true"
@@ -45,7 +46,7 @@ typedef enum
 	CONFIG_ARG_BOOLEAN,
 	CONFIG_ARG_NUMBER,
 	CONFIG_ARG_STRING,
-	// these are for symantic clearity
+	// these are for semantic clarity
 	CONFIG_ARG_OPT_BOOLEAN      = CONFIG_ARG_BOOLEAN,
 	CONFIG_ARG_OPT_NUMBER       = CONFIG_ARG_NUMBER,
 	CONFIG_ARG_OPT_STRING       = CONFIG_ARG_STRING,
@@ -104,44 +105,48 @@ typedef union
 }
 config_list_u;
 
-typedef struct
-{
-	size_t count;
-	config_list_u *items;
-}
-config_list_t;
-
 typedef union
 {
 	bool boolean;
 	int64_t number;
 	char *string;
 	config_pair_u pair;
-	config_list_t list;
+	LIST *list;
 }
 config_arg_u;
 
+/*!
+ * \brief  A named command line parameter.
+ *
+ * A named command line parameter; for instance --help
+ */
 typedef struct
 {
-	char short_option;
-	char *long_option;
-	char *option_type;
-	char *description;
-	config_arg_e response_type;
-	config_arg_u response_value;
-	bool required:1;
-	bool advanced:1;
-	bool hidden:1;
+	char short_option;           /*!< The command line short option */
+	char *long_option;           /*!< The command line long option */
+	char *option_type;           /*!< What the expected parameter should be */
+	char *description;           /*!< A description of the argument */
+	config_arg_e response_type;  /*!< The expected response type */
+	config_arg_u response_value; /*!< The response value */
+	bool required:1;             /*!< Whether this option is required */
+	bool advanced:1;             /*!< Whether this option is considered advanced */
+	bool hidden:1;               /*!< Whether this option should be hidden */
 }
 config_arg_t;
 
+/*!
+ * \brief  An unnamed command line parameter.
+ *
+ * An unnamed command line parameter; for instance when passing a file
+ * name to a program: vim config.c
+ */
 typedef struct
 {
-	char *description;
-	config_arg_e response_type;
-	config_arg_u response_value;
-	bool required:1;
-	bool seen:1;
+	char *description;           /*!< A description of the argument */
+	config_arg_e response_type;  /*!< The expected response type */
+	config_arg_u response_value; /*!< The response value */
+	bool required:1;             /*!< Whether this option is required */
+	bool seen:1;                 /*!< Whether this argument was detected */
 }
 config_extra_t;
 
@@ -157,7 +162,7 @@ config_about_t;
 
 extern void config_init(config_about_t about);
 
-extern void config_show_usage(config_arg_t *args, config_extra_t *extra);
+extern void config_show_usage(LIST args, LIST extra);
 
 #define CONFIG_PARSE_COUNT(...) CONFIG_PARSE_COUNT2(__VA_ARGS__, 6, 5, 4, 3, 2, 1)
 #define CONFIG_PARSE_COUNT2(_1, _2, _3, _4, _5, _6, _, ...) _
@@ -182,7 +187,7 @@ extern void config_show_usage(config_arg_t *args, config_extra_t *extra);
  * options where set. Removes a lot of the cruft from the legacy common
  * code that used to exist here.
  */
-extern int config_parse_aux(int c, char **v, config_arg_t *a, config_extra_t *x, char **t, bool w);
+extern int config_parse_aux(int c, char **v, LIST a, LIST x, LIST t, bool w);
 
 /*!
  * \brief         Update configuration file
@@ -192,6 +197,18 @@ extern int config_parse_aux(int c, char **v, config_arg_t *a, config_extra_t *x,
  * Set or update the given configuration option with the given value.
  */
 extern void update_config(const char * const restrict o, const char * const restrict v) __attribute__((nonnull(1, 2)));
+
+
+/*!
+ * \brief         Compare config_arg_t's
+ * \param[in]  a  First config_arg_t
+ * \param[in]  b  Second config_arg_t
+ * \return        The difference between the two
+ *
+ * Compare two config_arg_t using the short_option. Used to ensure that
+ * only one of each argument is in the LIST.
+ */
+extern int config_arg_comp(const void *a, const void *b);
 
 #if 0
 /*!

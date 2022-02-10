@@ -1,6 +1,6 @@
 /*
  * Common code for dealing with tag, length, value arrays
- * Copyright © 2009-2021, albinoloverats ~ Software Development
+ * Copyright © 2009-2022, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -32,6 +32,10 @@
 #include "non-gnu.h"
 #include "tlv.h"
 
+/*
+ * TODO the TLV list could/should use linked list
+ */
+
 typedef struct
 {
 	size_t  tags;
@@ -40,12 +44,12 @@ typedef struct
 }
 tlv_private_t;
 
-extern TLV_HANDLE tlv_init(void)
+extern TLV tlv_init(void)
 {
 	return calloc(sizeof( tlv_private_t ), sizeof( byte_t ));
 }
 
-extern void tlv_deinit(TLV_HANDLE *ptr)
+extern void tlv_deinit(TLV *ptr)
 {
 	tlv_private_t *tlv_ptr = (tlv_private_t *)*ptr;
 	if (!tlv_ptr)
@@ -69,7 +73,7 @@ extern void tlv_deinit(TLV_HANDLE *ptr)
 	return;
 }
 
-extern void tlv_append(TLV_HANDLE *ptr, tlv_t tlv)
+extern void tlv_append(TLV *ptr, tlv_t tlv)
 {
 	tlv_private_t *tlv_ptr = (tlv_private_t *)*ptr;
 	if (!tlv_ptr)
@@ -84,7 +88,7 @@ extern void tlv_append(TLV_HANDLE *ptr, tlv_t tlv)
 	return;
 }
 
-extern tlv_t *tlv_get(TLV_HANDLE ptr, uint8_t tag)
+extern tlv_t *tlv_get(TLV ptr, uint8_t tag)
 {
 	tlv_private_t *tlv_ptr = (tlv_private_t *)ptr;
 	if (!tlv_ptr)
@@ -95,7 +99,7 @@ extern tlv_t *tlv_get(TLV_HANDLE ptr, uint8_t tag)
 	return NULL;
 }
 
-extern bool tlv_has_tag(TLV_HANDLE ptr, uint8_t tag)
+extern bool tlv_has_tag(TLV ptr, uint8_t tag)
 {
 	tlv_private_t *tlv_ptr = (tlv_private_t *)ptr;
 	if (!tlv_ptr)
@@ -106,7 +110,7 @@ extern bool tlv_has_tag(TLV_HANDLE ptr, uint8_t tag)
 	return false;
 }
 
-extern byte_t *tlv_value_of_aux(TLV_HANDLE ptr, uint8_t tag, uint8_t *def)
+extern byte_t *tlv_value_of_aux(TLV ptr, uint8_t tag, uint8_t *def)
 {
 	tlv_private_t *tlv_ptr = (tlv_private_t *)ptr;
 	if (!tlv_ptr)
@@ -115,7 +119,7 @@ extern byte_t *tlv_value_of_aux(TLV_HANDLE ptr, uint8_t tag, uint8_t *def)
 	return t ? t->value : def;
 }
 
-extern uint16_t tlv_length_of(TLV_HANDLE ptr, uint8_t tag)
+extern uint16_t tlv_length_of(TLV ptr, uint8_t tag)
 {
 	tlv_private_t *tlv_ptr = (tlv_private_t *)ptr;
 	if (!tlv_ptr)
@@ -124,7 +128,7 @@ extern uint16_t tlv_length_of(TLV_HANDLE ptr, uint8_t tag)
 	return t ? t->length : 0;
 }
 
-extern byte_t *tlv_export_aux(TLV_HANDLE ptr, bool nbo)
+extern byte_t *tlv_export_aux(TLV ptr, bool nbo)
 {
 	tlv_private_t *tlv_ptr = (tlv_private_t *)ptr;
 	if (!tlv_ptr)
@@ -148,12 +152,12 @@ extern byte_t *tlv_export_aux(TLV_HANDLE ptr, bool nbo)
 	return tlv_ptr->export;
 }
 
-extern uint16_t tlv_count(TLV_HANDLE ptr)
+extern uint16_t tlv_count(TLV ptr)
 {
 	return ((tlv_private_t *)ptr)->tags;
 }
 
-extern size_t tlv_size(TLV_HANDLE ptr)
+extern size_t tlv_size(TLV ptr)
 {
 	tlv_private_t *tlv_ptr = (tlv_private_t *)ptr;
 	if (!tlv_ptr)
