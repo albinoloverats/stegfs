@@ -661,7 +661,7 @@ int main(int argc, char **argv)
 	list_add(args, &((config_arg_t){ 'p', "paranoid",       NULL,            _("Enable paranoia mode"),                                                             CONFIG_ARG_BOOLEAN,     { .boolean = false }, false, true,  false }));
 	list_add(args, &((config_arg_t){ 'x', "duplicates",     "#",             _("Number of times each file should be duplicated"),                                   CONFIG_ARG_REQ_NUMBER,  { .number  = 0     }, false, true,  false }));
 	list_add(args, &((config_arg_t){ 'b', "show-bloc",      NULL,            _("Expose the /bloc/ in-use block list directory"),                                    CONFIG_ARG_BOOLEAN,     { .boolean = false }, false, true,  false }));
-	list_add(args, &((config_arg_t){ 'd', NULL,             NULL,            _("Enable debug output (implies -f)"),                                                 CONFIG_ARG_BOOLEAN,     { .boolean = false }, false, false, false }));
+	list_add(args, &((config_arg_t){ 'd', NULL,             NULL,            _("Enable debug output (forces foreground and single-thread)"),                        CONFIG_ARG_BOOLEAN,     { .boolean = false }, false, false, false }));
 	list_add(args, &((config_arg_t){ 'f', NULL,             NULL,            _("Foreground operation"),                                                             CONFIG_ARG_BOOLEAN,     { .boolean = false }, false, false, false }));
 	list_add(args, &((config_arg_t){ 't', NULL,             NULL,            _("Disable multi-threaded operation (FUSE option -s)"),                                CONFIG_ARG_BOOLEAN,     { .boolean = false }, false, false, false }));
 	list_add(args, &((config_arg_t){ 'o', NULL,             "opt,[opt...]",  _("FUSE mount options--see FUSE documentation for details"),                           CONFIG_ARG_LIST_STRING, { .list    = NULL  }, false, false, false }));
@@ -727,9 +727,9 @@ int main(int argc, char **argv)
 	 * deal with FUSE options
 	 */
 
-	bool debug         = ((config_arg_t *)list_get(args,  8))->response_value.boolean;
-	bool foreground    = ((config_arg_t *)list_get(args,  9))->response_value.boolean;
-	bool single_thread = ((config_arg_t *)list_get(args, 10))->response_value.boolean;
+	bool debug         =          ((config_arg_t *)list_get(args,  8))->response_value.boolean;
+	bool foreground    = debug || ((config_arg_t *)list_get(args,  9))->response_value.boolean;
+	bool single_thread = debug || ((config_arg_t *)list_get(args, 10))->response_value.boolean;
 
 	int fuse_argc = 3;
 	char **fuse_argv = calloc(fuse_argc, sizeof (char *));
