@@ -197,19 +197,19 @@ static void superblock_info(stegfs_block_t *sb, const char *cipher, const char *
 	TLV tlv = tlv_init();
 
 	tlv_t t = { TAG_STEGFS, strlen(STEGFS_NAME), (byte_t *)STEGFS_NAME };
-	tlv_append(&tlv, t);
+	tlv_append(tlv, t);
 
 	t.tag = TAG_VERSION;
 	t.length = strlen(STEGFS_VERSION);
 	t.value = (byte_t *)STEGFS_VERSION;
-	tlv_append(&tlv, t);
+	tlv_append(tlv, t);
 
 	t.tag = TAG_BLOCKSIZE;
 	uint32_t blocksize = htonl(SIZE_BYTE_BLOCK);
 	t.length = sizeof blocksize;
 	t.value = malloc(sizeof blocksize);
 	memcpy(t.value, &blocksize, sizeof blocksize);
-	tlv_append(&tlv, t);
+	tlv_append(tlv, t);
 	free(t.value);
 
 	t.tag = TAG_HEADER_OFFSET;
@@ -217,34 +217,34 @@ static void superblock_info(stegfs_block_t *sb, const char *cipher, const char *
 	t.length = sizeof head_offset;
 	t.value = malloc(sizeof head_offset);
 	memcpy(t.value, &head_offset, sizeof head_offset);
-	tlv_append(&tlv, t);
+	tlv_append(tlv, t);
 	free(t.value);
 
 	t.tag = TAG_CIPHER;
 	t.length = strlen(cipher);
 	t.value = (byte_t *)cipher;
-	tlv_append(&tlv, t);
+	tlv_append(tlv, t);
 
 	t.tag = TAG_MODE;
 	t.length = strlen(mode);
 	t.value = (byte_t *)mode;
-	tlv_append(&tlv, t);
+	tlv_append(tlv, t);
 
 	t.tag = TAG_HASH;
 	t.length = strlen(hash);
 	t.value = (byte_t *)hash;
-	tlv_append(&tlv, t);
+	tlv_append(tlv, t);
 
 	t.tag = TAG_MAC;
 	t.length = strlen(mac);
 	t.value = (byte_t *)mac;
-	tlv_append(&tlv, t);
+	tlv_append(tlv, t);
 
 	t.tag = TAG_DUPLICATION;
 	t.length = sizeof copies;
 	t.value = malloc(sizeof copies);
 	memcpy(t.value, &copies, sizeof copies);
-	tlv_append(&tlv, t);
+	tlv_append(tlv, t);
 	free(t.value);
 
 	t.tag = TAG_KDF;
@@ -252,7 +252,7 @@ static void superblock_info(stegfs_block_t *sb, const char *cipher, const char *
 	t.value = malloc(sizeof kdf);
 	uint64_t k = htonll(kdf);
 	memcpy(t.value, &k, sizeof kdf);
-	tlv_append(&tlv, t);
+	tlv_append(tlv, t);
 	free(t.value);
 
 	uint64_t tags = htonll(tlv_count(tlv));

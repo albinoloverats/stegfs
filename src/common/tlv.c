@@ -64,9 +64,9 @@ extern void tlv_deinit(TLV *ptr)
 	return;
 }
 
-extern void tlv_append(TLV *ptr, tlv_t tlv)
+extern void tlv_append(TLV ptr, tlv_t tlv)
 {
-	tlv_private_t *tlv_ptr = (tlv_private_t *)*ptr;
+	tlv_private_t *tlv_ptr = (tlv_private_t *)ptr;
 	if (!tlv_ptr)
 		return;
 	tlv_t *t  = malloc(sizeof tlv);
@@ -151,7 +151,7 @@ extern size_t tlv_size(TLV ptr)
 	size_t size = 0;
 	ITER iter = list_iterator(tlv_ptr->tags);
 	while (list_has_next(iter))
-		size += ((tlv_t *)list_get_next(iter))->length;
+		size += sizeof( uint8_t ) + sizeof( uint16_t ) + ((tlv_t *)list_get_next(iter))->length;
 	return size;
 }
 

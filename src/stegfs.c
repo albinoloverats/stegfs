@@ -123,7 +123,7 @@ extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid, 
 		t.value = malloc(t.length);
 		memcpy(t.value, block.data + j, t.length);
 		j += t.length;
-		tlv_append(&tlv, t);
+		tlv_append(tlv, t);
 		free(t.value);
 	}
 

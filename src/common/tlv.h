@@ -79,7 +79,7 @@ extern void tlv_deinit(TLV *h) __attribute__((nonnull(1)));
  * (currently) check for duplicates. Potentially modifies the address of
  * the TLV in accordance with the rules of realloc().
  */
-extern void tlv_append(TLV *h, tlv_t t) __attribute__((nonnull(1)));
+extern void tlv_append(TLV h, tlv_t t) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Get TLV structure for tag
