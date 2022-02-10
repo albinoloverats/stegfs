@@ -74,18 +74,25 @@ typedef void * ITER;
  */
 extern LIST list_init(int c(const void *, const void *), bool d, bool s) __attribute__((malloc));
 
+#define LIST_DEINIT_ARGS_COUNT(...) LIST_DEINIT_ARGS_COUNT2(__VA_ARGS__, 2, 1) /*!< Function overloading argument count (part 1) */
+#define LIST_DEINIT_ARGS_COUNT2(_1, _2, _, ...) _                              /*!< Function overloading argument count (part 2) */
+
+#define list_deinit_1(A)     list_deinit_aux(A, NULL)  /*<! Call list_deinit_aux with false for second parameter */
+#define list_deinit_2(A, B)  list_deinit_aux(A, B)     /*<! Call list_deinit_aux with both user supplied parameters */
+#define list_deinit(...) CONCAT(list_deinit_, LIST_DEINIT_ARGS_COUNT(__VA_ARGS__))(__VA_ARGS__) /*!< Decide how to call list_deinit */
+
 /*!
  * \brief         Destroy a linked list
  * \param[in]  h  A pointer to a linked list to destroy
+ * \param[in]  f  A function to free data items within the list
  *
  * Destroy a previously created linked list when it is no longer needed.
  * Free the memory and sets h to NULL so all subsequent calls to LIST
- * functions will not result in undefined behaviour.
+ * functions will not result in undefined behaviour. If called with a
+ * NULL function f then data items will not be freed.
  *
- * NB: Does not free any data within the list, this is the users
- * responsibility.
  */
-extern void list_deinit(LIST *h) __attribute__((nonnull(1)));
+extern void list_deinit_aux(LIST *h, void f(void *)) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Get the number of items in the list

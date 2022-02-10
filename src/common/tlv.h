@@ -62,6 +62,7 @@ extern TLV tlv_init(void) __attribute__((malloc));
 /*!
  * \brief         Destroy a TLV array
  * \param[in]  h  A pointer to a TLV array to destroy
+ * \param[in]  f  Whether to free the values within the TLV
  *
  * Destroy a previously created TLV array when it is no longer needed.
  * Free the memory and sets h to NULL so all subsequent calls to TLV
@@ -89,7 +90,7 @@ extern void tlv_append(TLV *h, tlv_t t) __attribute__((nonnull(1)));
  * Return the TLV structure for the given tag value. NB Do not free the
  * returned TLV pointer: bad things will happen.
  */
-extern tlv_t *tlv_get(TLV h, uint8_t t) __attribute__((nonnull(1)));
+extern const tlv_t *tlv_get(TLV h, uint8_t t) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Check whether a TLV array has a particular tag

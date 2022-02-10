@@ -61,7 +61,7 @@ extern LIST list_init(int comparison_fn_t(const void *, const void *), bool dupe
 	return list;
 }
 
-extern void list_deinit(LIST *ptr)
+extern void list_deinit_aux(LIST *ptr, void f(void *))
 {
 	list_private_t *list_ptr = (list_private_t *)*ptr;
 	if (!list_ptr)
@@ -70,6 +70,8 @@ extern void list_deinit(LIST *ptr)
 	while (item && item->next)
 	{
 		list_t *next = item->next;
+		if (f)
+			f((void *)item->data);
 		free(item);
 		item = next;
 	}
