@@ -132,7 +132,7 @@ typedef struct
 	bool advanced:1;             /*!< Whether this option is considered advanced */
 	bool hidden:1;               /*!< Whether this option should be hidden */
 }
-config_arg_t;
+config_named_t;
 
 /*!
  * \brief  An unnamed command line parameter.
@@ -148,7 +148,7 @@ typedef struct
 	bool required:1;             /*!< Whether this option is required */
 	bool seen:1;                 /*!< Whether this argument was detected */
 }
-config_extra_t;
+config_unnamed_t;
 
 typedef struct
 {
@@ -200,12 +200,12 @@ extern void update_config(const char * const restrict o, const char * const rest
 
 
 /*!
- * \brief         Compare config_arg_t's
- * \param[in]  a  First config_arg_t
- * \param[in]  b  Second config_arg_t
+ * \brief         Compare config_named_t's
+ * \param[in]  a  First config_named_t
+ * \param[in]  b  Second config_named_t
  * \return        The difference between the two
  *
- * Compare two config_arg_t using the short_option. Used to ensure that
+ * Compare two config_named_t using the short_option. Used to ensure that
  * only one of each argument is in the LIST.
  */
 extern int config_arg_comp(const void *a, const void *b);

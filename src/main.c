@@ -653,22 +653,22 @@ int main(int argc, char **argv)
 	fargs[0] = argv[0];
 
 	LIST args = list_init(config_arg_comp, false, false);
-	list_add(args, &((config_arg_t){ 'c', "cipher",         _("algorithm"),  _("Algorithm to use to encrypt data; use ‘list’ to show available cipher algorithms"), CONFIG_ARG_REQ_STRING,  { .string  = NULL  }, false, false, false }));
-	list_add(args, &((config_arg_t){ 's', "hash",           _("algorithm"),  _("Hash algorithm to generate key; use ‘list’ to show available hash algorithms"),     CONFIG_ARG_REQ_STRING,  { .string  = NULL  }, false, false, false }));
-	list_add(args, &((config_arg_t){ 'm', "mode",           _("mode"),       _("The encryption mode to use; use ‘list’ to show available cipher modes"),            CONFIG_ARG_REQ_STRING,  { .string  = NULL  }, false, false, false }));
-	list_add(args, &((config_arg_t){ 'a', "mac",            _("mac"),        _("The MAC algorithm to use; use ‘list’ to show available MACs"),                      CONFIG_ARG_REQ_STRING,  { .string  = NULL  }, false, false, false }));
-	list_add(args, &((config_arg_t){ 'i', "kdf-iterations", _("iterations"), _("Number of iterations the KDF should use"),                                          CONFIG_ARG_REQ_NUMBER,  { .number  = 0     }, false, false, false }));
-	list_add(args, &((config_arg_t){ 'p', "paranoid",       NULL,            _("Enable paranoia mode"),                                                             CONFIG_ARG_BOOLEAN,     { .boolean = false }, false, true,  false }));
-	list_add(args, &((config_arg_t){ 'x', "duplicates",     "#",             _("Number of times each file should be duplicated"),                                   CONFIG_ARG_REQ_NUMBER,  { .number  = 0     }, false, true,  false }));
-	list_add(args, &((config_arg_t){ 'b', "show-bloc",      NULL,            _("Expose the /bloc/ in-use block list directory"),                                    CONFIG_ARG_BOOLEAN,     { .boolean = false }, false, true,  false }));
-	list_add(args, &((config_arg_t){ 'd', NULL,             NULL,            _("Enable debug output (forces foreground and single-thread)"),                        CONFIG_ARG_BOOLEAN,     { .boolean = false }, false, false, false }));
-	list_add(args, &((config_arg_t){ 'f', NULL,             NULL,            _("Foreground operation"),                                                             CONFIG_ARG_BOOLEAN,     { .boolean = false }, false, false, false }));
-	list_add(args, &((config_arg_t){ 't', NULL,             NULL,            _("Disable multi-threaded operation (FUSE option -s)"),                                CONFIG_ARG_BOOLEAN,     { .boolean = false }, false, false, false }));
-	list_add(args, &((config_arg_t){ 'o', NULL,             "opt,[opt...]",  _("FUSE mount options--see FUSE documentation for details"),                           CONFIG_ARG_LIST_STRING, { .list    = NULL  }, false, false, false }));
+	list_add(args, &((config_named_t){ 'c', "cipher",         _("algorithm"),  _("Algorithm to use to encrypt data; use ‘list’ to show available cipher algorithms"), CONFIG_ARG_REQ_STRING,  { .string  = NULL  }, false, false, false }));
+	list_add(args, &((config_named_t){ 's', "hash",           _("algorithm"),  _("Hash algorithm to generate key; use ‘list’ to show available hash algorithms"),     CONFIG_ARG_REQ_STRING,  { .string  = NULL  }, false, false, false }));
+	list_add(args, &((config_named_t){ 'm', "mode",           _("mode"),       _("The encryption mode to use; use ‘list’ to show available cipher modes"),            CONFIG_ARG_REQ_STRING,  { .string  = NULL  }, false, false, false }));
+	list_add(args, &((config_named_t){ 'a', "mac",            _("mac"),        _("The MAC algorithm to use; use ‘list’ to show available MACs"),                      CONFIG_ARG_REQ_STRING,  { .string  = NULL  }, false, false, false }));
+	list_add(args, &((config_named_t){ 'i', "kdf-iterations", _("iterations"), _("Number of iterations the KDF should use"),                                          CONFIG_ARG_REQ_NUMBER,  { .number  = 0     }, false, false, false }));
+	list_add(args, &((config_named_t){ 'p', "paranoid",       NULL,            _("Enable paranoia mode"),                                                             CONFIG_ARG_BOOLEAN,     { .boolean = false }, false, true,  false }));
+	list_add(args, &((config_named_t){ 'x', "duplicates",     "#",             _("Number of times each file should be duplicated"),                                   CONFIG_ARG_REQ_NUMBER,  { .number  = 0     }, false, true,  false }));
+	list_add(args, &((config_named_t){ 'b', "show-bloc",      NULL,            _("Expose the /bloc/ in-use block list directory"),                                    CONFIG_ARG_BOOLEAN,     { .boolean = false }, false, true,  false }));
+	list_add(args, &((config_named_t){ 'd', NULL,             NULL,            _("Enable debug output (forces foreground and single-thread)"),                        CONFIG_ARG_BOOLEAN,     { .boolean = false }, false, false, false }));
+	list_add(args, &((config_named_t){ 'f', NULL,             NULL,            _("Foreground operation"),                                                             CONFIG_ARG_BOOLEAN,     { .boolean = false }, false, false, false }));
+	list_add(args, &((config_named_t){ 't', NULL,             NULL,            _("Disable multi-threaded operation (FUSE option -s)"),                                CONFIG_ARG_BOOLEAN,     { .boolean = false }, false, false, false }));
+	list_add(args, &((config_named_t){ 'o', NULL,             "opt,[opt...]",  _("FUSE mount options--see FUSE documentation for details"),                           CONFIG_ARG_LIST_STRING, { .list    = NULL  }, false, false, false }));
 
 	LIST extra = list_default();
-	list_add(extra, &((config_extra_t){ "file system", CONFIG_ARG_STRING,  { .string = NULL }, true,  false }));
-	list_add(extra, &((config_extra_t){ "mount point", CONFIG_ARG_STRING,  { .string = NULL }, true,  false }));
+	list_add(extra, &((config_unnamed_t){ "file system", CONFIG_ARG_STRING,  { .string = NULL }, true,  false }));
+	list_add(extra, &((config_unnamed_t){ "mount point", CONFIG_ARG_STRING,  { .string = NULL }, true,  false }));
 
 	LIST notes = list_default();
 	list_add(notes, _("It doesn't matter which order the file system and mount point are specified as stegfs will figure that out. All other options are passed to FUSE."));
@@ -689,17 +689,17 @@ int main(int argc, char **argv)
 	char *fs  = NULL;
 	char *mnt = NULL;
 	struct stat s = { 0x0 };
-	stat(((config_extra_t *)list_get(extra, 0))->response_value.string, &s);
+	stat(((config_unnamed_t *)list_get(extra, 0))->response_value.string, &s);
 	if (S_ISDIR(s.st_mode))
 	{
 		// 1st argument is directory, so it's the mount point
-		mnt = ((config_extra_t *)list_get(extra, 0))->response_value.string;
-		fs  = ((config_extra_t *)list_get(extra, 1))->response_value.string;
+		mnt = ((config_unnamed_t *)list_get(extra, 0))->response_value.string;
+		fs  = ((config_unnamed_t *)list_get(extra, 1))->response_value.string;
 	}
 	else
 	{
-		fs  = ((config_extra_t *)list_get(extra, 0))->response_value.string;
-		mnt = ((config_extra_t *)list_get(extra, 1))->response_value.string;
+		fs  = ((config_unnamed_t *)list_get(extra, 0))->response_value.string;
+		mnt = ((config_unnamed_t *)list_get(extra, 1))->response_value.string;
 	}
 	list_deinit(&extra);
 
@@ -709,27 +709,27 @@ int main(int argc, char **argv)
 	enum gcry_md_algos     hash   = DEFAULT_HASH;
 	enum gcry_mac_algos    mac    = DEFAULT_MAC;
 	uint64_t kdf_iters            = DEFAULT_KDF_ITERATIONS;
-	bool paranoid                 = ((config_arg_t *)list_get(args, 5))->response_value.boolean;
+	bool paranoid                 = ((config_named_t *)list_get(args, 5))->response_value.boolean;
 	uint8_t duplicates            = COPIES_DEFAULT;
-	bool show_bloc                = ((config_arg_t *)list_get(args, 7))->response_value.boolean;
+	bool show_bloc                = ((config_named_t *)list_get(args, 7))->response_value.boolean;
 
 	if (paranoid)
 	{
-		cipher     = cipher_id_from_name(((config_arg_t *)list_get(args, 0))->response_value.string);
-		mode       =   mode_id_from_name(((config_arg_t *)list_get(args, 1))->response_value.string);
-		hash       =   hash_id_from_name(((config_arg_t *)list_get(args, 2))->response_value.string);
-		mac        =    mac_id_from_name(((config_arg_t *)list_get(args, 3))->response_value.string);
-		kdf_iters  =                     ((config_arg_t *)list_get(args, 4))->response_value.number;
-		duplicates =            (uint8_t)((config_arg_t *)list_get(args, 6))->response_value.number;
+		cipher     = cipher_id_from_name(((config_named_t *)list_get(args, 0))->response_value.string);
+		mode       =   mode_id_from_name(((config_named_t *)list_get(args, 1))->response_value.string);
+		hash       =   hash_id_from_name(((config_named_t *)list_get(args, 2))->response_value.string);
+		mac        =    mac_id_from_name(((config_named_t *)list_get(args, 3))->response_value.string);
+		kdf_iters  =                     ((config_named_t *)list_get(args, 4))->response_value.number;
+		duplicates =            (uint8_t)((config_named_t *)list_get(args, 6))->response_value.number;
 	}
 
 	/*
 	 * deal with FUSE options
 	 */
 
-	bool debug         =          ((config_arg_t *)list_get(args,  8))->response_value.boolean;
-	bool foreground    = debug || ((config_arg_t *)list_get(args,  9))->response_value.boolean;
-	bool single_thread = debug || ((config_arg_t *)list_get(args, 10))->response_value.boolean;
+	bool debug         =          ((config_named_t *)list_get(args,  8))->response_value.boolean;
+	bool foreground    = debug || ((config_named_t *)list_get(args,  9))->response_value.boolean;
+	bool single_thread = debug || ((config_named_t *)list_get(args, 10))->response_value.boolean;
 
 	int fuse_argc = 3;
 	char **fuse_argv = calloc(fuse_argc, sizeof (char *));
@@ -753,7 +753,7 @@ int main(int argc, char **argv)
 		fuse_argv = realloc(fuse_argv, fuse_argc * sizeof (char *));
 		fuse_argv[fuse_argc - 2] = "-s";
 	}
-	LIST fuse_options = ((config_arg_t *)list_get(args, 11))->response_value.list;
+	LIST fuse_options = ((config_named_t *)list_get(args, 11))->response_value.list;
 	ITER iter = list_iterator(fuse_options);
 	while (list_has_next(iter))
 	{

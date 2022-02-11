@@ -83,8 +83,8 @@ extern void config_init(config_about_t a)
 
 extern int config_arg_comp(const void *a, const void *b)
 {
-	const config_arg_t *x = a;
-	const config_arg_t *y = b;
+	const config_named_t *x = a;
+	const config_named_t *y = b;
 	return x->short_option - y->short_option;
 }
 
@@ -128,7 +128,7 @@ extern int config_parse_aux(int argc, char **argv, LIST args, LIST extra, LIST n
 				ITER iter = list_iterator(args);
 				while (list_has_next(iter))
 				{
-					config_arg_t *arg = (config_arg_t *)list_get_next(iter);
+					config_named_t *arg = (config_named_t *)list_get_next(iter);
 					if (arg->long_option && !strncmp(arg->long_option, line, strlen(arg->long_option)) && isspace((unsigned char)line[strlen(arg->long_option)]))
 						switch (arg->response_type)
 						{
@@ -236,7 +236,7 @@ end_line:
 
 		for (size_t i = 0; i < list_size(args); i++)
 		{
-			const config_arg_t *arg = list_get(args, i);
+			const config_named_t *arg = list_get(args, i);
 			if (isalnum(arg->short_option))
 			{
 				char S[] = "X";
@@ -279,7 +279,7 @@ end_line:
 				ITER iter = list_iterator(args);
 				while (list_has_next(iter))
 				{
-					config_arg_t *arg = (config_arg_t *)list_get_next(iter);
+					config_named_t *arg = (config_named_t *)list_get_next(iter);
 					if (c == arg->short_option)
 					{
 						unknown = false;
@@ -348,7 +348,7 @@ end_line:
 		ITER iter = list_iterator(extra);
 		for (int i = 0; list_has_next(iter) && optind < argc; i++, optind++)
 		{
-			config_extra_t *x = (config_extra_t *)list_get_next(iter);
+			config_unnamed_t *x = (config_unnamed_t *)list_get_next(iter);
 			x->seen = true;
 			switch (x->response_type)
 			{
@@ -372,7 +372,7 @@ end_line:
 		iter = list_iterator(extra);
 		while (list_has_next(iter))
 		{
-			const config_extra_t *x = (config_extra_t *)list_get_next(iter);
+			const config_unnamed_t *x = (config_unnamed_t *)list_get_next(iter);
 			if (x->required && !x->seen && warn)
 			{
 				cli_eprintf("Missing required argument \"%s\"\n", x->description);
@@ -417,7 +417,7 @@ inline static void print_usage(LIST args, LIST extra)
 		ITER iter = list_iterator(extra);
 		while (list_has_next(iter))
 		{
-			const config_extra_t *x = (config_extra_t *)list_get_next(iter);
+			const config_unnamed_t *x = (config_unnamed_t *)list_get_next(iter);
 			if (x->required)
 				j += cli_eprintf(ANSI_COLOUR_RED " <%s>" ANSI_COLOUR_RESET, x->description);
 			else
@@ -432,7 +432,7 @@ inline static void print_usage(LIST args, LIST extra)
 		ITER iter = list_iterator(args);
 		while (list_has_next(iter))
 		{
-			const config_arg_t *arg = list_get_next(iter);
+			const config_named_t *arg = list_get_next(iter);
 			if (!arg->hidden)
 			{
 				if ((int)(j + 4 + (arg->option_type ? strlen(arg->option_type) : 0)) > max_width)
@@ -628,7 +628,7 @@ static void show_help(LIST args, LIST notes, LIST extra)
 	ITER iter = list_iterator(args);
 	while (list_has_next(iter))
 	{
-		const config_arg_t *arg = list_get_next(iter);
+		const config_named_t *arg = list_get_next(iter);
 		int w = 10 + (arg->long_option ? strlen(arg->long_option) : 0);
 		if (arg->option_type)
 			w += 3 + strlen(arg->option_type);
@@ -646,7 +646,7 @@ static void show_help(LIST args, LIST notes, LIST extra)
 	iter = list_iterator(args);
 	while (list_has_next(iter))
 	{
-		const config_arg_t *arg = list_get_next(iter);
+		const config_named_t *arg = list_get_next(iter);
 		if (!arg->hidden && !arg->advanced)
 			print_option(indent, arg->short_option, arg->long_option, arg->option_type ? : NULL, arg->response_type & CONFIG_ARG_REQUIRED, arg->description);
 	}
@@ -658,7 +658,7 @@ static void show_help(LIST args, LIST notes, LIST extra)
 		iter = list_iterator(args);
 		while (list_has_next(iter))
 		{
-			const config_arg_t *arg = list_get_next(iter);
+			const config_named_t *arg = list_get_next(iter);
 			if (!arg->hidden && arg->advanced)
 				print_option(indent, arg->short_option, arg->long_option, arg->option_type ? : NULL, arg->response_type & CONFIG_ARG_REQUIRED, arg->description);
 		}
