@@ -312,6 +312,8 @@ int main(int argc, char **argv)
 	bool rewrite    = ((config_named_t *)list_get(args,  9))->response_value.boolean;
 	bool dry_run    = ((config_named_t *)list_get(args, 10))->response_value.boolean;
 
+	list_deinit(&args);
+
 	enum gcry_cipher_algos cipher = c ? cipher_id_from_name(c) : DEFAULT_CIPHER;
 	if (cipher == GCRY_CIPHER_NONE)
 	{

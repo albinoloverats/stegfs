@@ -765,6 +765,8 @@ int main(int argc, char **argv)
 	fuse_argc--;
 	fuse_argv[fuse_argc] = NULL;
 
+	list_deinit(&args);
+
 	errno = EXIT_SUCCESS;
 	switch (stegfs_init(fs, paranoid, cipher, mode, hash, mac, kdf_iters, duplicates, show_bloc))
 	{
