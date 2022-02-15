@@ -34,6 +34,8 @@
 #include <stdint.h> /*!< Necessary include as c99 standard integer types are referenced in this header */
 #include <stdbool.h> /*!< Necessary include as c99 standard boolean type is referenced in this header */
 
+#include "list.h"
+
 typedef void * TLV; /*<! Handle type for TLV functions */
 
 /*!
@@ -71,15 +73,33 @@ extern TLV tlv_init(void) __attribute__((malloc));
 extern void tlv_deinit(TLV *h) __attribute__((nonnull(1)));
 
 /*!
- * \brief         Append a new TLV triple to an array
+ * \brief         Append a new TLV triple to the array
  * \param[in]  h  A pointer to the TLV
  * \param[in]  t  The TLV triple to add
  *
- * Add a new TLV triple to the end of an existing TLV array. Does not
- * (currently) check for duplicates. Potentially modifies the address of
- * the TLV in accordance with the rules of realloc().
+ * Add a new TLV triple to the end of an existing TLV array. It takes a
+ * copy of t (including the value pointer) so remember to free that
+ * yourself. Duplicate tags are ignored.
  */
 extern void tlv_append(TLV h, tlv_t t) __attribute__((nonnull(1)));
+
+/*!
+ * \brief         Remove a TLV triple from the array
+ * \param[in]  h  A pointer to the TLV
+ * \param[in]  t  The TLV triple to remove
+ *
+ * Remove the given TLV triple from the TLV array.
+ */
+extern const tlv_t *tlv_remove(TLV h, tlv_t t) __attribute__((nonnull(1)));
+
+/*!
+ * \brief         Remove a TLV triple from the array
+ * \param[in]  h  A pointer to the TLV
+ * \param[in]  t  The tag to remove
+ *
+ * Remove the given tag from the TLV array.
+ */
+extern const tlv_t * tlv_remove_tag(TLV h, uint8_t t) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Get TLV structure for tag
@@ -168,5 +188,35 @@ extern uint16_t tlv_count(TLV h) __attribute__((nonnull(1)));
  * tlv_export().
  */
 extern size_t tlv_size(TLV h) __attribute__((nonnull(1)));
+
+/*!
+ * \brief         Set the TLV up for iterating
+ * \param[in]  h  A pointer to the TLV
+ * \return        An iterator for the TLV
+ *
+ * Set the TLV up to be iterated over. The iterator should be freed
+ * after use.
+ */
+extern ITER tlv_iterator(TLV h) __attribute__((nonnull(1)));
+
+/*!
+ * \brief         Get the next item in the TLV
+ * \param[in]  h  A pointer to the iterator
+ * \return        The next item in the TLV
+ *
+ * Allow iterating through the TLV, this returns the next item.
+ */
+extern const tlv_t *tlv_get_next(ITER h) __attribute__((nonnull(1)));
+
+/*!
+ * \brief         Indicates if there is another item in the TLV
+ * \param[in]  h  A pointer to the iterator
+ * \return        Returns true if there is another item
+ *
+ * Allow iterating through the TLV, this returns whether there is
+ * another item.
+ */
+extern bool tlv_has_next(ITER h) __attribute__((nonnull(1)));
+
 
 #endif /* _COMMON_TLV_H_ */

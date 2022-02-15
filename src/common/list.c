@@ -37,10 +37,10 @@ typedef struct
 	list_t *head;
 	list_t *next;
 	list_t *tail;
-	size_t *size;
+	size_t  size;
 	int (*compare)(const void *, const void *);
-	bool duplicates;
-	bool sorted;
+	bool duplicates:1;
+	bool sorted:1;
 }
 list_private_t;
 
@@ -54,7 +54,7 @@ iterator_t;
 extern LIST list_init(int comparison_fn_t(const void *, const void *), bool dupes, bool sorted)
 {
 	list_private_t *list = calloc(sizeof( list_private_t ), sizeof( byte_t ));
-	list->size = calloc(sizeof( size_t ), 1);
+	list->size = 0;
 	list->compare = comparison_fn_t;
 	list->duplicates = dupes;
 	list->sorted = sorted;
@@ -67,11 +67,11 @@ extern void list_deinit_aux(LIST *ptr, void f(void *))
 	if (!list_ptr)
 		return;
 	list_t *item = list_ptr->head;
-	while (item && item->next)
+	while (item)
 	{
-		list_t *next = item->next;
 		if (f)
 			f((void *)item->data);
+		list_t *next = item->next;
 		free(item);
 		item = next;
 	}
@@ -89,7 +89,7 @@ extern size_t list_size(LIST ptr)
 	list_private_t *list_ptr = (list_private_t *)ptr;
 	if (!list_ptr)
 		return 0;
-	return *list_ptr->size;
+	return list_ptr->size;
 }
 
 extern void list_append(LIST ptr, const void *d)
@@ -112,7 +112,7 @@ extern void list_append(LIST ptr, const void *d)
 	if (!list_ptr->head)
 		list_ptr->head = new;
 	list_ptr->tail = new;
-	(*list_ptr->size)++;
+	list_ptr->size++;
 	return;
 }
 
@@ -126,7 +126,7 @@ extern void list_insert(LIST ptr, size_t i, const void *d)
 		list_add(ptr, d);
 		return;
 	}
-	if (i >= *list_ptr->size)
+	if (i >= list_ptr->size)
 	{
 		list_append(ptr, d);
 		return;
@@ -149,7 +149,7 @@ extern void list_insert(LIST ptr, size_t i, const void *d)
 		prev->next = new;
 		new->next = next;
 	}
-	(*list_ptr->size)++;
+	list_ptr->size++;
 	return;
 }
 
@@ -167,12 +167,12 @@ extern void list_add(LIST ptr, const void *d)
 		return;
 	list_t *new = calloc(sizeof( list_t ), sizeof( byte_t ));
 	new->data = d;
-	if (*list_ptr->size == 0)
+	if (list_ptr->size == 0)
 	{
 		list_ptr->head = new;
 		list_ptr->tail = new;
 	}
-	else if (*list_ptr->size == 1)
+	else if (list_ptr->size == 1)
 	{
 		list_t *prev = list_ptr->head;
 		if (list_ptr->compare(new->data, prev->data) <= 0)
@@ -214,7 +214,7 @@ extern void list_add(LIST ptr, const void *d)
 			list_ptr->tail = new;
 		}
 	}
-	(*list_ptr->size)++;
+	list_ptr->size++;
 	return;
 }
 
@@ -223,7 +223,7 @@ extern const void *list_get(LIST ptr, size_t i)
 	list_private_t *list_ptr = (list_private_t *)ptr;
 	if (!list_ptr)
 		return NULL;
-	if (i >= *list_ptr->size)
+	if (i >= list_ptr->size)
 		return NULL;
 	list_t *item = list_ptr->head;
 	for (size_t j = 0; j < i; j++)
@@ -236,7 +236,7 @@ extern const void *list_contains(LIST ptr, const void *d)
 	list_private_t *list_ptr = (list_private_t *)ptr;
 	if (!list_ptr)
 		return NULL;
-	if (!*list_ptr->size)
+	if (!list_ptr->size)
 		return NULL;
 	list_t *item = list_ptr->head;
 	do
@@ -254,7 +254,7 @@ extern const void *list_remove_item(LIST ptr, const void *d)
 	list_private_t *list_ptr = (list_private_t *)ptr;
 	if (!list_ptr)
 		return NULL;
-	if (!*list_ptr->size)
+	if (!list_ptr->size)
 		return NULL;
 	const void *data = NULL;
 	list_t *item = list_ptr->head;
@@ -268,7 +268,7 @@ extern const void *list_remove_item(LIST ptr, const void *d)
 				prev->next = item->next;
 			else
 				list_ptr->head = item->next;
-			(*list_ptr->size)--;
+			list_ptr->size--;
 			free(item);
 			item = prev ? prev->next : list_ptr->head;
 		}
@@ -287,7 +287,7 @@ extern const void *list_remove_index(LIST ptr, size_t i)
 	list_private_t *list_ptr = (list_private_t *)ptr;
 	if (!list_ptr)
 		return NULL;
-	if (i >= *list_ptr->size)
+	if (i >= list_ptr->size)
 		return NULL;
 	list_t *item = list_ptr->head;
 	if (i == 0)
@@ -302,7 +302,7 @@ extern const void *list_remove_index(LIST ptr, size_t i)
 		prev->next = next;
 	}
 	const void *data = item->data;
-	(*list_ptr->size)--;
+	list_ptr->size--;
 	free(item);
 	return data;
 }
@@ -318,7 +318,7 @@ extern ITER list_iterator(LIST ptr)
 	return iter;
 }
 
-extern const void *list_get_next(LIST ptr)
+extern const void *list_get_next(ITER ptr)
 {
 	iterator_t *iter_ptr = (iterator_t *)ptr;
 	if (!iter_ptr)
@@ -330,7 +330,7 @@ extern const void *list_get_next(LIST ptr)
 	return next->data;
 }
 
-extern bool list_has_next(LIST ptr)
+extern bool list_has_next(ITER ptr)
 {
 	iterator_t *iter_ptr = (iterator_t *)ptr;
 	if (!iter_ptr)

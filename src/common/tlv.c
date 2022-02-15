@@ -33,6 +33,9 @@
 #include "tlv.h"
 #include "list.h"
 
+/*
+ * TODO this could be simplified to just a LIST
+ */
 typedef struct
 {
 	LIST    tags;
@@ -57,7 +60,7 @@ extern void tlv_deinit(TLV *ptr)
 		return;
 	if (tlv_ptr->export)
 		free(tlv_ptr->export);
-	list_deinit(tlv_ptr->tags, tlv_free);
+	list_deinit(&tlv_ptr->tags, tlv_free);
 	free(tlv_ptr);
 	tlv_ptr = NULL;
 	*ptr = NULL;
@@ -78,6 +81,19 @@ extern void tlv_append(TLV ptr, tlv_t tlv)
 	return;
 }
 
+extern const tlv_t *tlv_remove(TLV ptr, tlv_t tlv)
+{
+	tlv_private_t *tlv_ptr = (tlv_private_t *)ptr;
+	if (!tlv_ptr)
+		return NULL;
+	return list_remove_item(tlv_ptr->tags, &tlv);
+}
+
+extern const tlv_t *tlv_remove_tag(TLV ptr, uint8_t tag)
+{
+	return tlv_remove(ptr, (tlv_t){ tag, 0, NULL });
+}
+
 extern const tlv_t *tlv_get(TLV ptr, uint8_t tag)
 {
 	tlv_private_t *tlv_ptr = (tlv_private_t *)ptr;
@@ -89,9 +105,6 @@ extern const tlv_t *tlv_get(TLV ptr, uint8_t tag)
 
 extern bool tlv_has_tag(TLV ptr, uint8_t tag)
 {
-	tlv_private_t *tlv_ptr = (tlv_private_t *)ptr;
-	if (!tlv_ptr)
-		return NULL;
 	return tlv_get(ptr, tag);
 }
 
@@ -155,11 +168,32 @@ extern size_t tlv_size(TLV ptr)
 	return size;
 }
 
+extern ITER tlv_iterator(TLV ptr)
+{
+	tlv_private_t *tlv_ptr = (tlv_private_t *)ptr;
+	if (!tlv_ptr)
+		return NULL;
+	return list_iterator(tlv_ptr->tags);
+}
+
+extern const tlv_t *tlv_get_next(ITER ptr)
+{
+	return list_get_next(ptr);
+}
+
+extern bool tlv_has_next(ITER ptr)
+{
+	return list_has_next(ptr);
+}
+
 static int tlv_compare(const void *a, const void *b)
 {
 	const tlv_t *x = a;
 	const tlv_t *y = b;
-	// cast to int allows us to overlook that tags are uint8_t's
+	/*
+	 * cast to int allows us to overlook that tags are uint8_t's and
+	 * get a negative result if applicable
+	 */
 	return (int)x->tag - (int)y->tag;
 }
 

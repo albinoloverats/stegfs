@@ -131,6 +131,7 @@ typedef struct
 	bool required:1;             /*!< Whether this option is required */
 	bool advanced:1;             /*!< Whether this option is considered advanced */
 	bool hidden:1;               /*!< Whether this option should be hidden */
+	bool seen:1;                 /*!< Whether the argument was detected */
 }
 config_named_t;
 
@@ -182,6 +183,7 @@ extern void config_show_usage(LIST args, LIST extra);
  * \param[in/out]  x  Any arguments without flags (file names, etc)
  * \param[in]      t  Any additional text to display as notes
  * \param[in]      w  Whether to warn about unknown arguments
+ * \return            The total number of arguments seen (includes named and unnamed)
  *
  * Provide simple command line argument parsing, and pass back whatever
  * options where set. Removes a lot of the cruft from the legacy common

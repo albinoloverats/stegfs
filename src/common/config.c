@@ -55,9 +55,9 @@
 
 
 
-static void show_version(void);
-static void show_help(LIST args, LIST about, LIST extra);
-static void show_licence(void);
+static void show_version(void) __attribute__((noreturn));
+static void show_help(LIST args, LIST about, LIST extra) __attribute__((noreturn));
+static void show_licence(void) __attribute__((noreturn));
 
 static bool    parse_config_boolean(const char *, const char *, bool);
 static int64_t parse_config_number(const char *, const char *, int64_t);
@@ -102,7 +102,7 @@ extern int config_parse_aux(int argc, char **argv, LIST args, LIST extra, LIST n
 	{
 		char *rc = NULL;
 #ifndef _WIN32
-		if (about.config[0] == '/')
+		if (about.config[0] == '/' || (about.config[0] == '.' && about.config[1] == '/'))
 			rc = strdup(about.config);
 		else if (!asprintf(&rc, "%s/%s", getenv("HOME") ? : ".", about.config))
 			die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(getenv("HOME")) + strlen(about.config) + 2);
@@ -136,23 +136,27 @@ extern int config_parse_aux(int argc, char **argv, LIST args, LIST extra, LIST n
 								(void)0; // for Slackware's older GCC
 								__attribute__((fallthrough)); /* allow fall-through */
 							case CONFIG_ARG_REQ_BOOLEAN:
+								arg->seen = true;
 								arg->response_value.boolean = parse_config_boolean(arg->long_option, line, arg->response_value.boolean);
 								break;
 							case CONFIG_ARG_OPT_NUMBER:
 								(void)0; // for Slackware's older GCC
 								__attribute__((fallthrough)); /* allow fall-through */
 							case CONFIG_ARG_REQ_NUMBER:
+								arg->seen = true;
 								arg->response_value.number = parse_config_number(arg->long_option, line, arg->response_value.number);
 								break;
 							case CONFIG_ARG_OPT_STRING:
 								(void)0; // for Slackware's older GCC
 								__attribute__((fallthrough)); /* allow fall-through */
 							case CONFIG_ARG_REQ_STRING:
+								arg->seen = true;
 								arg->response_value.string = parse_config_string(arg->long_option, line, arg->response_value.string);
 								break;
 
 							case CONFIG_ARG_PAIR_BOOLEAN:
 								{
+									arg->seen = true;
 									config_pair_boolean_t *pair = parse_config_pair_boolean(arg->long_option, line);
 									arg->response_value.pair.boolean.b1 = pair->b1;
 									arg->response_value.pair.boolean.b2 = pair->b2;
@@ -162,6 +166,7 @@ extern int config_parse_aux(int argc, char **argv, LIST args, LIST extra, LIST n
 
 							case CONFIG_ARG_PAIR_NUMBER:
 								{
+									arg->seen = true;
 									config_pair_number_t *pair = parse_config_pair_number(arg->long_option, line);
 									arg->response_value.pair.number.n1 = pair->n1;
 									arg->response_value.pair.number.n2 = pair->n2;
@@ -171,6 +176,7 @@ extern int config_parse_aux(int argc, char **argv, LIST args, LIST extra, LIST n
 
 							case CONFIG_ARG_PAIR_STRING:
 								{
+									arg->seen = true;
 									config_pair_string_t *pair = parse_config_pair_string(arg->long_option, line);
 									arg->response_value.pair.string.s1 = pair->s1;
 									arg->response_value.pair.string.s2 = pair->s2;
@@ -179,12 +185,14 @@ extern int config_parse_aux(int argc, char **argv, LIST args, LIST extra, LIST n
 								break;
 
 							case CONFIG_ARG_LIST_STRING:
+								arg->seen = true;
 								if (!arg->response_value.list)
 									arg->response_value.list = list_default();
 								list_append(arg->response_value.list, parse_config_string(arg->long_option, line, NULL));
 								break;
 
 							case CONFIG_ARG_LIST_PAIR_STRING:
+								arg->seen = true;
 								if (!arg->response_value.list)
 									arg->response_value.list = list_default();
 								list_append(arg->response_value.list, parse_config_pair_string(arg->long_option, line));
@@ -203,146 +211,167 @@ end_line:
 		free(rc);
 	}
 
-	if (args)
+	/*
+	 * build and populate the getopt structure
+	 */
+	char *short_options;
+	int optlen = 4 + (args ? list_size(args) : 0);
+	if (!(short_options = calloc(optlen * 2, sizeof (char))))
+		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, optlen * 2 * sizeof (char));
+	struct option *long_options;
+	if (!(long_options = calloc(optlen + 1, sizeof (struct option))))
+		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, (optlen + 1) * sizeof (struct option));
+
+	strcat(short_options, "h");
+	long_options[0].name    = "help";
+	long_options[0].has_arg = no_argument;
+	long_options[0].flag    = NULL;
+	long_options[0].val     = 'h';
+
+	strcat(short_options, "v");
+	long_options[1].name    = "version";
+	long_options[1].has_arg = no_argument;
+	long_options[1].flag    = NULL;
+	long_options[1].val     = 'v';
+
+	strcat(short_options, "l");
+	long_options[2].name    = "licence";
+	long_options[2].has_arg = no_argument;
+	long_options[2].flag    = NULL;
+	long_options[2].val     = 'l';
+
+	for (size_t i = 0; args && i < list_size(args); i++)
 	{
-		/*
-		 * build and populate the getopt structure
-		 */
-		char *short_options;
-		int optlen = 4 + list_size(args);
-		if (!(short_options = calloc(optlen * 2, sizeof (char))))
-			die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, optlen * 2 * sizeof (char));
-		struct option *long_options;
-		if (!(long_options = calloc(optlen + 1, sizeof (struct option))))
-			die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, (optlen + 1) * sizeof (struct option));
-
-		strcat(short_options, "h");
-		long_options[0].name    = "help";
-		long_options[0].has_arg = no_argument;
-		long_options[0].flag    = NULL;
-		long_options[0].val     = 'h';
-
-		strcat(short_options, "v");
-		long_options[1].name    = "version";
-		long_options[1].has_arg = no_argument;
-		long_options[1].flag    = NULL;
-		long_options[1].val     = 'v';
-
-		strcat(short_options, "l");
-		long_options[2].name    = "licence";
-		long_options[2].has_arg = no_argument;
-		long_options[2].flag    = NULL;
-		long_options[2].val     = 'l';
-
-		for (size_t i = 0; i < list_size(args); i++)
+		const config_named_t *arg = list_get(args, i);
+		if (isalnum(arg->short_option))
 		{
-			const config_named_t *arg = list_get(args, i);
-			if (isalnum(arg->short_option))
-			{
-				char S[] = "X";
-				S[0] = arg->short_option;
-				strcat(short_options, S);
-			}
-			if (arg->response_type != CONFIG_ARG_REQ_BOOLEAN && arg->response_type != CONFIG_ARG_OPT_BOOLEAN)
-				strcat(short_options, ":");
-			long_options[i + 3].name = arg->long_option;
-
-			if (arg->response_type == CONFIG_ARG_REQ_BOOLEAN || arg->response_type == CONFIG_ARG_OPT_BOOLEAN)
-				long_options[i + 3].has_arg = no_argument;
-			else if (arg->response_type & CONFIG_ARG_REQUIRED)
-				long_options[i + 3].has_arg = required_argument;
-			else
-				long_options[i + 3].has_arg = optional_argument;
-			long_options[i + 3].flag = NULL;
-			long_options[i + 3].val  = arg->short_option;
+			char S[] = "X";
+			S[0] = arg->short_option;
+			strcat(short_options, S);
 		}
+		if (arg->response_type != CONFIG_ARG_REQ_BOOLEAN && arg->response_type != CONFIG_ARG_OPT_BOOLEAN)
+			strcat(short_options, ":");
+		long_options[i + 3].name = arg->long_option;
 
-		/*
-		 * parse command line options
-		 */
-		while (argc && argv)
+		if (arg->response_type == CONFIG_ARG_REQ_BOOLEAN || arg->response_type == CONFIG_ARG_OPT_BOOLEAN)
+			long_options[i + 3].has_arg = no_argument;
+		else if (arg->response_type & CONFIG_ARG_REQUIRED)
+			long_options[i + 3].has_arg = required_argument;
+		else
+			long_options[i + 3].has_arg = optional_argument;
+		long_options[i + 3].flag = NULL;
+		long_options[i + 3].val  = arg->short_option;
+	}
+
+	/*
+	 * parse command line options
+	 */
+	while (argc && argv)
+	{
+		int c = getopt_long(argc, argv, short_options, long_options, &((int){0}));
+		if (c == -1)
+			break;
+		bool unknown = true;
+		if (c == 'h' || c == 'v' || c == 'l')
 		{
-			int c = getopt_long(argc, argv, short_options, long_options, &((int){0}));
-			if (c == -1)
-				break;
-			bool unknown = true;
-			if (c == 'h')
-				show_help(args, notes, extra);
-			else if (c == 'v')
-				show_version();
-			else if (c == 'l')
-				show_licence();
-			else if (c == '?' && warn)
-				config_show_usage(args, extra);
-			else
+			free(short_options);
+			free(long_options);
+			switch (c)
 			{
-				ITER iter = list_iterator(args);
-				while (list_has_next(iter))
+				case 'h':
+					show_help(args, notes, extra);
+				case 'v':
+					show_version();
+				case 'l':
+					show_licence();
+			}
+		}
+		else if (c == '?' && warn)
+		{
+			free(short_options);
+			free(long_options);
+			config_show_usage(args, extra);
+		}
+		else if (args)
+		{
+			ITER iter = list_iterator(args);
+			while (list_has_next(iter))
+			{
+				config_named_t *arg = (config_named_t *)list_get_next(iter);
+				if (c == arg->short_option)
 				{
-					config_named_t *arg = (config_named_t *)list_get_next(iter);
-					if (c == arg->short_option)
+					unknown = false;
+					switch (arg->response_type)
 					{
-						unknown = false;
-						switch (arg->response_type)
-						{
-							case CONFIG_ARG_OPT_NUMBER:
-								if (!optarg)
-									break;
-								__attribute__((fallthrough)); /* allow fall-through; argument was seen and has a value */
-							case CONFIG_ARG_REQ_NUMBER:
-								arg->response_value.number = strtoull(optarg, NULL, 0);
+						case CONFIG_ARG_OPT_NUMBER:
+							arg->seen = true;
+							if (!optarg)
 								break;
-							case CONFIG_ARG_OPT_STRING:
-								if (!optarg)
-									break;
-								__attribute__((fallthrough)); /* allow fall-through; argument was seen and has a value */
-							case CONFIG_ARG_REQ_STRING:
-								if (arg->response_value.string)
-									free(arg->response_value.string);
-								arg->response_value.string = strdup(optarg);
+							__attribute__((fallthrough)); /* allow fall-through; argument was seen and has a value */
+						case CONFIG_ARG_REQ_NUMBER:
+							arg->seen = true;
+							arg->response_value.number = strtoull(optarg, NULL, 0);
+							break;
+						case CONFIG_ARG_OPT_STRING:
+							arg->seen = true;
+							if (!optarg)
 								break;
-							case CONFIG_ARG_OPT_BOOLEAN:
-								(void)0; // for Slackware's older GCC
-								__attribute__((fallthrough)); /* allow fall-through; argument was seen */
-							case CONFIG_ARG_REQ_BOOLEAN:
-								arg->response_value.boolean = !arg->response_value.boolean;
-								break;
+							__attribute__((fallthrough)); /* allow fall-through; argument was seen and has a value */
+						case CONFIG_ARG_REQ_STRING:
+							arg->seen = true;
+							if (arg->response_value.string)
+								free(arg->response_value.string);
+							arg->response_value.string = strdup(optarg);
+							break;
+						case CONFIG_ARG_OPT_BOOLEAN:
+							(void)0; // for Slackware's older GCC
+							__attribute__((fallthrough)); /* allow fall-through; argument was seen */
+						case CONFIG_ARG_REQ_BOOLEAN:
+							arg->seen = true;
+							arg->response_value.boolean = !arg->response_value.boolean;
+							break;
 
-							/* TODO extend handling of lists and pairs and list of pairs... */
+						/* TODO extend handling of lists and pairs and list of pairs... */
 
-							case CONFIG_ARG_LIST_STRING:
+						case CONFIG_ARG_LIST_STRING:
+							arg->seen = true;
+							if (!arg->response_value.list)
+								arg->response_value.list = list_default();
+							if (strchr(optarg, ','))
+							{
+								char *s = strdup(optarg);
+								list_append(arg->response_value.list, strdup(strtok(s, ",")));
+								char *t = NULL;
+								while ((t = strtok(NULL, ",")))
+									list_append(arg->response_value.list, strdup(t));
+								free(s);
+							}
+							else
+								list_append(arg->response_value.list, strdup(optarg));
+							break;
 
-								if (!arg->response_value.list)
-									arg->response_value.list = list_default();
-
-								if (strchr(optarg, ','))
-								{
-									char *s = strdup(optarg);
-									list_append(arg->response_value.list, strdup(strtok(s, ",")));
-									char *t = NULL;
-									while ((t = strtok(NULL, ",")))
-										list_append(arg->response_value.list, strdup(t));
-									free(s);
-								}
-								else
-									list_append(arg->response_value.list, strdup(optarg));
-								break;
-
-							default:
-								arg->response_value.boolean = !arg->response_value.boolean;
-								break;
-						}
+						default:
+							arg->response_value.boolean = !arg->response_value.boolean;
+							break;
 					}
 				}
-				free(iter);
 			}
-			if (unknown && warn)
-				config_show_usage(args, extra);
+			free(iter);
 		}
-		free(short_options);
-		free(long_options);
+		if (unknown && warn)
+			config_show_usage(args, extra);
 	}
+	free(short_options);
+	free(long_options);
+
 	int r = 0;
+	ITER iter = list_iterator(args);
+	while (list_has_next(iter))
+	{
+		config_named_t *arg = (config_named_t *)list_get_next(iter);
+		if (arg->seen)
+			r++;
+	}
 	if (extra)
 	{
 		ITER iter = list_iterator(extra);
@@ -350,6 +379,7 @@ end_line:
 		{
 			config_unnamed_t *x = (config_unnamed_t *)list_get_next(iter);
 			x->seen = true;
+			r++;
 			switch (x->response_type)
 			{
 				case CONFIG_ARG_STRING:
@@ -368,7 +398,6 @@ end_line:
 			}
 		}
 		free(iter);
-		r = argc - optind;
 		iter = list_iterator(extra);
 		while (list_has_next(iter))
 		{
@@ -625,37 +654,45 @@ static void show_help(LIST args, LIST notes, LIST extra)
 
 	int indent = 10;
 	bool has_advanced = false;
-	ITER iter = list_iterator(args);
-	while (list_has_next(iter))
+	if (args)
 	{
-		const config_named_t *arg = list_get_next(iter);
-		int w = 10 + (arg->long_option ? strlen(arg->long_option) : 0);
-		if (arg->option_type)
-			w += 3 + strlen(arg->option_type);
-		indent = indent > w ? indent : w;
-		if (arg->advanced && !arg->hidden)
-			has_advanced = true;
+		ITER iter = list_iterator(args);
+		while (list_has_next(iter))
+		{
+			const config_named_t *arg = list_get_next(iter);
+			int w = 10 + (arg->long_option ? strlen(arg->long_option) : 0);
+			if (arg->option_type)
+				w += 3 + strlen(arg->option_type);
+			indent = indent > w ? indent : w;
+			if (arg->advanced && !arg->hidden)
+				has_advanced = true;
+		}
+		free(iter);
 	}
-	free(iter);
+	else
+		indent += 7;
 
 	cli_eprintf("\n");
 	format_section(_("Options"));
 	print_option(indent, 'h', "help",    NULL, false, "Display this message");
 	print_option(indent, 'l', "licence", NULL, false, "Display GNU GPL v3 licence header");
 	print_option(indent, 'v', "version", NULL, false, "Display application version");
-	iter = list_iterator(args);
-	while (list_has_next(iter))
+	if (args)
 	{
-		const config_named_t *arg = list_get_next(iter);
-		if (!arg->hidden && !arg->advanced)
-			print_option(indent, arg->short_option, arg->long_option, arg->option_type ? : NULL, arg->response_type & CONFIG_ARG_REQUIRED, arg->description);
+		ITER iter = list_iterator(args);
+		while (list_has_next(iter))
+		{
+			const config_named_t *arg = list_get_next(iter);
+			if (!arg->hidden && !arg->advanced)
+				print_option(indent, arg->short_option, arg->long_option, arg->option_type ? : NULL, arg->response_type & CONFIG_ARG_REQUIRED, arg->description);
+		}
+		free(iter);
 	}
-	free(iter);
 	if (has_advanced)
 	{
 		cli_eprintf("\n");
 		format_section(_("Advanced Options"));
-		iter = list_iterator(args);
+		ITER iter = list_iterator(args);
 		while (list_has_next(iter))
 		{
 			const config_named_t *arg = list_get_next(iter);
@@ -668,7 +705,7 @@ static void show_help(LIST args, LIST notes, LIST extra)
 	{
 		cli_eprintf("\n");
 		format_section(_("Notes"));
-		iter = list_iterator(notes);
+		ITER iter = list_iterator(notes);
 		while (list_has_next(iter))
 			print_notes(list_get_next(iter));
 		free(iter);
