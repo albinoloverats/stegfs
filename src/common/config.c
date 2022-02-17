@@ -372,6 +372,7 @@ end_line:
 		if (arg->seen)
 			r++;
 	}
+	free(iter);
 	if (extra)
 	{
 		ITER iter = list_iterator(extra);
@@ -452,9 +453,9 @@ inline static void print_usage(LIST args, LIST extra)
 			else
 				j+= cli_eprintf(ANSI_COLOUR_YELLOW " [%s]" ANSI_COLOUR_RESET, x->description);
 		}
+		free(iter);
 		if (isatty(STDERR_FILENO))
 			j -= (strlen(ANSI_COLOUR_RESET) + strlen(ANSI_COLOUR_WHITE));
-		free(iter);
 	}
 	if (args)
 	{

@@ -221,7 +221,7 @@ extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid, 
 	if (file_system.copies <= 0 || file_system.copies > COPIES_MAX)
 		return STEGFS_INIT_INVALID_TAG;
 
-	tlv_deinit(&tlv);
+	tlv_deinit(tlv);
 
 done:
 	file_system.blocks.used = 1;

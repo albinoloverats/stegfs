@@ -61,9 +61,9 @@ extern LIST list_init(int comparison_fn_t(const void *, const void *), bool dupe
 	return list;
 }
 
-extern void list_deinit_aux(LIST *ptr, void f(void *))
+extern void list_deinit_aux(LIST ptr, void f(void *))
 {
-	list_private_t *list_ptr = (list_private_t *)*ptr;
+	list_private_t *list_ptr = (list_private_t *)ptr;
 	if (!list_ptr)
 		return;
 	list_t *item = list_ptr->head;
@@ -76,8 +76,6 @@ extern void list_deinit_aux(LIST *ptr, void f(void *))
 		item = next;
 	}
 	free(list_ptr);
-	list_ptr = NULL;
-	*ptr = NULL;
 	return;
 }
 

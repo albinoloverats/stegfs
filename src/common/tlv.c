@@ -53,17 +53,15 @@ extern TLV tlv_init(void)
 	return t;
 }
 
-extern void tlv_deinit(TLV *ptr)
+extern void tlv_deinit(TLV ptr)
 {
-	tlv_private_t *tlv_ptr = (tlv_private_t *)*ptr;
+	tlv_private_t *tlv_ptr = (tlv_private_t *)ptr;
 	if (!tlv_ptr)
 		return;
 	if (tlv_ptr->export)
 		free(tlv_ptr->export);
-	list_deinit(&tlv_ptr->tags, tlv_free);
+	list_deinit(tlv_ptr->tags, tlv_free);
 	free(tlv_ptr);
-	tlv_ptr = NULL;
-	*ptr = NULL;
 	return;
 }
 

@@ -70,7 +70,7 @@ extern TLV tlv_init(void) __attribute__((malloc));
  * Free the memory and sets h to NULL so all subsequent calls to TLV
  * functions will not result in undefined behaviour.
  */
-extern void tlv_deinit(TLV *h) __attribute__((nonnull(1)));
+extern void tlv_deinit(TLV h) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Append a new TLV triple to the array

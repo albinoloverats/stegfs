@@ -18,11 +18,20 @@
  *
  */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include <fcntl.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include "non-gnu.h"
+#include "common.h"
+#include "error.h"
 #include "dir.h"
+#include "list.h"
 
 extern char *dir_get_name_aux(const char * const path, const char ext)
 {
@@ -81,4 +90,91 @@ extern char *dir_get_path(const char * const restrict path)
 		return p;
 	free(p);
 	return strdup(DIR_SEPARATOR);
+}
+
+/*
+ * Taken from http://nion.modprobe.de/tmp/mkdir.c
+ */
+extern void dir_mk_recursive(const char *path, mode_t mode)
+{
+#ifdef _WIN32
+	(void)mode;
+#endif
+	char *opath = strdup(path);
+	size_t len = strlen(opath);
+	if (opath[len - 1] == '/')
+		opath[len - 1] = '\0';
+	for (char *p = opath; *p; p++)
+		if (*p == '/')
+		{
+			*p = '\0';
+			if (access(opath, F_OK))
+				mkdir(opath, mode);
+			*p = '/';
+		}
+	if (access(opath, F_OK)) /* if path is not terminated with / */
+		mkdir(opath, mode);
+	free(opath);
+	return;
+}
+
+static void get_tree(LIST l, const char *path, dir_type_e type)
+{
+	struct dirent **eps = NULL;
+	int n = 0;
+	if ((n = scandir(path, &eps, NULL, alphasort)))
+	{
+		for (int i = 0; i < n; i++)
+		{
+			if (!strcmp(".", eps[i]->d_name) || !strcmp("..", eps[i]->d_name))
+				continue;
+
+			char *full_path = NULL;
+			if (!asprintf(&full_path, "%s/%s", path, eps[i]->d_name))
+				die(_("Out of memory @ %s:%d:%s [%" PRIu64 "]"), __FILE__, __LINE__, __func__, strlen(path) + strlen(eps[i]->d_name) + 2);
+
+			bool add = false;
+			switch (eps[i]->d_type)
+			{
+				case DT_DIR:
+					add = type & DIR_FOLDER;
+					break;
+				case DT_CHR:
+					add = type & DIR_CHAR;
+					break;
+				case DT_BLK:
+					add = type & DIR_BLOCK;
+					break;
+				case DT_REG:
+					add = type & DIR_FILE;
+					break;
+				case DT_LNK:
+					add = type & DIR_LINK;
+					break;
+				case DT_SOCK:
+					add = type & DIR_SOCKET;
+					break;
+				case DT_FIFO:
+					add = type & DIR_PIPE;
+					break;
+			}
+			if (add)
+				list_add(l, strdup(full_path));
+			if (eps[i]->d_type == DT_DIR)
+				get_tree(l, full_path, type);
+
+			free(full_path);
+		}
+	}
+	for (int i = 0; i < n; i++)
+		free(eps[i]);
+	free(eps);
+	return;
+}
+
+extern LIST dir_get_tree(const char *path, dir_type_e type)
+{
+	LIST l = list_string();
+	get_tree(l, path, type);
+	return l;
 }

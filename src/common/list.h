@@ -60,6 +60,16 @@ typedef void * ITER;
 
 /*!
  * \brief         Create a new linked list
+ * \return        A new linked list
+ *
+ * Create a new linked list instance that is intended to contain string
+ * values. It allows duplicates and will sort the list according to
+ * strcmp. Returns NULL on error.
+ */
+#define list_string() list_init((void *)strcmp, true, true)
+
+/*!
+ * \brief         Create a new linked list
  * \param[in]  c  A function to compare items within the list (can be NULL)
  * \param[in]  d  Whether to allow duplicates in the list
  * \param[in]  s  Whether items in the list should be sorted
@@ -92,7 +102,7 @@ extern LIST list_init(int c(const void *, const void *), bool d, bool s) __attri
  * NULL function f then data items will not be freed.
  *
  */
-extern void list_deinit_aux(LIST *h, void f(void *)) __attribute__((nonnull(1)));
+extern void list_deinit_aux(LIST h, void f(void *)) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Get the number of items in the list

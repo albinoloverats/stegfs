@@ -266,17 +266,17 @@ int main(int argc, char **argv)
 {
 
 	LIST args = list_init(config_arg_comp, false, false);
-	list_add(args, &((config_named_t){ 'c', "cipher",         _("algorithm"),  _("Algorithm to use to encrypt data; use ‘list’ to show available cipher algorithms"),        CONFIG_ARG_REQ_STRING,  { .string  = NULL  }, false, false, false }));
-	list_add(args, &((config_named_t){ 's', "hash",           _("algorithm"),  _("Hash algorithm to generate key; use ‘list’ to show available hash algorithms"),            CONFIG_ARG_REQ_STRING,  { .string  = NULL  }, false, false, false }));
-	list_add(args, &((config_named_t){ 'm', "mode",           _("mode"),       _("The encryption mode to use; use ‘list’ to show available cipher modes"),                   CONFIG_ARG_REQ_STRING,  { .string  = NULL  }, false, false, false }));
-	list_add(args, &((config_named_t){ 'a', "mac",            _("mac"),        _("The MAC algorithm to use; use ‘list’ to show available MACs"),                             CONFIG_ARG_REQ_STRING,  { .string  = NULL  }, false, false, false }));
-	list_add(args, &((config_named_t){ 'i', "kdf-iterations", _("iterations"), _("Number of iterations the KDF should use"),                                                 CONFIG_ARG_REQ_NUMBER,  { .number  = 0     }, false, false, false }));
-	list_add(args, &((config_named_t){ 'p', "paranoid",       NULL,            _("Enable paranoia mode"),                                                                    CONFIG_ARG_BOOLEAN,     { .boolean = false }, false, true,  false }));
-	list_add(args, &((config_named_t){ 'x', "duplicates",     "#",             _("Number of times each file should be duplicated"),                                          CONFIG_ARG_REQ_NUMBER,  { .number  = 0     }, false, true,  false }));
-	list_add(args, &((config_named_t){ 'z', "size",           _("size"),       _("Desired file system size, required when creating a file system in a normal file"),         CONFIG_ARG_REQ_STRING,  { .string  = NULL  }, false, false, false }));
-	list_add(args, &((config_named_t){ 'f', "force",          NULL,            _("Force overwrite existing file, required when overwriting a file system in a normal file"), CONFIG_ARG_REQ_BOOLEAN, { .boolean = false }, false, true,  false }));
-	list_add(args, &((config_named_t){ 'r', "rewrite-sb",     NULL,            _("Rewrite the superblock (perhaps it became corrupt)"),                                      CONFIG_ARG_REQ_BOOLEAN, { .boolean = false }, false, true,  false }));
-	list_add(args, &((config_named_t){ 'd', "dry-run",        NULL,            _("Dry run - print details about the file system that would have been created"),              CONFIG_ARG_REQ_BOOLEAN, { .boolean = false }, false, false, false }));
+	list_add(args, &((config_named_t){ 'c', "cipher",         _("algorithm"),  _("Algorithm to use to encrypt data; use ‘list’ to show available cipher algorithms"),        CONFIG_ARG_REQ_STRING,  { .string  = NULL  }, false, false, false, false }));
+	list_add(args, &((config_named_t){ 's', "hash",           _("algorithm"),  _("Hash algorithm to generate key; use ‘list’ to show available hash algorithms"),            CONFIG_ARG_REQ_STRING,  { .string  = NULL  }, false, false, false, false }));
+	list_add(args, &((config_named_t){ 'm', "mode",           _("mode"),       _("The encryption mode to use; use ‘list’ to show available cipher modes"),                   CONFIG_ARG_REQ_STRING,  { .string  = NULL  }, false, false, false, false }));
+	list_add(args, &((config_named_t){ 'a', "mac",            _("mac"),        _("The MAC algorithm to use; use ‘list’ to show available MACs"),                             CONFIG_ARG_REQ_STRING,  { .string  = NULL  }, false, false, false, false }));
+	list_add(args, &((config_named_t){ 'i', "kdf-iterations", _("iterations"), _("Number of iterations the KDF should use"),                                                 CONFIG_ARG_REQ_NUMBER,  { .number  = 0     }, false, false, false, false }));
+	list_add(args, &((config_named_t){ 'p', "paranoid",       NULL,            _("Enable paranoia mode"),                                                                    CONFIG_ARG_BOOLEAN,     { .boolean = false }, false, true,  false, false }));
+	list_add(args, &((config_named_t){ 'x', "duplicates",     "#",             _("Number of times each file should be duplicated"),                                          CONFIG_ARG_REQ_NUMBER,  { .number  = 0     }, false, true,  false, false }));
+	list_add(args, &((config_named_t){ 'z', "size",           _("size"),       _("Desired file system size, required when creating a file system in a normal file"),         CONFIG_ARG_REQ_STRING,  { .string  = NULL  }, false, false, false, false }));
+	list_add(args, &((config_named_t){ 'f', "force",          NULL,            _("Force overwrite existing file, required when overwriting a file system in a normal file"), CONFIG_ARG_REQ_BOOLEAN, { .boolean = false }, false, true,  false, false }));
+	list_add(args, &((config_named_t){ 'r', "rewrite-sb",     NULL,            _("Rewrite the superblock (perhaps it became corrupt)"),                                      CONFIG_ARG_REQ_BOOLEAN, { .boolean = false }, false, true,  false, false }));
+	list_add(args, &((config_named_t){ 'd', "dry-run",        NULL,            _("Dry run - print details about the file system that would have been created"),              CONFIG_ARG_REQ_BOOLEAN, { .boolean = false }, false, false, false, false }));
 
 	LIST extra = list_default();
 	list_add(extra, &((config_unnamed_t){ "device", CONFIG_ARG_STRING,  { 0x0 }, true,  false }));
@@ -294,11 +294,11 @@ int main(int argc, char **argv)
 	config_init(about);
 	config_parse(argc, argv, args, extra, notes);
 
-	list_deinit(&notes);
+	list_deinit(notes);
 
 	char *path = ((config_unnamed_t *)list_get(extra, 0))->response_value.string;
 
-	list_deinit(&extra);
+	list_deinit(extra);
 
 	char *c         = ((config_named_t *)list_get(args,  0))->response_value.string;
 	char *h         = ((config_named_t *)list_get(args,  1))->response_value.string;
@@ -312,7 +312,7 @@ int main(int argc, char **argv)
 	bool rewrite    = ((config_named_t *)list_get(args,  9))->response_value.boolean;
 	bool dry_run    = ((config_named_t *)list_get(args, 10))->response_value.boolean;
 
-	list_deinit(&args);
+	list_deinit(args);
 
 	enum gcry_cipher_algos cipher = c ? cipher_id_from_name(c) : DEFAULT_CIPHER;
 	if (cipher == GCRY_CIPHER_NONE)

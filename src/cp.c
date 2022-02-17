@@ -29,7 +29,7 @@
 
 #include "common/common.h"
 #include "common/error.h"
-#include "common/fs.h"
+#include "common/dir.h"
 #include "common/config.h"
 
 #include "stegfs.h"
@@ -56,7 +56,7 @@ static void copy(const char *from_prefix, const char *from, const char *to_prefi
 				printf("%s/%s --> %s/%s\n", from_prefix, dir, to, dir);
 				char *new = NULL;
 				asprintf(&new, "%s/%s/%s", to_prefix, to, dir);
-				recursive_mkdir(new, S_IRUSR | S_IWUSR | S_IXUSR);
+				dir_mk_recursive(new, S_IRUSR | S_IWUSR | S_IXUSR);
 				copy(from_prefix, dir, to_prefix, to);
 			}
 			free(dir);

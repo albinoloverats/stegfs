@@ -36,6 +36,7 @@
 #include <inttypes.h>
 
 #include "common.h"
+#include "list.h"
 
 #ifndef _WIN32
 	#define DIR_SEPARATOR "/"
@@ -54,6 +55,19 @@
 #define dir_get_name_1(A)     dir_get_name_aux(A, '\0')
 #define dir_get_name_2(A, B)  dir_get_name_aux(A, B)
 #define dir_get_name(...) CONCAT(dir_get_name_, DIR_GET_NAME_ARGS_COUNT(__VA_ARGS__))(__VA_ARGS__)
+
+typedef enum
+{
+	DIR_UNKNOWN = 0x0000,
+	DIR_FOLDER  = 0x0001,
+	DIR_FILE    = 0x0002,
+	DIR_LINK    = 0x0004,
+	DIR_BLOCK   = 0x0008,
+	DIR_CHAR    = 0x0010,
+	DIR_SOCKET  = 0x0020,
+	DIR_PIPE    = 0x0040
+}
+dir_type_e;
 
 /*!
  * \brief         Extract the name part of the /path/file:password
@@ -102,5 +116,25 @@ extern char *dir_get_pass(const char * const restrict p) __attribute__((nonnull(
  * Take the given path, copy it, and cut off the file name and password
  */
 extern char *dir_get_path(const char * const restrict p) __attribute__((nonnull(1)));
+
+
+/*!
+ * \brief         Create a new directory recursively
+ * \param[in]  p  Directory path to create
+ * \param[in]  m  New directories mode
+ *
+ * Creates a new directory, recursively, for the given path.
+ */
+extern void dir_mk_recursive(const char *p, mode_t m) __attribute__((nonnull(1)));
+
+/*!
+ * \brief         Get all entries in a directory tree
+ * \param[in]  p  Directory path to scan
+ * \param[in]  m  The type of files to find
+ *
+ * Return all found files (of a paticular type) in a given directory
+ * tree.
+ */
+extern LIST dir_get_tree(const char *p, dir_type_e m) __attribute__((nonnull(1)));
 
 #endif /* _DIR_H_ */
