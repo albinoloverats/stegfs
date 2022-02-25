@@ -129,7 +129,7 @@ extern byte_t *tlv_export_aux(TLV ptr, bool nbo)
 	tlv_private_t *tlv_ptr = (tlv_private_t *)ptr;
 	if (!tlv_ptr)
 		return NULL;
-	size_t size = tlv_size(tlv_ptr);
+	size_t size = tlv_length(tlv_ptr);
 	if (tlv_ptr->export)
 		free(tlv_ptr->export);
 	tlv_ptr->export = malloc(size);
@@ -149,12 +149,12 @@ extern byte_t *tlv_export_aux(TLV ptr, bool nbo)
 	return tlv_ptr->export;
 }
 
-extern uint16_t tlv_count(TLV ptr)
+extern uint16_t tlv_size(TLV ptr)
 {
 	return list_size(((tlv_private_t *)ptr)->tags);
 }
 
-extern size_t tlv_size(TLV ptr)
+extern size_t tlv_length(TLV ptr)
 {
 	tlv_private_t *tlv_ptr = (tlv_private_t *)ptr;
 	if (!tlv_ptr)

@@ -40,13 +40,14 @@ typedef void * LIST; /*!< The user visible LIST type */
 typedef void * ITER;
 
 #if 0
-#define LIST_INIT_ARGS_COUNT(...) LIST_INIT_ARGS_COUNT2(__VA_ARGS__, 2, 1) /*!< Function overloading argument count (part 1) */
-#define LIST_INIT_ARGS_COUNT2(_1, _2, _, ...) _                            /*!< Function overloading argument count (part 2) */
-
-#define list_init_0()      list_init_aux(NULL, true) /*<! Call list_init_aux with NULL and true for parameters  */
-#define list_init_1(A)     list_init_aux(A, true)    /*<! Call list_init_aux with true for second parameter     */
-#define list_init_2(A, B)  list_init_aux(A, B)       /*<! Call list_init_aux with both user supplied parameters */
-#define list_init(...) CONCAT(list_init_, LIST_INIT_ARGS_COUNT(__VA_ARGS__))(__VA_ARGS__) /*!< Decide how to call list_init */
+#define LIST_INIT_COUNT(...) LIST_INIT_COUNT2(__VA_ARGS__, 3, 2, 1) /*!< Function overloading argument count (part 1) */
+#define LIST_INIT_COUNT2(_1, _2, _3, _, ...) _                      /*!< Function overloading argument count (part 2) */
+// doesn't (yet) work with zero arguments
+#define list_init_0()         list_init_aux(NULL, true, false) /*<! Call list_init_aux with NULL and true for parameters    */
+#define list_init_1(A)        list_init_aux(A, true, false)    /*<! Call list_init_aux with true for second parameter       */
+#define list_init_2(A, B)     list_init_aux(A, B, false)       /*<! Call list_init_aux with both user supplied parameters   */
+#define list_init_3(A, B, C)  list_init_aux(A, B, C)           /*<! Call list_init_aux with both user supplied parameters   */
+#define list_init(...) CONCAT(list_init_, LIST_INIT_COUNT(__VA_ARGS__))(__VA_ARGS__) /*!< Decide how to call list_init */
 #endif
 
 /*!

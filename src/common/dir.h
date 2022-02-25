@@ -58,14 +58,17 @@
 
 typedef enum
 {
-	DIR_UNKNOWN = 0x0000,
+	DIR_NONE    = 0x0000,
+
 	DIR_FOLDER  = 0x0001,
 	DIR_FILE    = 0x0002,
 	DIR_LINK    = 0x0004,
 	DIR_BLOCK   = 0x0008,
 	DIR_CHAR    = 0x0010,
 	DIR_SOCKET  = 0x0020,
-	DIR_PIPE    = 0x0040
+	DIR_PIPE    = 0x0040,
+
+	DIR_ALL     = 0x00FF
 }
 dir_type_e;
 

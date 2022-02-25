@@ -26,15 +26,18 @@
 #include <stdbool.h>
 
 #include "common.h"
+#include "pair.h"
 #include "list.h"
 
 
 #define CONF_TRUE     "true"
 #define CONF_ON       "on"
 #define CONF_ENABLED  "enabled"
+#define CONF_YES      "yes"
 #define CONF_FALSE    "false"
 #define CONF_OFF      "off"
 #define CONF_DISABLED "disabled"
+#define CONF_NO       "no"
 
 
 #define CONFIG_ARG_REQUIRED 0x80000000 // 1000
@@ -44,73 +47,40 @@
 typedef enum
 {
 	CONFIG_ARG_BOOLEAN,
-	CONFIG_ARG_NUMBER,
+	CONFIG_ARG_INTEGER,
+	CONFIG_ARG_DECIMAL,
 	CONFIG_ARG_STRING,
 	// these are for semantic clarity
 	CONFIG_ARG_OPT_BOOLEAN      = CONFIG_ARG_BOOLEAN,
-	CONFIG_ARG_OPT_NUMBER       = CONFIG_ARG_NUMBER,
+	CONFIG_ARG_OPT_INTEGER      = CONFIG_ARG_INTEGER,
+	CONFIG_ARG_OPT_DECIMAL      = CONFIG_ARG_DECIMAL,
 	CONFIG_ARG_OPT_STRING       = CONFIG_ARG_STRING,
 
 	CONFIG_ARG_REQ_BOOLEAN      = (CONFIG_ARG_OPT_BOOLEAN | CONFIG_ARG_REQUIRED),
-	CONFIG_ARG_REQ_NUMBER       = (CONFIG_ARG_OPT_NUMBER  | CONFIG_ARG_REQUIRED),
+	CONFIG_ARG_REQ_INTEGER      = (CONFIG_ARG_OPT_INTEGER | CONFIG_ARG_REQUIRED),
+	CONFIG_ARG_REQ_DECIMAL      = (CONFIG_ARG_OPT_DECIMAL | CONFIG_ARG_REQUIRED),
 	CONFIG_ARG_REQ_STRING       = (CONFIG_ARG_OPT_STRING  | CONFIG_ARG_REQUIRED),
 
 	CONFIG_ARG_PAIR_BOOLEAN     = (CONFIG_ARG_REQ_BOOLEAN | CONFIG_ARG_PAIR), // pairs of options are currently required
-	CONFIG_ARG_PAIR_NUMBER      = (CONFIG_ARG_REQ_NUMBER  | CONFIG_ARG_PAIR),
+	CONFIG_ARG_PAIR_INTEGER     = (CONFIG_ARG_REQ_INTEGER | CONFIG_ARG_PAIR),
+	CONFIG_ARG_PAIR_DECIMAL     = (CONFIG_ARG_REQ_DECIMAL | CONFIG_ARG_PAIR),
 	CONFIG_ARG_PAIR_STRING      = (CONFIG_ARG_REQ_STRING  | CONFIG_ARG_PAIR),
 
 //	CONFIG_ARG_LIST_BOOLEAN     = (CONFIG_ARG_REQ_BOOLEAN | CONFIG_ARG_LIST), // list options are currently required
-//	CONFIG_ARG_LIST_NUMBER      = (CONFIG_ARG_REQ_NUMBER  | CONFIG_ARG_LIST),
+//	CONFIG_ARG_LIST_INTEGER     = (CONFIG_ARG_REQ_INTEGER | CONFIG_ARG_LIST),
 	CONFIG_ARG_LIST_STRING      = (CONFIG_ARG_REQ_STRING  | CONFIG_ARG_LIST),
 
 	CONFIG_ARG_LIST_PAIR_STRING = (CONFIG_ARG_LIST_STRING | CONFIG_ARG_PAIR_STRING)
 }
 config_arg_e;
 
-typedef struct
-{
-	bool b1;
-	bool b2;
-}
-config_pair_boolean_t;
-
-typedef struct
-{
-	int64_t n1;
-	int64_t n2;
-}
-config_pair_number_t;
-
-typedef struct
-{
-	char *s1;
-	char *s2;
-}
-config_pair_string_t;
-
-typedef union
-{
-	config_pair_boolean_t boolean;
-	config_pair_number_t number;
-	config_pair_string_t string;
-}
-config_pair_u;
-
 typedef union
 {
 	bool boolean;
-	uint64_t number;
+	int64_t integer;
+	_Float128 decimal;
 	char *string;
-	config_pair_u pair;
-}
-config_list_u;
-
-typedef union
-{
-	bool boolean;
-	int64_t number;
-	char *string;
-	config_pair_u pair;
+	pair_u pair;
 	LIST *list;
 }
 config_arg_u;

@@ -177,7 +177,7 @@ extern byte_t *tlv_export_aux(TLV h, bool e) __attribute__((nonnull(1)));
  *
  * Count the number of TLV elements in the array.
  */
-extern uint16_t tlv_count(TLV h) __attribute__((nonnull(1)));
+extern uint16_t tlv_size(TLV h) __attribute__((nonnull(1)));
 
 /*!
  * \brief         The size of TLV array
@@ -187,7 +187,7 @@ extern uint16_t tlv_count(TLV h) __attribute__((nonnull(1)));
  * Return the total size of the TLV array in bytes; useful when calling
  * tlv_export().
  */
-extern size_t tlv_size(TLV h) __attribute__((nonnull(1)));
+extern size_t tlv_length(TLV h) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Set the TLV up for iterating

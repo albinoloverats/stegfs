@@ -123,49 +123,52 @@ static void get_tree(LIST l, const char *path, dir_type_e type)
 	struct dirent **eps = NULL;
 	int n = 0;
 	if ((n = scandir(path, &eps, NULL, alphasort)))
-	{
 		for (int i = 0; i < n; i++)
 		{
 			if (!strcmp(".", eps[i]->d_name) || !strcmp("..", eps[i]->d_name))
 				continue;
-
 			char *full_path = NULL;
 			if (!asprintf(&full_path, "%s/%s", path, eps[i]->d_name))
 				die(_("Out of memory @ %s:%d:%s [%" PRIu64 "]"), __FILE__, __LINE__, __func__, strlen(path) + strlen(eps[i]->d_name) + 2);
-
 			bool add = false;
-			switch (eps[i]->d_type)
+			bool dir = false;
+			/*
+			 * eps[i]->d_type doesn't always give a proper
+			 * answer, so we've gotta stat
+			 */
+			struct stat s;
+			lstat(full_path, &s);
+			switch (s.st_mode & S_IFMT)
 			{
-				case DT_DIR:
+				case S_IFDIR:
 					add = type & DIR_FOLDER;
+					dir = true;
 					break;
-				case DT_CHR:
+				case S_IFCHR:
 					add = type & DIR_CHAR;
 					break;
-				case DT_BLK:
+				case S_IFBLK:
 					add = type & DIR_BLOCK;
 					break;
-				case DT_REG:
+				case S_IFREG:
 					add = type & DIR_FILE;
 					break;
-				case DT_LNK:
+				case S_IFLNK:
 					add = type & DIR_LINK;
 					break;
-				case DT_SOCK:
+				case S_IFSOCK:
 					add = type & DIR_SOCKET;
 					break;
-				case DT_FIFO:
+				case S_IFIFO:
 					add = type & DIR_PIPE;
 					break;
 			}
 			if (add)
 				list_add(l, strdup(full_path));
-			if (eps[i]->d_type == DT_DIR)
+			if (dir)
 				get_tree(l, full_path, type);
-
 			free(full_path);
 		}
-	}
 	for (int i = 0; i < n; i++)
 		free(eps[i]);
 	free(eps);

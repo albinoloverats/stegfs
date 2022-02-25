@@ -60,14 +60,16 @@ static void show_help(LIST args, LIST about, LIST extra) __attribute__((noreturn
 static void show_licence(void) __attribute__((noreturn));
 
 static bool    parse_config_boolean(const char *, const char *, bool);
-static int64_t parse_config_number(const char *, const char *, int64_t);
+static int64_t parse_config_integer(const char *, const char *, int64_t);
+static _Float128 parse_config_decimal(const char *, const char *, _Float128);
 static char   *parse_config_string(const char *, const char *, char *);
 
-static config_pair_boolean_t *parse_config_pair_boolean(const char *c, const char *l);
-static config_pair_number_t  *parse_config_pair_number(const char *c, const char *l);
-static config_pair_string_t  *parse_config_pair_string(const char *c, const char *l);
+static pair_boolean_t  *parse_pair_boolean(const char *c, const char *l);
+static pair_integer_t  *parse_pair_integer(const char *c, const char *l);
+static pair_decimal_t  *parse_pair_decimal(const char *c, const char *l);
+static pair_string_t   *parse_pair_string(const char *c, const char *l);
 
-static config_pair_u *parse_config_pair(const char *c, const char *l);
+static pair_u *parse_pair(const char *c, const char *l);
 static char *parse_config_tail(const char *, const char *);
 
 static bool init = false;
@@ -139,13 +141,23 @@ extern int config_parse_aux(int argc, char **argv, LIST args, LIST extra, LIST n
 								arg->seen = true;
 								arg->response_value.boolean = parse_config_boolean(arg->long_option, line, arg->response_value.boolean);
 								break;
-							case CONFIG_ARG_OPT_NUMBER:
+
+							case CONFIG_ARG_OPT_INTEGER:
 								(void)0; // for Slackware's older GCC
 								__attribute__((fallthrough)); /* allow fall-through */
-							case CONFIG_ARG_REQ_NUMBER:
+							case CONFIG_ARG_REQ_INTEGER:
 								arg->seen = true;
-								arg->response_value.number = parse_config_number(arg->long_option, line, arg->response_value.number);
+								arg->response_value.integer = parse_config_integer(arg->long_option, line, arg->response_value.integer);
 								break;
+
+							case CONFIG_ARG_OPT_DECIMAL:
+								(void)0; // for Slackware's older GCC
+								__attribute__((fallthrough)); /* allow fall-through */
+							case CONFIG_ARG_REQ_DECIMAL:
+								arg->seen = true;
+								arg->response_value.decimal = parse_config_decimal(arg->long_option, line, arg->response_value.decimal);
+								break;
+
 							case CONFIG_ARG_OPT_STRING:
 								(void)0; // for Slackware's older GCC
 								__attribute__((fallthrough)); /* allow fall-through */
@@ -157,19 +169,29 @@ extern int config_parse_aux(int argc, char **argv, LIST args, LIST extra, LIST n
 							case CONFIG_ARG_PAIR_BOOLEAN:
 								{
 									arg->seen = true;
-									config_pair_boolean_t *pair = parse_config_pair_boolean(arg->long_option, line);
+									pair_boolean_t *pair = parse_pair_boolean(arg->long_option, line);
 									arg->response_value.pair.boolean.b1 = pair->b1;
 									arg->response_value.pair.boolean.b2 = pair->b2;
 									free(pair);
 								}
 								break;
 
-							case CONFIG_ARG_PAIR_NUMBER:
+							case CONFIG_ARG_PAIR_INTEGER:
 								{
 									arg->seen = true;
-									config_pair_number_t *pair = parse_config_pair_number(arg->long_option, line);
-									arg->response_value.pair.number.n1 = pair->n1;
-									arg->response_value.pair.number.n2 = pair->n2;
+									pair_integer_t *pair = parse_pair_integer(arg->long_option, line);
+									arg->response_value.pair.integer.i1 = pair->i1;
+									arg->response_value.pair.integer.i2 = pair->i2;
+									free(pair);
+								}
+								break;
+
+							case CONFIG_ARG_PAIR_DECIMAL:
+								{
+									arg->seen = true;
+									pair_decimal_t *pair = parse_pair_decimal(arg->long_option, line);
+									arg->response_value.pair.decimal.d1 = pair->d1;
+									arg->response_value.pair.decimal.d2 = pair->d2;
 									free(pair);
 								}
 								break;
@@ -177,7 +199,7 @@ extern int config_parse_aux(int argc, char **argv, LIST args, LIST extra, LIST n
 							case CONFIG_ARG_PAIR_STRING:
 								{
 									arg->seen = true;
-									config_pair_string_t *pair = parse_config_pair_string(arg->long_option, line);
+									pair_string_t *pair = parse_pair_string(arg->long_option, line);
 									arg->response_value.pair.string.s1 = pair->s1;
 									arg->response_value.pair.string.s2 = pair->s2;
 									free(pair);
@@ -195,7 +217,7 @@ extern int config_parse_aux(int argc, char **argv, LIST args, LIST extra, LIST n
 								arg->seen = true;
 								if (!arg->response_value.list)
 									arg->response_value.list = list_default();
-								list_append(arg->response_value.list, parse_config_pair_string(arg->long_option, line));
+								list_append(arg->response_value.list, parse_pair_string(arg->long_option, line));
 								break;
 						}
 				}
@@ -303,15 +325,26 @@ end_line:
 					unknown = false;
 					switch (arg->response_type)
 					{
-						case CONFIG_ARG_OPT_NUMBER:
+						case CONFIG_ARG_OPT_INTEGER:
 							arg->seen = true;
 							if (!optarg)
 								break;
 							__attribute__((fallthrough)); /* allow fall-through; argument was seen and has a value */
-						case CONFIG_ARG_REQ_NUMBER:
+						case CONFIG_ARG_REQ_INTEGER:
 							arg->seen = true;
-							arg->response_value.number = strtoull(optarg, NULL, 0);
+							arg->response_value.integer = strtoull(optarg, NULL, 0);
 							break;
+
+						case CONFIG_ARG_OPT_DECIMAL:
+							arg->seen = true;
+							if (!optarg)
+								break;
+							__attribute__((fallthrough)); /* allow fall-through; argument was seen and has a value */
+						case CONFIG_ARG_REQ_DECIMAL:
+							arg->seen = true;
+							arg->response_value.decimal = strtof128(optarg, NULL);
+							break;
+
 						case CONFIG_ARG_OPT_STRING:
 							arg->seen = true;
 							if (!optarg)
@@ -323,6 +356,7 @@ end_line:
 								free(arg->response_value.string);
 							arg->response_value.string = strdup(optarg);
 							break;
+
 						case CONFIG_ARG_OPT_BOOLEAN:
 							(void)0; // for Slackware's older GCC
 							__attribute__((fallthrough)); /* allow fall-through; argument was seen */
@@ -387,8 +421,11 @@ end_line:
 					if (!(x->response_value.string = strdup(argv[optind])))
 						die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(argv[optind]));
 					break;
-				case CONFIG_ARG_NUMBER:
-					x->response_value.number = strtoull(argv[optind], NULL, 0);
+				case CONFIG_ARG_INTEGER:
+					x->response_value.integer = strtoull(argv[optind], NULL, 0);
+					break;
+				case CONFIG_ARG_DECIMAL:
+					x->response_value.decimal = strtof128(argv[optind], NULL);
 					break;
 				case CONFIG_ARG_BOOLEAN:
 					(void)0; // for Slackware's older GCC
@@ -798,22 +835,34 @@ static bool parse_config_boolean(const char *c, const char *l, bool d)
 	char *v = parse_config_tail(c, l);
 	if (v)
 	{
-		if (!strcasecmp(CONF_TRUE, v) || !strcasecmp(CONF_ON, v) || !strcasecmp(CONF_ENABLED, v))
+		if (!strcasecmp(CONF_TRUE, v) || !strcasecmp(CONF_ON, v) || !strcasecmp(CONF_ENABLED, v) || !strcasecmp(CONF_YES, v))
 			r = true;
-		else if (!strcasecmp(CONF_FALSE, v) || !strcasecmp(CONF_OFF, v) || !strcasecmp(CONF_DISABLED, v))
+		else if (!strcasecmp(CONF_FALSE, v) || !strcasecmp(CONF_OFF, v) || !strcasecmp(CONF_DISABLED, v) || !strcasecmp(CONF_NO, v))
 			r = false;
 		free(v);
 	}
 	return r;
 }
 
-static int64_t parse_config_number(const char *c, const char *l, int64_t d)
+static int64_t parse_config_integer(const char *c, const char *l, int64_t d)
 {
 	int64_t r = d;
 	char *n = parse_config_tail(c, l);
 	if (n)
 	{
 		r = strtoull(n, NULL, 0);
+		free(n);
+	}
+	return r;
+}
+
+static _Float128 parse_config_decimal(const char *c, const char *l, _Float128 d)
+{
+	_Float128 r = d;
+	char *n = parse_config_tail(c, l);
+	if (n)
+	{
+		r = strtof128(n, NULL);
 		free(n);
 	}
 	return r;
@@ -844,12 +893,12 @@ static char *parse_config_tail(const char *c, const char *l)
 	return tail;
 }
 
-static config_pair_boolean_t *parse_config_pair_boolean(const char *c, const char *l)
+static pair_boolean_t *parse_pair_boolean(const char *c, const char *l)
 {
-	config_pair_boolean_t *pair = calloc(1, sizeof (config_pair_boolean_t));
+	pair_boolean_t *pair = calloc(1, sizeof (pair_boolean_t));
 	if (!pair)
-		die("Out of memory @ %s:%d:%s [%zu]", __FILE__, __LINE__, __func__, sizeof (config_pair_boolean_t));
-	config_pair_u *p = parse_config_pair(c, l);
+		die("Out of memory @ %s:%d:%s [%zu]", __FILE__, __LINE__, __func__, sizeof (pair_boolean_t));
+	pair_u *p = parse_pair(c, l);
 	/* FIXME this only verifies is a value is true, and doesn't default like above */
 	pair->b1 = (!strcasecmp(CONF_TRUE, p->string.s1) || !strcasecmp(CONF_ON, p->string.s1) || !strcasecmp(CONF_ENABLED, p->string.s1));
 	pair->b2 = (!strcasecmp(CONF_TRUE, p->string.s2) || !strcasecmp(CONF_ON, p->string.s2) || !strcasecmp(CONF_ENABLED, p->string.s2));
@@ -859,37 +908,51 @@ static config_pair_boolean_t *parse_config_pair_boolean(const char *c, const cha
 	return pair;
 }
 
-static config_pair_number_t *parse_config_pair_number(const char *c, const char *l)
+static pair_integer_t *parse_pair_integer(const char *c, const char *l)
 {
-	config_pair_number_t *pair = calloc(1, sizeof (config_pair_number_t));
+	pair_integer_t *pair = calloc(1, sizeof (pair_integer_t));
 	if (!pair)
-		die("Out of memory @ %s:%d:%s [%zu]", __FILE__, __LINE__, __func__, sizeof (config_pair_number_t));
-	config_pair_u *p = parse_config_pair(c, l);
-	pair->n1 = strtoull(p->string.s1, NULL, 0);
-	pair->n2 = strtoull(p->string.s2, NULL, 0);
+		die("Out of memory @ %s:%d:%s [%zu]", __FILE__, __LINE__, __func__, sizeof (pair_integer_t));
+	pair_u *p = parse_pair(c, l);
+	pair->i1 = strtoull(p->string.s1, NULL, 0);
+	pair->i2 = strtoull(p->string.s2, NULL, 0);
 	free(p->string.s1);
 	free(p->string.s2);
 	free(p);
 	return pair;
 }
 
-static config_pair_string_t *parse_config_pair_string(const char *c, const char *l)
+static pair_decimal_t *parse_pair_decimal(const char *c, const char *l)
 {
-	config_pair_string_t *pair = calloc(1, sizeof (config_pair_string_t));
+	pair_decimal_t *pair = calloc(1, sizeof (pair_decimal_t));
 	if (!pair)
-		die("Out of memory @ %s:%d:%s [%zu]", __FILE__, __LINE__, __func__, sizeof (config_pair_string_t));
-	config_pair_u *p = parse_config_pair(c, l);
+		die("Out of memory @ %s:%d:%s [%zu]", __FILE__, __LINE__, __func__, sizeof (pair_integer_t));
+	pair_u *p = parse_pair(c, l);
+	pair->d1 = strtof128(p->string.s1, NULL);
+	pair->d2 = strtof128(p->string.s2, NULL);
+	free(p->string.s1);
+	free(p->string.s2);
+	free(p);
+	return pair;
+}
+
+static pair_string_t *parse_pair_string(const char *c, const char *l)
+{
+	pair_string_t *pair = calloc(1, sizeof (pair_string_t));
+	if (!pair)
+		die("Out of memory @ %s:%d:%s [%zu]", __FILE__, __LINE__, __func__, sizeof (pair_string_t));
+	pair_u *p = parse_pair(c, l);
 	pair->s1 = p->string.s1;
 	pair->s2 = p->string.s2;
 	free(p);
 	return pair;
 }
 
-static config_pair_u *parse_config_pair(const char *c, const char *l)
+static pair_u *parse_pair(const char *c, const char *l)
 {
-	config_pair_u *pair = calloc(1, sizeof (config_pair_u));
+	pair_u *pair = calloc(1, sizeof (pair_u));
 	if (!pair)
-		die("Out of memory @ %s:%d:%s [%zu]", __FILE__, __LINE__, __func__, sizeof (config_pair_u));
+		die("Out of memory @ %s:%d:%s [%zu]", __FILE__, __LINE__, __func__, sizeof (pair_u));
 	/* get everything after the parameter name */
 	char *x = strdup(l + strlen(c));
 	if (!x)
