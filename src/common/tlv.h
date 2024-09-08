@@ -1,6 +1,6 @@
 /*
  * Common code for dealing with tag, length, value arrays
- * Copyright © 2009-2022, albinoloverats ~ Software Development
+ * Copyright © 2009-2024, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -24,7 +24,7 @@
 /*!
  * \file    tlv.h
  * \author  albinoloverats ~ Software Development
- * \date    2009-2022
+ * \date    2009-2024
  * \brief   Common TLV code shared between projects
  *
  * Common tag/length/value code, for creating, importing and exporting
@@ -76,12 +76,14 @@ extern void tlv_deinit(TLV h) __attribute__((nonnull(1)));
  * \brief         Append a new TLV triple to the array
  * \param[in]  h  A pointer to the TLV
  * \param[in]  t  The TLV triple to add
+ * \reutrn        True if the value was added
  *
  * Add a new TLV triple to the end of an existing TLV array. It takes a
  * copy of t (including the value pointer) so remember to free that
- * yourself. Duplicate tags are ignored.
+ * yourself. Duplicate tags are ignored. Will return true if the item
+ * was added, false if it was a duplicate and ignored.
  */
-extern void tlv_append(TLV h, tlv_t t) __attribute__((nonnull(1)));
+extern bool tlv_append(TLV h, tlv_t t) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Remove a TLV triple from the array
@@ -218,5 +220,13 @@ extern const tlv_t *tlv_get_next(ITER h) __attribute__((nonnull(1)));
  */
 extern bool tlv_has_next(ITER h) __attribute__((nonnull(1)));
 
+/*!
+ * \brief         Call the given function for each item in the TLV
+ * \param[in]  h  A pointer to the TLV
+ * \param[in]  f  The function to call
+ *
+ * Iterate through the TLV, calling the given function for each item.
+ */
+extern void tlv_for_each(TLV h, void f(uint8_t, uint16_t, const void *)) __attribute__((nonnull(1, 2)));
 
 #endif /* _COMMON_TLV_H_ */

@@ -1,6 +1,6 @@
 /*
  * Common code for error reporting
- * Copyright © 2009-2022, albinoloverats ~ Software Development
+ * Copyright © 2009-2024, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -38,6 +38,11 @@
 #include "error.h"
 #include "non-gnu.h"
 
+#define ERROR_DIVIDE "\n********** ********** ********** **********\n\n"
+#define ERROR_DIVIDE_LEN 46
+#define ERROR_CURSOR "\e[?25h\n"
+#define ERROR_CURSOR_LEN 7
+
 #ifdef BUILD_GUI
 static void error_gui_alert(const char * const restrict);
 
@@ -47,9 +52,11 @@ static GtkWidget *error_gui_message;
 
 extern void on_error(int) __attribute__((noreturn));
 
-static bool error_inited = false;
+static char *int_to_ascii(int);
 
-volatile sig_atomic_t fatal_error_in_progress = 0;
+static volatile sig_atomic_t error_inited = 0;
+
+static volatile sig_atomic_t fatal_error_in_progress = 0;
 
 extern void on_error(int s)
 {
@@ -57,10 +64,13 @@ extern void on_error(int s)
 		raise(s);
 	fatal_error_in_progress = 1;
 
-	fprintf(stderr, "\e[?25h\n"); /* restore cursor */
+	write(STDERR_FILENO, ERROR_CURSOR, ERROR_CURSOR_LEN);
+	write(STDERR_FILENO, ERROR_DIVIDE, ERROR_DIVIDE_LEN);
 
 	char m[32] = { 0x0 };
-	snprintf(m, sizeof m, "Received fatal signal [%d] ", s);
+	strcat(m, "Received fatal signal [");
+	strcat(m, int_to_ascii(s));
+	strcat(m, "]");
 	psignal(s, m);
 
 #ifdef BUILD_GUI
@@ -72,12 +82,14 @@ extern void on_error(int s)
 	int c = backtrace(bt, BACKTRACE_BUFFER_LIMIT);
 	char **sym = backtrace_symbols(bt, c);
 	if (sym)
-	{
 		for (int i = 0; i < c; i++)
-			fprintf(stderr, "%s\n", sym[i]);
-		free(sym);
-	}
+		{
+			write(STDERR_FILENO, sym[i], strlen(sym[i]));
+			write(STDERR_FILENO, "\n", 1);
+		}
 #endif
+
+	write(STDERR_FILENO, ERROR_DIVIDE, ERROR_DIVIDE_LEN);
 
 #ifndef __APPLE__
 	signal(s, SIG_DFL);
@@ -98,8 +110,9 @@ extern void error_init(void)
 	signal(SIGBUS,  on_error);
 	signal(SIGABRT, on_error);
 	signal(SIGSYS,  on_error);
+	//signal(SIGPROF, on_error);
 
-	error_inited = true;
+	error_inited = 1;
 
 	return;
 }
@@ -127,7 +140,7 @@ extern void die(const char * const restrict s, ...)
 	if (ex)
 	{
 		char * const restrict e = strdup(strerror(ex));
-		for (uint32_t i = 0; i < strlen(e); i++)
+		for (uint32_t i = 0; e && i < strlen(e); i++)
 			e[i] = tolower((unsigned char)e[i]);
 		fprintf(stderr, "%s\n", e);
 		free(e);
@@ -172,3 +185,30 @@ static void error_gui_alert(const char * const restrict msg)
 	return;
 }
 #endif
+
+#define INT_DIGITS 19       /* enough for 64 bit integer */
+
+static char *int_to_ascii(int i)
+{
+	/* Room for INT_DIGITS digits, - and '\0' */
+	static char buf[INT_DIGITS + 2];
+	char *p = buf + INT_DIGITS + 1; /* points to terminating '\0' */
+	if (i >= 0)
+		do
+		{
+			*--p = '0' + (i % 10);
+			i /= 10;
+		}
+		while (i != 0);
+	else
+	{          /* i < 0 */
+		do
+		{
+			*--p = '0' - (i % 10);
+			i /= 10;
+		}
+		while (i != 0);
+		*--p = '-';
+	}
+	return p;
+}

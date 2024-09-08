@@ -10,7 +10,7 @@ CPSRC    = src/cp.c
 COMMON   = src/common/error.c src/common/ccrypt.c src/common/tlv.c src/common/list.c src/common/dir.c src/common/cli.c src/common/version.c src/common/config.c
 MISC     = src/common/misc.h
 
-CFLAGS   += -Wall -Wextra -std=gnu99 $(shell pkg-config --cflags fuse) -pipe -O2 -I/usr/local/include -Isrc
+CFLAGS   += -Wall -Wextra -std=gnu99 $(shell pkg-config --cflags fuse libgcrypt) -pipe -O2 -I/usr/local/include -Isrc
 CPPFLAGS += -D_GNU_SOURCE -DGCRYPT_NO_DEPRECATED -D_FILE_OFFSET_BITS=64 -DGIT_COMMIT=\"`git log | head -n1 | cut -f2 -d' '`\" -DBUILD_OS=\"$(shell grep PRETTY_NAME /etc/os-release | cut -d= -f2)\"
 
 DEBUG_CFLAGS   = -O0 -ggdb
@@ -18,7 +18,7 @@ DEBUG_CPPFLAGS = -D__DEBUG__ -DUSE_PROC
 PROFILE        = ${DEBUG} -pg -lc
 
 # -lpthread
-LIBS     = $(shell libgcrypt-config --libs) -lpthread -lcurl $(shell pkg-config --libs fuse)
+LIBS     = -lpthread -lcurl $(shell pkg-config --libs fuse libgcrypt)
 
 all: stegfs mkfs man
 

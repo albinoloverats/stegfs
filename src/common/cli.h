@@ -1,6 +1,6 @@
 /*
  * Common code for providing a cmomand line progress bar
- * Copyright © 2005-2022, albinoloverats ~ Software Development
+ * Copyright © 2005-2024, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -24,7 +24,7 @@
 /*!
  * \file    cli.h
  * \author  albinoloverats ~ Software Development
- * \date    2014-2022
+ * \date    2014-2024
  * \brief   Common console output functions
  *
  * Various functions to help with console output.
@@ -57,6 +57,7 @@
 	#define ANSI_COLOUR_WHITE   "\x1b[97m"
 #endif
 
+#define CLI_MAX_WIDTH 77
 #define CLI_TRUNCATED_DISPLAY_LONG  25
 #define CLI_TRUNCATED_DISPLAY_SHORT 10
 #define CLI_TRUNCATED_ELLIPSE   "...."
@@ -214,5 +215,17 @@ extern int cli_eprintx(const uint8_t * const restrict x, size_t z) __attribute__
  * output error.
  */
 extern int cli_fprintx(FILE *f, const uint8_t * const restrict x, size_t z) __attribute__((nonnull(2)));
+
+/*!
+ * \brief         Formatted output to stderr
+ * \param[in]  s  The format template
+ * \return        The number of bytes written
+ *
+ * Similar to cli_eprintf with the addition of appending a new line.
+ * There is the possibility of prepending the date and time but systemd
+ * does that for us (in our use-case).
+ */
+extern int logger(const char * const restrict s, ...) __attribute__((nonnull(1), format(printf, 1, 2)));
+// TODO Add more log-like functions (hex, to file, etc)
 
 #endif /* _COMMON_CLI_H_ */

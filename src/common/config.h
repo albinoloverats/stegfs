@@ -1,6 +1,6 @@
 /*
  * encrypt ~ a simple, multi-OS encryption utility
- * Copyright © 2005-2022, albinoloverats ~ Software Development
+ * Copyright © 2005-2024, albinoloverats ~ Software Development
  * email: encrypt@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -26,6 +26,7 @@
 #include <stdbool.h>
 
 #include "common.h"
+#include "non-gnu.h"
 #include "pair.h"
 #include "list.h"
 
@@ -34,10 +35,13 @@
 #define CONF_ON       "on"
 #define CONF_ENABLED  "enabled"
 #define CONF_YES      "yes"
+#define CONF_ONE      "1"
+
 #define CONF_FALSE    "false"
 #define CONF_OFF      "off"
 #define CONF_DISABLED "disabled"
 #define CONF_NO       "no"
+#define CONF_ZERO     "0"
 
 
 #define CONFIG_ARG_REQUIRED 0x80000000 // 1000
@@ -46,10 +50,10 @@
 
 typedef enum
 {
-	CONFIG_ARG_BOOLEAN,
-	CONFIG_ARG_INTEGER,
-	CONFIG_ARG_DECIMAL,
-	CONFIG_ARG_STRING,
+	CONFIG_ARG_BOOLEAN = 1,
+	CONFIG_ARG_INTEGER = 2,
+	CONFIG_ARG_DECIMAL = 4,
+	CONFIG_ARG_STRING  = 8,
 	// these are for semantic clarity
 	CONFIG_ARG_OPT_BOOLEAN      = CONFIG_ARG_BOOLEAN,
 	CONFIG_ARG_OPT_INTEGER      = CONFIG_ARG_INTEGER,
@@ -66,8 +70,9 @@ typedef enum
 	CONFIG_ARG_PAIR_DECIMAL     = (CONFIG_ARG_REQ_DECIMAL | CONFIG_ARG_PAIR),
 	CONFIG_ARG_PAIR_STRING      = (CONFIG_ARG_REQ_STRING  | CONFIG_ARG_PAIR),
 
-//	CONFIG_ARG_LIST_BOOLEAN     = (CONFIG_ARG_REQ_BOOLEAN | CONFIG_ARG_LIST), // list options are currently required
-//	CONFIG_ARG_LIST_INTEGER     = (CONFIG_ARG_REQ_INTEGER | CONFIG_ARG_LIST),
+	CONFIG_ARG_LIST_BOOLEAN     = (CONFIG_ARG_REQ_BOOLEAN | CONFIG_ARG_LIST), // list options are currently required
+	CONFIG_ARG_LIST_INTEGER     = (CONFIG_ARG_REQ_INTEGER | CONFIG_ARG_LIST),
+	CONFIG_ARG_LIST_DECIMAL     = (CONFIG_ARG_REQ_DECIMAL | CONFIG_ARG_LIST),
 	CONFIG_ARG_LIST_STRING      = (CONFIG_ARG_REQ_STRING  | CONFIG_ARG_LIST),
 
 	CONFIG_ARG_LIST_PAIR_STRING = (CONFIG_ARG_LIST_STRING | CONFIG_ARG_PAIR_STRING)
@@ -78,12 +83,20 @@ typedef union
 {
 	bool boolean;
 	int64_t integer;
-	_Float128 decimal;
+	//__float128 decimal;
+	long double decimal;
 	char *string;
 	pair_u pair;
 	LIST *list;
 }
 config_arg_u;
+
+typedef struct
+{
+	config_arg_e type;
+	config_arg_u value;
+}
+config_arg_t;
 
 /*!
  * \brief  A named command line parameter.
@@ -96,8 +109,7 @@ typedef struct
 	char *long_option;           /*!< The command line long option */
 	char *option_type;           /*!< What the expected parameter should be */
 	char *description;           /*!< A description of the argument */
-	config_arg_e response_type;  /*!< The expected response type */
-	config_arg_u response_value; /*!< The response value */
+	config_arg_t response;       /*!< The expected repsonse type and value */
 	bool required:1;             /*!< Whether this option is required */
 	bool advanced:1;             /*!< Whether this option is considered advanced */
 	bool hidden:1;               /*!< Whether this option should be hidden */
@@ -114,8 +126,7 @@ config_named_t;
 typedef struct
 {
 	char *description;           /*!< A description of the argument */
-	config_arg_e response_type;  /*!< The expected response type */
-	config_arg_u response_value; /*!< The response value */
+	config_arg_t response;       /*!< The expected repsonse type and value */
 	bool required:1;             /*!< Whether this option is required */
 	bool seen:1;                 /*!< Whether this argument was detected */
 }
@@ -180,38 +191,20 @@ extern void update_config(const char * const restrict o, const char * const rest
  * Compare two config_named_t using the short_option. Used to ensure that
  * only one of each argument is in the LIST.
  */
-extern int config_arg_comp(const void *a, const void *b);
+extern int config_named_compare(const void *a, const void *b);
 
-#if 0
 /*!
- * \brief         Show list of command line options
+ * \brief         Compare config_unnamed_t's
+ * \param[in]  a  First config_unnamed_t
+ * \param[in]  b  Second config_unnamed_t
+ * \return        The difference between the two
  *
- * Show list of command line options, and ways to invoke the application.
- * Usually when --help is given as a command line argument.
+ * Compare two config_unnamed_t using the description.
  */
-extern void show_help(void) __attribute__((noreturn));
+extern int config_unnamed_compare(const void *a, const void *b);
 
-/*!
-  * \brief        Show brief GPL licence text
-  *
-  * Display a brief overview of the GNU GPL v3 licence, such as when the
-  * command line argument is --licence.
-  */
-extern void show_licence(void) __attribute__((noreturn));
+extern void config_named_free(void *f);
 
-/*!
- * \brief         Show simple usage instructions
- *
- * Display simple application usage instruction.
- */
-extern void show_usage(void) __attribute__((noreturn));
-
-/*!
- * \brief         Show application version
- *
- * Display the version of the application.
- */
-extern void show_version(void) __attribute__((noreturn));
-#endif
+extern void config_unnamed_free(void *f);
 
 #endif /* ! _COMMON_CONFIG_H_ */

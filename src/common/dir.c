@@ -1,6 +1,6 @@
 /*
  * stegfs ~ a steganographic file system for unix-like systems
- * Copyright © 2007-2022, albinoloverats ~ Software Development
+ * Copyright © 2007-2024, albinoloverats ~ Software Development
  * email: stegfs@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -43,7 +43,10 @@ extern char *dir_get_name_aux(const char * const path, const char ext)
 	const char *pass = strrchr(path, ext);
 	if (!pass)
 		pass = strchr(file, '\0');
-	return strndup(file, pass - file);
+	char *r = strndup(file, pass - file);
+	if (!r)
+		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, pass - file);
+	return r;
 }
 
 extern uint16_t dir_get_deep(const char * const path)
@@ -61,7 +64,12 @@ extern uint16_t dir_get_deep(const char * const path)
 extern char *dir_get_part(const char * const path, const uint16_t index)
 {
 	if (!index)
-		return strdup(DIR_SEPARATOR);
+	{
+		char *r = strdup(DIR_SEPARATOR);
+		if (!r)
+			die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(DIR_SEPARATOR));
+		return r;
+	}
 	char *ptr = (char *)path;
 	for (uint16_t i = 0; i < index; i++)
 	{
@@ -70,26 +78,45 @@ extern char *dir_get_part(const char * const path, const uint16_t index)
 			break;
 		ptr++;
 	}
-	return strndup(ptr, strchrnul(ptr, DIR_SEPARATOR_CHAR) - ptr);
+	char *r = strndup(ptr, strchrnul(ptr, DIR_SEPARATOR_CHAR) - ptr);
+	if (!r)
+		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strchrnul(ptr, DIR_SEPARATOR_CHAR) - ptr);
+	return r;
 }
 
 extern char *dir_get_pass(const char * const restrict path)
 {
 	if (!strrchr(path, ':'))
-		return strdup("");
-	return strdup(strrchr(path, ':') + 1);
+	{
+		char *r = strdup("");
+		if (!r)
+			die(_("Out of memory @ %s:%d:%s [%u]"), __FILE__, __LINE__, __func__, 2);
+		return r;
+	}
+	char *r = strdup(strrchr(path, ':') + 1);
+	if (!r)
+		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(strrchr(path, ':') + 1));
+	return r;
 }
 
 extern char *dir_get_path(const char * const restrict path)
 {
 	char *s = strrchr(path, DIR_SEPARATOR_CHAR);
 	if (!s)
-		return strdup("");
+	{
+		char *r = strdup("");
+		if (!r)
+			die(_("Out of memory @ %s:%d:%s [%u]"), __FILE__, __LINE__, __func__, 2);
+		return r;
+	}
 	char *p = strndup(path, s - path);
 	if (strlen(p))
 		return p;
 	free(p);
-	return strdup(DIR_SEPARATOR);
+	char *r = strdup(DIR_SEPARATOR);
+	if (!r)
+		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(DIR_SEPARATOR));
+	return r;
 }
 
 /*
@@ -101,6 +128,8 @@ extern void dir_mk_recursive(const char *path, mode_t mode)
 	(void)mode;
 #endif
 	char *opath = strdup(path);
+	if (!opath)
+		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(path));
 	size_t len = strlen(opath);
 	if (opath[len - 1] == '/')
 		opath[len - 1] = '\0';
@@ -129,7 +158,7 @@ static void get_tree(LIST l, const char *path, dir_type_e type)
 				continue;
 			char *full_path = NULL;
 			if (!asprintf(&full_path, "%s/%s", path, eps[i]->d_name))
-				die(_("Out of memory @ %s:%d:%s [%" PRIu64 "]"), __FILE__, __LINE__, __func__, strlen(path) + strlen(eps[i]->d_name) + 2);
+				die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(path) + strlen(eps[i]->d_name) + 2);
 			bool add = false;
 			bool dir = false;
 			/*
@@ -153,18 +182,26 @@ static void get_tree(LIST l, const char *path, dir_type_e type)
 				case S_IFREG:
 					add = type & DIR_FILE;
 					break;
+#ifndef _WIN32
 				case S_IFLNK:
 					add = type & DIR_LINK;
 					break;
 				case S_IFSOCK:
 					add = type & DIR_SOCKET;
 					break;
+#endif
 				case S_IFIFO:
 					add = type & DIR_PIPE;
 					break;
 			}
 			if (add)
-				list_add(l, strdup(full_path));
+			{
+				char *f = strdup(full_path);
+				if (!f)
+					die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(full_path));
+				if (!list_add(l, f))
+					free(f);
+			}
 			if (dir)
 				get_tree(l, full_path, type);
 			free(full_path);

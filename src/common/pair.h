@@ -1,6 +1,6 @@
 /*
  * Common code for dealing with pairs of values.
- * Copyright © 2022-2022, albinoloverats ~ Software Development
+ * Copyright © 2022-2024, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -24,14 +24,16 @@
 /*!
  * \file    pair.h
  * \author  albinoloverats ~ Software Development
- * \date    2022-2022
+ * \date    2022-2024
  * \brief   Common pair-o-values code shared between projects
  *
- * Common map implementation.
+ * Common pairs structures.
  */
 
 #include <inttypes.h>
 #include <stdbool.h>
+
+#include "non-gnu.h"
 
 typedef struct
 {
@@ -49,8 +51,10 @@ pair_integer_t;
 
 typedef struct
 {
-	_Float128 d1;
-	_Float128 d2;
+	//__float128 d1;
+	//__float128 d2;
+	long double d1;
+	long double d2;
 }
 pair_decimal_t;
 

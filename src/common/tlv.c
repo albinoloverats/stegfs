@@ -1,6 +1,6 @@
 /*
  * Common code for dealing with tag, length, value arrays
- * Copyright © 2009-2022, albinoloverats ~ Software Development
+ * Copyright © 2009-2024, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -32,6 +32,7 @@
 #include "non-gnu.h"
 #include "tlv.h"
 #include "list.h"
+#include "error.h"
 
 /*
  * TODO this could be simplified to just a LIST
@@ -49,6 +50,8 @@ static void tlv_free(void *tlv);
 extern TLV tlv_init(void)
 {
 	tlv_private_t *t = calloc(sizeof( tlv_private_t ), sizeof( byte_t ));
+	if (!t)
+		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof( tlv_private_t ));
 	t->tags = list_init(tlv_compare, false, false);
 	return t;
 }
@@ -65,18 +68,26 @@ extern void tlv_deinit(TLV ptr)
 	return;
 }
 
-extern void tlv_append(TLV ptr, tlv_t tlv)
+extern bool tlv_append(TLV ptr, tlv_t tlv)
 {
 	tlv_private_t *tlv_ptr = (tlv_private_t *)ptr;
 	if (!tlv_ptr)
-		return;
+		return false;
 	tlv_t *t  = malloc(sizeof tlv);
+	if (!t)
+		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof tlv );
 	t->tag    = tlv.tag;
 	t->length = tlv.length;
-	t->value  = malloc(t->length);
+	if (!(t->value  = malloc(t->length)))
+		die(_("Out of memory @ %s:%d:%s [%du]"), __FILE__, __LINE__, __func__, t->length);
 	memcpy(t->value, tlv.value, t->length);
-	list_append(tlv_ptr->tags, t);
-	return;
+	bool r = list_append(tlv_ptr->tags, t);
+	if (!r)
+	{
+		free(t->value);
+		free(t);
+	}
+	return r;
 }
 
 extern const tlv_t *tlv_remove(TLV ptr, tlv_t tlv)
@@ -97,8 +108,7 @@ extern const tlv_t *tlv_get(TLV ptr, uint8_t tag)
 	tlv_private_t *tlv_ptr = (tlv_private_t *)ptr;
 	if (!tlv_ptr)
 		return NULL;
-	tlv_t t = { tag, 0, NULL };
-	return list_contains(tlv_ptr->tags, &t);
+	return list_contains(tlv_ptr->tags, &((tlv_t){ tag, 0, NULL }));
 }
 
 extern bool tlv_has_tag(TLV ptr, uint8_t tag)
@@ -132,7 +142,8 @@ extern byte_t *tlv_export_aux(TLV ptr, bool nbo)
 	size_t size = tlv_length(tlv_ptr);
 	if (tlv_ptr->export)
 		free(tlv_ptr->export);
-	tlv_ptr->export = malloc(size);
+	if (!(tlv_ptr->export = malloc(size)))
+		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, size);
 	size_t off = 0;
 	ITER iter = list_iterator(tlv_ptr->tags);
 	while (list_has_next(iter))
@@ -184,6 +195,24 @@ extern bool tlv_has_next(ITER ptr)
 	return list_has_next(ptr);
 }
 
+extern void tlv_for_each(TLV ptr, void f(uint8_t , uint16_t, const void *))
+{
+	tlv_private_t *tlv_ptr = (tlv_private_t *)ptr;
+	if (!tlv_ptr)
+		return;
+	if (!list_size(tlv_ptr->tags))
+		return;
+	ITER iter = list_iterator(tlv_ptr->tags);
+	do
+	{
+		const tlv_t *entry = (tlv_t *)list_get_next(iter);
+		f(entry->tag, entry->length, entry->value);
+	}
+	while (list_has_next(iter));
+	free(iter);
+	return;
+}
+
 static int tlv_compare(const void *a, const void *b)
 {
 	const tlv_t *x = a;
@@ -199,4 +228,5 @@ static void tlv_free(void *tlv)
 {
 	free(((tlv_t *)tlv)->value);
 	free(tlv);
+	return;
 }

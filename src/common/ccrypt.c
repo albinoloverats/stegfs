@@ -1,6 +1,6 @@
 /*
  * Common code for working with libgcrypt
- * Copyright © 2005-2022, albinoloverats ~ Software Development
+ * Copyright © 2005-2024, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -226,6 +226,10 @@ extern LIST list_of_macs(void)
 
 extern enum gcry_cipher_algos cipher_id_from_name(const char * const restrict n)
 {
+#ifdef __APPLE__
+	if (!n)
+		return GCRY_CIPHER_NONE;
+#endif
 	int list[0xff] = { 0x00 };
 	int len = 0;
 	enum gcry_cipher_algos id = GCRY_CIPHER_NONE;
@@ -251,6 +255,10 @@ extern enum gcry_cipher_algos cipher_id_from_name(const char * const restrict n)
 
 extern enum gcry_md_algos hash_id_from_name(const char * const restrict n)
 {
+#ifdef __APPLE__
+	if (!n)
+		return GCRY_MD_NONE;
+#endif
 	int list[0xff] = { 0x00 };
 	int len = 0;
 	enum gcry_md_algos id = GCRY_MD_NONE;
@@ -276,6 +284,10 @@ extern enum gcry_md_algos hash_id_from_name(const char * const restrict n)
 
 extern enum gcry_cipher_modes mode_id_from_name(const char * const restrict n)
 {
+#ifdef __APPLE__
+	if (!n)
+		return GCRY_CIPHER_MODE_NONE;
+#endif
 	for (unsigned i = 0; i < sizeof MODES / sizeof( block_mode_t ); i++)
 		if (!strcasecmp(n, MODES[i].name))
 			return MODES[i].id;
@@ -284,6 +296,10 @@ extern enum gcry_cipher_modes mode_id_from_name(const char * const restrict n)
 
 extern enum gcry_mac_algos mac_id_from_name(const char * const restrict n)
 {
+#ifdef __APPLE__
+	if (!n)
+		return GCRY_MAC_NONE;
+#endif
 	int list[0xff] = { 0x00 };
 	int len = 0;
 	enum gcry_mac_algos id = GCRY_MAC_NONE;

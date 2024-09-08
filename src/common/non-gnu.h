@@ -1,6 +1,6 @@
 /*
  * Common code which is typically missing on Apple OS X
- * Copyright © 2005-2022, albinoloverats ~ Software Development
+ * Copyright © 2005-2024, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -39,6 +39,12 @@
 
 #if defined __sun || defined __clang__
 	#define __attribute__(X)
+#endif
+
+#if defined __APPLE__ || defined _WIN32 || defined __clang__ || defined __sun
+	#define __float128  double
+	#define strtof128   strtod
+	#define strfromf128 snprintf
 #endif
 
 #ifdef _WIN32
@@ -114,6 +120,8 @@ extern ssize_t getline(char **lineptr, size_t *n, FILE *stream) __attribute__((n
 extern char *strndup(const char *s, size_t l) __attribute__((nonnull(1)));
 
 extern int scandir(const char *path, struct dirent ***res, int (*sel)(const struct dirent *), int (*cmp)(const struct dirent **, const struct dirent **)) __attribute__((nonnull(1, 2)));
+
+extern int alphasort(const struct dirent **a, const struct dirent **b);
 
 extern FILE *temp_file(void);
 

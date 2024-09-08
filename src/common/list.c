@@ -1,6 +1,6 @@
 /*
  * Common code for dealing with linked lists.
- * Copyright © 2021-2022, albinoloverats ~ Software Development
+ * Copyright © 2021-2024, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -23,7 +23,9 @@
 #include <stdbool.h>
 
 #include "common.h"
+#include "non-gnu.h"
 #include "list.h"
+#include "error.h"
 
 typedef struct _item_t
 {
@@ -52,6 +54,8 @@ iterator_t;
 extern LIST list_init(int comparison_fn_t(const void *, const void *), bool dupes, bool sorted)
 {
 	list_t *list = calloc(sizeof( list_t ), sizeof( byte_t ));
+	if (!list)
+		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof( list_t ));
 	list->size = 0;
 	list->compare = comparison_fn_t;
 	list->duplicates = dupes;
@@ -77,6 +81,24 @@ extern void list_deinit_aux(LIST ptr, void f(void *))
 	return;
 }
 
+extern LIST list_copy(LIST ptr, void *c(const void *))
+{
+	list_t *list_ptr = (list_t *)ptr;
+	if (!list_ptr)
+		return NULL;
+	LIST copy = list_init(list_ptr->compare, list_ptr->duplicates, list_ptr->sorted);
+	if (!list_ptr->size)
+		return copy;
+	item_t *item = list_ptr->head;
+	do
+	{
+		list_append(copy, c(item->data));
+		item = item->next;
+	}
+	while (item);
+	return copy;
+}
+
 /*
  * TODO see whether this could be better as a macro
  */
@@ -88,19 +110,18 @@ extern size_t list_size(LIST ptr)
 	return list_ptr->size;
 }
 
-extern void list_append(LIST ptr, const void *d)
+extern bool list_append(LIST ptr, const void *d)
 {
 	list_t *list_ptr = (list_t *)ptr;
 	if (!list_ptr)
-		return;
+		return false;
 	if (list_ptr->sorted)
-	{
-		list_add(ptr, d);
-		return;
-	}
+		return list_add(ptr, d);
 	if (!list_ptr->duplicates && list_contains(ptr, d))
-		return;
+		return false;
 	item_t *new = calloc(sizeof( item_t ), sizeof( byte_t ));
+	if (!new)
+		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof( item_t ));
 	new->data = d;
 	item_t *end = list_ptr->tail;
 	if (end)
@@ -109,27 +130,23 @@ extern void list_append(LIST ptr, const void *d)
 		list_ptr->head = new;
 	list_ptr->tail = new;
 	list_ptr->size++;
-	return;
+	return true;
 }
 
-extern void list_insert(LIST ptr, size_t i, const void *d)
+extern bool list_insert(LIST ptr, size_t i, const void *d)
 {
 	list_t *list_ptr = (list_t *)ptr;
 	if (!list_ptr)
-		return;
+		return false;
 	if (list_ptr->sorted)
-	{
-		list_add(ptr, d);
-		return;
-	}
+		return list_add(ptr, d);
 	if (i >= list_ptr->size)
-	{
-		list_append(ptr, d);
-		return;
-	}
+		return list_append(ptr, d);
 	if (!list_ptr->duplicates && list_contains(ptr, d))
-		return;
+		return false;
 	item_t *new = calloc(sizeof( item_t ), sizeof( byte_t ));
+	if (!new)
+		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof( item_t ));
 	new->data = d;
 	item_t *prev = list_ptr->head;
 	if (i == 0)
@@ -146,22 +163,21 @@ extern void list_insert(LIST ptr, size_t i, const void *d)
 		new->next = next;
 	}
 	list_ptr->size++;
-	return;
+	return true;
 }
 
-extern void list_add(LIST ptr, const void *d)
+extern bool list_add(LIST ptr, const void *d)
 {
 	list_t *list_ptr = (list_t *)ptr;
 	if (!list_ptr)
-		return;
+		return false;
 	if (!list_ptr->sorted)
-	{
-		list_append(ptr, d);
-		return;
-	}
+		return list_append(ptr, d);
 	if (!list_ptr->duplicates && list_contains(ptr, d))
-		return;
+		return false;
 	item_t *new = calloc(sizeof( item_t ), sizeof( byte_t ));
+	if (!new)
+		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof( item_t ));
 	new->data = d;
 	if (list_ptr->size == 0)
 	{
@@ -189,14 +205,15 @@ extern void list_add(LIST ptr, const void *d)
 		bool added = false;
 		do
 		{
-			int p = list_ptr->compare(new->data, this->data);
-			if (p < 0)
+			if (list_ptr->compare(new->data, this->data) < 0)
 			{
 				new->next = this;
 				if (this == list_ptr->head)
 					list_ptr->head = new;
 				else if (prev)
 					prev->next = new;
+				else
+					die(_("We’ve reached an unreachable location in the code @ %s:%d:%s"), __FILE__, __LINE__, __func__);
 				added = true;
 				break;
 			}
@@ -211,7 +228,29 @@ extern void list_add(LIST ptr, const void *d)
 		}
 	}
 	list_ptr->size++;
-	return;
+	return true;
+}
+
+extern int list_add_all(LIST ptr, LIST otr, void *c(const void *))
+{
+	list_t *list_ptr = (list_t *)ptr;
+	if (!list_ptr)
+		return -1;
+	list_t *list_otr = (list_t *)otr;
+	if (!list_otr)
+		return -1;
+	if (!list_otr->size)
+		return 0;
+	int r = 0;
+	item_t *item = list_otr->head;
+	do
+	{
+		if (list_append(list_ptr, c(item->data)))
+			r++;
+		item = item->next;
+	}
+	while (item);
+	return r;
 }
 
 extern const void *list_get(LIST ptr, size_t i)
@@ -309,6 +348,8 @@ extern ITER list_iterator(LIST ptr)
 	if (!list_ptr)
 		return NULL;
 	iterator_t *iter = malloc(sizeof (iterator_t));
+	if (!iter)
+		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof( iterator_t ));
 	iter->next = list_ptr->head;
 	return iter;
 }
@@ -333,6 +374,53 @@ extern bool list_has_next(ITER ptr)
 	return iter_ptr->next;
 }
 
+extern void list_for_each(LIST ptr, void f(const void *))
+{
+	list_t *list_ptr = (list_t *)ptr;
+	if (!list_ptr)
+		return;
+	if (!list_ptr->size)
+		return;
+	item_t *item = list_ptr->head;
+	do
+	{
+		f(item->data);
+		item = item->next;
+	}
+	while (item);
+	return;
+}
+
+static void *list_sort_noop(const void *x)
+{
+	return (void *)x;
+}
+
+extern void list_sort(LIST ptr)
+{
+	list_t *list_ptr = (list_t *)ptr;
+	if (!list_ptr)
+		return;
+	if (!list_ptr->compare)
+		return;
+	if (!list_ptr->size)
+		return;
+
+	list_t *copy = list_init(list_ptr->compare, list_ptr->duplicates, true);
+	list_add_all(copy, list_ptr, list_sort_noop);
+
+	size_t z = list_ptr->size;
+	for (size_t i = 0; i < z; i++)
+		list_remove_index(list_ptr, 0);
+
+	list_ptr->sorted = true;
+	list_add_all(list_ptr, copy, list_sort_noop);
+
+	list_deinit(copy);
+
+	return;
+}
+
 extern void list_add_comparator(LIST ptr, int c(const void *, const void *))
 {
 	list_t *list_ptr = (list_t *)ptr;
@@ -340,4 +428,20 @@ extern void list_add_comparator(LIST ptr, int c(const void *, const void *))
 		return;
 	list_ptr->compare = c;
 	return;
+}
+
+extern int list_compare_integer(const void *a, const void *b)
+{
+	const int64_t *x = a;
+	const int64_t *y = b;
+	return *x - *y;
+}
+
+extern int list_compare_decimal(const void *a, const void *b)
+{
+	//const __float128 *x = a;
+	//const __float128 *y = b;
+	const long double *x = a;
+	const long double *y = b;
+	return *x - *y;
 }

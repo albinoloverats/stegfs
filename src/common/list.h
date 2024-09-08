@@ -1,6 +1,6 @@
 /*
  * Common code for dealing with linked lists.
- * Copyright © 2021-2022, albinoloverats ~ Software Development
+ * Copyright © 2021-2024, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -24,7 +24,7 @@
 /*!
  * \file    list.h
  * \author  albinoloverats ~ Software Development
- * \date    2021-2022
+ * \date    2021-2024
  * \brief   Common linked list code shared between projects
  *
  * Common linked list implementation.
@@ -58,6 +58,26 @@ typedef void * ITER;
  * performed against this handle. Returns NULL on error.
  */
 #define list_default() list_init(NULL, true, false)
+
+/*!
+ * \brief         Create a new linked list
+ * \return        A new linked list
+ *
+ * Create a new linked list instance that is intended to contain integer
+ * values. It allows duplicates and will sort the list according to
+ * their value. Returns NULL on error.
+ */
+#define list_integer() list_init((void *)list_compare_integer, true, true)
+
+/*!
+ * \brief         Create a new linked list
+ * \return        A new linked list
+ *
+ * Create a new linked list instance that is intended to contain decimal
+ * values. It allows duplicates and will sort the list according to
+ * their values. Returns NULL on error.
+ */
+#define list_decimal() list_init((void *)list_compare_decimal, true, true)
 
 /*!
  * \brief         Create a new linked list
@@ -101,9 +121,19 @@ extern LIST list_init(int c(const void *, const void *), bool d, bool s) __attri
  * Free the memory and sets h to NULL so all subsequent calls to LIST
  * functions will not result in undefined behaviour. If called with a
  * NULL function f then data items will not be freed.
- *
  */
 extern void list_deinit_aux(LIST h, void f(void *)) __attribute__((nonnull(1)));
+
+/*!
+ * \brief         Copy an existing list
+ * \param[in]  h  A pointer to an existing list
+ * \param[in]  c  A function to copy the item data
+ * \return        A new list
+ *
+ * Create a new list that is a copy of an existing list. Creating a
+ * copy of each item too, hence the function c.
+ */
+extern LIST list_copy(LIST h, void *c(const void *)) __attribute__((nonnull(1, 2)));
 
 /*!
  * \brief         Get the number of items in the list
@@ -121,32 +151,52 @@ extern size_t list_size(LIST h) __attribute__((nonnull(1)));
  * \brief         Add an item to the end of the list
  * \param[in]  h  A pointer to the list
  * \param[in]  d  The item to add to the list
+ * \reutrn        Whether the item was added
  *
  * Add a new item to the end of the list. If the list is sorted then
- * this just calls list_add().
+ * this just calls list_add(). If duplicates are not allowed, this will
+ * return false if the item already exists and was not re-added.
  */
-extern void list_append(LIST h, const void *d) __attribute__((nonnull(1, 2)));
+extern bool list_append(LIST h, const void *d) __attribute__((nonnull(1, 2)));
 
 /*!
  * \brief         Insert an item into the list
  * \param[in]  h  A pointer to the list
  * \param[in]  i  The index where to insert the item
  * \param[in]  d  The item to be inserted
+ * \reutrn        Whether the item was added
  *
  * Insert an item into the middle of the list, at the given index. If
- * this list is sorted then this just call list_add().
+ * this list is sorted then this just call list_add(). If duplicates are
+ * not allowed, this will return false if the item already exists and
+ * was not re-added.
  */
-extern void list_insert(LIST h, size_t i, const void *d) __attribute__((nonnull(1, 3)));
+extern bool list_insert(LIST h, size_t i, const void *d) __attribute__((nonnull(1, 3)));
 
 /*!
  * \brief         Add an item to the sorted list
  * \param[in]  h  A pointer to the list
  * \param[in]  d  The item to add to the list
+ * \reutrn        Whether the item was added
  *
  * Add a new item to the list in sorted order. If the list is not sorted
- * then this just calls list_append().
+ * then this just calls list_append(). If duplicates are not allowed,
+ * this will return false if the item already exists and was not
+ * re-added.
  */
-extern void list_add(LIST h, const void *d) __attribute__((nonnull(1, 2)));
+extern bool list_add(LIST h, const void *d) __attribute__((nonnull(1, 2)));
+
+/*!
+ * \brief         Add all items to the list
+ * \param[in]  h  A pointer to the list
+ * \param[in]  o  The other list to add from
+ * \param[in]  c  Function to copy item data
+ * \return        The number of items copied
+ *
+ * Copy all items from one list to another, existing list. Creating a
+ * copy of the data using c.
+ */
+extern int list_add_all(LIST h, LIST o, void *c(const void *)) __attribute__((nonnull(1, 2, 3)));
 
 /*!
  * \brief         Check if the list contains the item
@@ -227,6 +277,28 @@ extern const void *list_get_next(ITER h) __attribute__((nonnull(1)));
 extern bool list_has_next(ITER h) __attribute__((nonnull(1)));
 
 /*!
+ * \brief         Call the given function for each item in the list
+ * \param[in]  h  A pointer to the list
+ * \param[in]  f  The function to call
+ *
+ * Iterate through the list, calling the given function for each item.
+ */
+extern void list_for_each(LIST h, void f(const void *)) __attribute__((nonnull(1, 2)));
+
+/*!
+ * \brief         Sort the given list
+ * \param[in]  h  A pointer to the list
+ *
+ * The list will be sorted, using the comparison function given during
+ * list_init() or list_add_comparator(). If there isn't one, nothing
+ * will happen. After this call the list will continue to be sorted and
+ * items will be inserted where appilcable
+ */
+extern void list_sort(LIST h) __attribute__((nonnull(1)));
+
+//extern void list_tidy(LIST h) __attribute__((nonnull(1)));
+
+/*!
  * \brief         Add comparator to the list
  * \param[in]  h  A pointer to the list
  * \param[in]  c  The comparator to add
@@ -234,5 +306,9 @@ extern bool list_has_next(ITER h) __attribute__((nonnull(1)));
  * Add a comparator to the list so that items can be compared.
  */
 extern void list_add_comparator(LIST h, int c(const void *, const void *)) __attribute__((nonnull(1, 2)));
+
+extern int list_compare_integer(const void *a, const void *b);
+
+extern int list_compare_decimal(const void *a, const void *b);
 
 #endif

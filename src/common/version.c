@@ -1,6 +1,6 @@
 /*
  * Version checking functions (non-applications specific)
- * Copyright © 2005-2022, albinoloverats ~ Software Development
+ * Copyright © 2005-2024, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -57,12 +57,9 @@
 	#include "non-gnu.h"
 #endif
 
-#ifdef __APPLE__
-	#include "osx.h"
-#endif
-
 #include "common.h"
 #include "version.h"
+#include "error.h"
 #include "cli.h"
 #ifdef USE_GCRYPT
 	#include "ccrypt.h"
@@ -77,12 +74,12 @@
 
 #define TIMEOUT 10
 
-static void version_format(int indent, char *id, char *value);
-static void version_format_line(char **buffer, int max_width, int indent, char *id, char *value);
-static void version_download_latest(char *);
-static void version_install_latest(char *);
-static void *version_check(void *);
-static size_t version_verify(void *, size_t, size_t, void *);
+static void version_format(int indent, char *id, char *value) __attribute__((nonnull(2, 3)));
+static void version_format_line(char **buffer, int max_width, int indent, char *id, char *value) __attribute__((nonnull(1, 4, 5)));
+static void version_download_latest(char *) __attribute__((nonnull(1)));
+static void version_install_latest(char *) __attribute__((nonnull(1)));
+static void *version_check(void *) __attribute__((nonnull(1)));
+static size_t version_verify(void *, size_t, size_t, void *) __attribute__((nonnull(1, 4)));
 
 bool version_new_available = false;
 bool version_is_checking = false;
@@ -104,7 +101,6 @@ extern void version_print(char *name, char *version, char *url)
 	int indent = strlen(name) + 8;
 	char *av = NULL;
 	asprintf(&av, _("%s version"), name);
-	char *git = strndup(GIT_COMMIT, GIT_COMMIT_LENGTH);
 	char *runtime = NULL;
 #ifndef _WIN32
 	struct utsname un;
@@ -115,7 +111,7 @@ extern void version_print(char *name, char *version, char *url)
 #endif
 	version_format(indent, av,              version);
 	version_format(indent, _("built on"),   __DATE__ " " __TIME__);
-	version_format(indent, _("git commit"), git);
+	version_format(indent, _("git commit"), GIT_COMMIT);
 	version_format(indent, _("build os"),   BUILD_OS);
 	version_format(indent, _("compiler"),   COMPILER);
 	version_format(indent, _("cflags"),     ALL_CFLAGS);
@@ -128,7 +124,6 @@ extern void version_print(char *name, char *version, char *url)
 	free(gcv);
 #endif
 	free(av);
-	free(git);
 	free(runtime);
 	struct timespec vc = { 0, MILLION }; /* 1ms == 1,000,000ns*/
 	while (version_is_checking)
@@ -145,7 +140,6 @@ extern char *version_build_info(void)
 {
 	char *info = NULL;
 
-	char *git = strndup(GIT_COMMIT, GIT_COMMIT_LENGTH);
 	char *runtime = NULL;
 #ifndef _WIN32
 	struct utsname un;
@@ -159,7 +153,7 @@ extern char *version_build_info(void)
 #define AA_GI 10
 
 	version_format_line(&info, AA_GW, AA_GI, _("built on"),   __DATE__ " " __TIME__);
-	version_format_line(&info, AA_GW, AA_GI, _("git commit"), git);
+	version_format_line(&info, AA_GW, AA_GI, _("git commit"), GIT_COMMIT);
 	version_format_line(&info, AA_GW, AA_GI, _("build os"),   BUILD_OS);
 	version_format_line(&info, AA_GW, AA_GI, _("compiler"),   COMPILER);
 	version_format_line(&info, AA_GW, AA_GI, _("cflags"),     ALL_CFLAGS);
@@ -174,7 +168,6 @@ extern char *version_build_info(void)
 	free(gcv);
 #endif
 
-	free(git);
 	free(runtime);
 
 	return info;
@@ -187,6 +180,8 @@ extern void version_check_for_update(char *current_version, char *check_url, cha
 	version_is_checking = true;
 
 	version_check_t *info = malloc(sizeof( version_check_t ));
+	if (!info)
+		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof( version_check_t ));
 	info->current    = strdup(current_version);
 	info->check_url  = strdup(check_url);
 	info->update_url = download_url ? strdup(download_url) : NULL;
@@ -286,10 +281,13 @@ static void version_download_latest(char *update_url)
 static void version_install_latest(char *u)
 {
 #if !defined VERSION_NO_INSTALL
-	if (!version_new_available || !u)
+	if (!version_new_available)
 		return;
 #if !defined __APPLE__ && !defined _WIN32
 	char *u2 = strdup(u);
+	if (!u2)
+		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(u) + 1);
+
 	pid_t pid = fork();
 	if (pid == 0)
 	{
@@ -299,17 +297,14 @@ static void version_install_latest(char *u)
 		_exit(EXIT_FAILURE);
 	}
 	else if (pid > 0)
-	{
 		waitpid(pid, NULL, 0);
-		unlink(u2);
-		free(u2);
-	}
+	unlink(u2);
+	free(u2);
 #elif defined __APPLE__
 	char *dmg = NULL;
 	asprintf(&dmg, "%s.dmg", u);
 	rename(u, dmg);
-	//execl("/usr/bin/open", "open", dmg, NULL);
-	osx_open_file(dmg);
+	execl("/usr/bin/open", dmg, NULL);
 	unlink(dmg);
 	free(dmg);
 #elif defined _WIN32
@@ -324,6 +319,8 @@ static void version_install_latest(char *u)
 static size_t version_verify(void *p, size_t s, size_t n, void *v)
 {
 	char *b = calloc(s + 1, n);
+	if (!b)
+		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, (s + 1) * n);
 	memcpy(b, p, s * n);
 	char *l = strrchr(b, '\n');
 	if (l)

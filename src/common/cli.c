@@ -1,6 +1,6 @@
 /*
  * Common code for providing a cmomand line progress bar
- * Copyright © 2005-2022, albinoloverats ~ Software Development
+ * Copyright © 2005-2024, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
  * This program is free software: you can redistribute it and/or modify
@@ -28,6 +28,7 @@
 #include <inttypes.h>
 #include <string.h>
 
+#include <time.h>
 #include <signal.h>
 
 #include <sys/stat.h>
@@ -42,10 +43,11 @@
 
 #include "common.h"
 #include "cli.h"
+#include "error.h"
 #include "dir.h"
 #include "non-gnu.h"
 
-#define CLI_HELP_FORMAT_RIGHT_COLUMN 37
+//#define CLI_HELP_FORMAT_RIGHT_COLUMN 37
 
 #define CLI_SMALL   62
 #define CLI_DEFAULT 80 /* Expected default terminal width */
@@ -59,17 +61,20 @@ static void cli_display_bars(cli_progress_t *, cli_progress_t *, cli_bps_t *);
 static void cli_sigwinch(int);
 #endif
 
+#define CLI_DO_INIT if (cli_inited != 1) cli_init();
+
 extern void on_quit(int) __attribute__((noreturn));
 
 static void cli_init(void);
 static int cli_inited = -1; // -1 (no), 0 (failed), 1 (okay)
 
 static int cli_bps_sort(const void *, const void *);
-static int cli_print(FILE *, char *);
+static int cli_print(FILE *, const char *);
 
 extern int cli_printf(const char * const restrict s, ...)
 {
-	cli_init();
+	CLI_DO_INIT;
+
 	va_list ap;
 	va_start(ap, s);
 	char *d = NULL;
@@ -82,7 +87,8 @@ extern int cli_printf(const char * const restrict s, ...)
 
 extern int cli_eprintf(const char * const restrict s, ...)
 {
-	cli_init();
+	CLI_DO_INIT;
+
 	va_list ap;
 	va_start(ap, s);
 	char *d = NULL;
@@ -93,9 +99,37 @@ extern int cli_eprintf(const char * const restrict s, ...)
 	return x;
 }
 
+extern int logger(const char * const restrict s, ...)
+{
+	CLI_DO_INIT;
+
+	int x = 0;
+#if 0
+	time_t now = time(NULL);
+	char at[24];
+	struct tm t;
+	localtime_r(&now, &t);
+	strftime(at, sizeof at, "%F %T : ", &t);
+	x += cli_print(stderr, at);
+#endif
+	va_list ap;
+	va_start(ap, s);
+	char *d = NULL;
+	vasprintf(&d, s, ap);
+	x += cli_print(stderr, d);
+	va_end(ap);
+	free(d);
+
+	static const char nl[] = "\n";
+	x += cli_print(stderr, nl);
+
+	return x;
+}
+
 extern int cli_fprintf(FILE *f, const char * const restrict s, ...)
 {
-	cli_init();
+	CLI_DO_INIT;
+
 	va_list ap;
 	va_start(ap, s);
 	char *d = NULL;
@@ -108,19 +142,22 @@ extern int cli_fprintf(FILE *f, const char * const restrict s, ...)
 
 extern int cli_printx(const uint8_t * const restrict x, size_t z)
 {
-	cli_init();
+	CLI_DO_INIT;
+
 	return cli_fprintx(stdout, x, z);
 }
 
 extern int cli_eprintx(const uint8_t * const restrict x, size_t z)
 {
-	cli_init();
+	CLI_DO_INIT;
+
 	return cli_fprintx(stderr, x, z);
 }
 
 extern int cli_fprintx(FILE *f, const uint8_t * const restrict x, size_t z)
 {
-	cli_init();
+	CLI_DO_INIT;
+
 #define CLI_PRINTX_W 16
 	// TODO allow variable width lines
 	int l = 0, o = 0;
@@ -146,11 +183,14 @@ extern int cli_fprintx(FILE *f, const uint8_t * const restrict x, size_t z)
 
 extern double cli_calc_bps(cli_bps_t *bps)
 {
-	cli_init();
+	CLI_DO_INIT;
+
 	cli_bps_t *copy = calloc(BPS, sizeof( cli_bps_t ));
+	if (!copy)
+		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, BPS * sizeof( cli_bps_t ));
 	for (int i = 0; i < BPS; i++)
 	{
-		copy[i].time = bps[i].time;
+		copy[i].time  = bps[i].time;
 		copy[i].bytes = bps[i].bytes;
 	}
 	qsort(copy, BPS, sizeof( cli_bps_t ), cli_bps_sort);
@@ -172,7 +212,8 @@ extern double cli_calc_bps(cli_bps_t *bps)
 //#ifndef _WIN32
 extern void cli_display(cli_t *p)
 {
-	cli_init();
+	CLI_DO_INIT;
+
 #ifndef _WIN32
 	cli_sigwinch(SIGWINCH);
 #endif
@@ -316,10 +357,12 @@ static int cli_bps_sort(const void *a, const void *b)
 	return (ba->time > bb->time) - (ba->time < bb->time);
 }
 
-static int cli_print(FILE *stream, char *text)
+static int cli_print(FILE *stream, const char *text)
 {
 	size_t l = strlen(text);
 	char *copy = calloc(1, l + 1);
+	if (!copy)
+		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, l + 1);
 #ifndef _WIN32
 	bool strip = !((stream == stdout && isatty(STDOUT_FILENO)) || (stream == stderr && isatty(STDERR_FILENO)));
 #else
@@ -331,7 +374,7 @@ static int cli_print(FILE *stream, char *text)
 #endif
 	if (strip)
 	{
-		char *ptr = text;
+		char *ptr = (char *)text;
 		for (size_t i = 0, j = 0; i < l; i++)
 		{
 			char *e = strstr(ptr, "\x1b[");
@@ -346,6 +389,7 @@ static int cli_print(FILE *stream, char *text)
 	else
 		strcpy(copy, text);
 	int x = fprintf(stream, "%s", copy);
+	//fprintf(stream, "\n");
 	free(copy);
 	return x;
 }
@@ -355,7 +399,7 @@ extern void on_quit(int s)
 	fprintf(stderr, "\e[?25h\n"); /* restore cursor */
 	signal(s, SIG_DFL);
 	raise(s);
-	exit(EXIT_FAILURE); // this shouldn't happen as the raise above will handle things
+	_exit(EXIT_FAILURE); // this shouldn't happen as the raise above will handle things
 }
 
 static void cli_init(void)
