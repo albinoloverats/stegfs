@@ -57,7 +57,7 @@
 static int cli_width = CLI_DEFAULT;
 static int cli_size_width = 0;
 
-static void cli_display_bars(cli_progress_t *, cli_progress_t *, cli_bps_t *);
+static void cli_display_bars(cli_progress_s *, cli_progress_s *, cli_bps_s *);
 #ifndef _WIN32
 static void cli_sigwinch(int);
 #endif
@@ -182,17 +182,17 @@ extern int cli_fprintx(FILE *f, const uint8_t * const restrict x, size_t z)
 	return l;
 }
 
-extern double cli_calc_bps(cli_bps_t *bps)
+extern double cli_calc_bps(cli_bps_s *bps)
 {
 	CLI_DO_INIT;
 
-	cli_bps_t *copy = m_calloc(BPS, sizeof( cli_bps_t ));
+	cli_bps_s *copy = m_calloc(BPS, sizeof( cli_bps_s ));
 	for (int i = 0; i < BPS; i++)
 	{
 		copy[i].time  = bps[i].time;
 		copy[i].bytes = bps[i].bytes;
 	}
-	qsort(copy, BPS, sizeof( cli_bps_t ), cli_bps_sort);
+	qsort(copy, BPS, sizeof( cli_bps_s ), cli_bps_sort);
 	double avg[BPS - 1] = { 0.0f };
 	for (int i = 0; i < BPS - 1; i++)
 		/*
@@ -209,7 +209,7 @@ extern double cli_calc_bps(cli_bps_t *bps)
 }
 
 //#ifndef _WIN32
-extern void cli_display(cli_t *p)
+extern void cli_display(cli_s *p)
 {
 	CLI_DO_INIT;
 
@@ -218,8 +218,8 @@ extern void cli_display(cli_t *p)
 #endif
 	cli_size_width = 0;
 
-	cli_bps_t bps[BPS];
-	memset(bps, 0x00, BPS * sizeof( cli_bps_t ));
+	cli_bps_s bps[BPS];
+	memset(bps, 0x00, BPS * sizeof( cli_bps_s ));
 	int b = 0;
 
 	fprintf(stderr, "\e[?25l\n"); /* hide cursor */
@@ -249,7 +249,7 @@ extern void cli_display(cli_t *p)
 	return;
 }
 
-static void cli_display_bar(char *name, cli_progress_t *p, double percent)
+static void cli_display_bar(char *name, cli_progress_s *p, double percent)
 {
 	int name_width = CLI_TRUNCATED_DISPLAY_SHORT + strlen(CLI_TRUNCATED_ELLIPSE) + (cli_width > CLI_DEFAULT ? CLI_TRUNCATED_DISPLAY_SHORT : 0);
 	fprintf(stderr, "\r%-*s : ", name_width, name);
@@ -273,7 +273,7 @@ static void cli_display_bar(char *name, cli_progress_t *p, double percent)
 	return;
 }
 
-static void cli_display_bps(cli_bps_t *bps)
+static void cli_display_bps(cli_bps_s *bps)
 {
 	/*
 	 * calculate B/s
@@ -309,7 +309,7 @@ static void cli_display_bps(cli_bps_t *bps)
 	return;
 }
 
-static void cli_display_bars(cli_progress_t *t, cli_progress_t *c, cli_bps_t *bps)
+static void cli_display_bars(cli_progress_s *t, cli_progress_s *c, cli_bps_s *bps)
 {
 	double total   = PERCENT * (t->offset + (1.0f * c->offset / c->size)) / t->size;
 	double current = PERCENT * c->offset / c->size;
@@ -351,8 +351,8 @@ static void cli_sigwinch(int s)
 
 static int cli_bps_sort(const void *a, const void *b)
 {
-	const cli_bps_t *ba = (const cli_bps_t *)a;
-	const cli_bps_t *bb = (const cli_bps_t *)b;
+	const cli_bps_s *ba = (const cli_bps_s *)a;
+	const cli_bps_s *bb = (const cli_bps_s *)b;
 	return (ba->time > bb->time) - (ba->time < bb->time);
 }
 

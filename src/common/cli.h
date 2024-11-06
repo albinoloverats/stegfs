@@ -90,7 +90,7 @@ typedef struct
 	uint64_t size;    /*!< Maximum */
 	char    *display; /*!< Extra text to display within the progress bar */
 }
-cli_progress_t;
+cli_progress_s;
 
 /*!
  * \brief Progress bar structure
@@ -103,10 +103,10 @@ cli_progress_t;
 typedef struct
 {
 	cli_status_e   *status;  /*!< Progress bar status */
-	cli_progress_t *current; /*!< Current item progress */
-	cli_progress_t *total;   /*!< Overall progress */
+	cli_progress_s *current; /*!< Current item progress */
+	cli_progress_s *total;   /*!< Overall progress */
 }
-cli_t;
+cli_s;
 
 #define BPS 128 /*!< Bytes per second history length */
 
@@ -121,7 +121,7 @@ typedef struct
 	uint64_t time;  /*!< The time at which this reading was taken */
 	uint64_t bytes; /*!< The number of bytes process */
 }
-cli_bps_t;
+cli_bps_s;
 
 /*!
  * \brief         Display a progress bar
@@ -132,17 +132,17 @@ cli_bps_t;
  * you need progress for current item and overall progress then you get
  * two.
  */
-extern void cli_display(cli_t *c) __attribute__((nonnull(1)));
+extern void cli_display(cli_s *c) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Calculate the number of bytes per second
  * \param[in]  c  The bytes per second history
  * \return        The number of bytes per second
  *
- * Calculate the speed of a transfer given a list of cli_bps_t readings.
+ * Calculate the speed of a transfer given a list of cli_bps_s readings.
  * Currently this is required to be 128.
  */
-extern double cli_calc_bps(cli_bps_t *c) __attribute__((nonnull(1)));
+extern double cli_calc_bps(cli_bps_s *c) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Formatted output to stdout

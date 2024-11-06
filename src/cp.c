@@ -62,7 +62,7 @@ int main(int argc, char **argv)
 	extra[0] = m_strdup("+source");
 	extra[0] = m_strdup("+destination");
 
-	config_about_t about =
+	config_about_s about =
 	{
 		"stegfs-cp-tree",
 		STEGFS_VERSION,

@@ -40,14 +40,14 @@ typedef struct
 	bool b1;
 	bool b2;
 }
-pair_boolean_t;
+pair_boolean_s;
 
 typedef struct
 {
 	int64_t i1;
 	int64_t i2;
 }
-pair_integer_t;
+pair_integer_s;
 
 typedef struct
 {
@@ -56,29 +56,29 @@ typedef struct
 	long double d1;
 	long double d2;
 }
-pair_decimal_t;
+pair_decimal_s;
 
 typedef struct
 {
 	char *s1;
 	char *s2;
 }
-pair_string_t;
+pair_string_s;
 
 typedef struct
 {
 	void *p1;
 	void *p2;
 }
-pair_object_t;
+pair_object_s;
 
 typedef union
 {
-	pair_boolean_t boolean;
-	pair_integer_t integer;
-	pair_decimal_t decimal;
-	pair_string_t  string;
-	pair_object_t  object;
+	pair_boolean_s boolean;
+	pair_integer_s integer;
+	pair_decimal_s decimal;
+	pair_string_s  string;
+	pair_object_s  object;
 }
 pair_u;
 

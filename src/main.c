@@ -119,7 +119,7 @@ static int fuse_stegfs_statfs(const char *path, struct statvfs *stvbuf)
 
 	(void)path;
 
-	stegfs_t file_system = stegfs_info();
+	stegfs_s file_system = stegfs_info();
 
 	stvbuf->f_bsize   = SIZE_BYTE_BLOCK;
 	stvbuf->f_frsize  = SIZE_BYTE_DATA;
@@ -140,7 +140,7 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
 {
 	errno = EXIT_SUCCESS;
 
-	stegfs_t file_system = stegfs_info();
+	stegfs_s file_system = stegfs_info();
 	char *f = dir_get_name(path, PASSWORD_SEPARATOR); /* used to check for symlink */
 	/* common attributes for root/files/directories */
 	stbuf->st_dev     = (dev_t)HASH_MAGIC_2;
@@ -185,7 +185,7 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
 	}
 	else
 	{
-		stegfs_cache_t c;
+		stegfs_cache_s c;
 		memset(&c, 0x00, sizeof c);
 		if (stegfs_cache_exists(path, &c))
 		{
@@ -214,7 +214,7 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
 		}
 		else
 		{
-			stegfs_file_t file;
+			stegfs_file_s file;
 			memset(&file, 0x00, sizeof file);
 			file.path = dir_get_path(path);
 			file.name = dir_get_name(path, PASSWORD_SEPARATOR);
@@ -276,11 +276,11 @@ static int fuse_stegfs_rmdir(const char *path)
 {
 	errno = EXIT_SUCCESS;
 
-	stegfs_t file_system = stegfs_info();
+	stegfs_s file_system = stegfs_info();
 	if (file_system.show_bloc && path_equals(path, PATH_BLOC))
 		return errno = EBUSY, -errno;
 
-	stegfs_cache_t *c = NULL;
+	stegfs_cache_s *c = NULL;
 	if ((c = stegfs_cache_exists(path, NULL)))
 	{
 		if (c->file)
@@ -311,7 +311,7 @@ static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t fill
 	filler(buf,  ".", NULL, 0);
 	filler(buf, "..", NULL, 0);
 
-	stegfs_t file_system = stegfs_info();
+	stegfs_s file_system = stegfs_info();
 
 	if (path_equals(DIR_SEPARATOR, path))
 	{
@@ -331,7 +331,7 @@ static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t fill
 	}
 	else
 	{
-		stegfs_cache_t c;
+		stegfs_cache_s c;
 		memset(&c, 0x00, sizeof c);
 		if (stegfs_cache_exists(path, &c))
 			for (uint64_t i = 0; i < c.ents; i++)
@@ -346,7 +346,7 @@ static int fuse_stegfs_unlink(const char *path)
 {
 	errno = EXIT_SUCCESS;
 
-	stegfs_file_t file;
+	stegfs_file_s file;
 	memset(&file, 0x00, sizeof file);
 	file.path = dir_get_path(path);
 	file.name = dir_get_name(path, PASSWORD_SEPARATOR);
@@ -367,7 +367,7 @@ static int fuse_stegfs_read(const char *path, char *buf, size_t size, off_t offs
 
 	(void)info;
 
-	stegfs_cache_t *c = NULL;
+	stegfs_cache_s *c = NULL;
 	if ((c = stegfs_cache_exists(path, NULL)) && c->file)
 	{
 		if ((unsigned)(offset + size) > c->file->size)
@@ -391,7 +391,7 @@ static int fuse_stegfs_write(const char *path, const char *buf, size_t size, off
 	 */
 	while (true)
 	{
-		stegfs_cache_t *c = NULL;
+		stegfs_cache_s *c = NULL;
 		if ((c = stegfs_cache_exists(path, NULL)) && c->file)
 		{
 			if (!stegfs_file_will_fit(c->file))
@@ -423,7 +423,7 @@ static int fuse_stegfs_open(const char *path, struct fuse_file_info *info)
 
 	(void)info;
 
-	stegfs_cache_t *c = NULL;
+	stegfs_cache_s *c = NULL;
 	if ((c = stegfs_cache_exists(path, NULL)) && c->file)
 	{
 		c->file->pass = dir_get_pass(path);
@@ -441,7 +441,7 @@ static int fuse_stegfs_flush(const char *path, struct fuse_file_info *info)
 
 	(void)info;
 
-	stegfs_cache_t *c = NULL;
+	stegfs_cache_s *c = NULL;
 	if ((c = stegfs_cache_exists(path, NULL)) && c->file)
 		if (stegfs_file_will_fit(c->file))
 			errno = EXIT_SUCCESS;
@@ -460,7 +460,7 @@ static int fuse_stegfs_ftruncate(const char *path, off_t offset, struct fuse_fil
 {
 	errno = EXIT_SUCCESS;
 
-	stegfs_cache_t *c = NULL;
+	stegfs_cache_s *c = NULL;
 	while (true)
 	{
 		if ((c = stegfs_cache_exists(path, NULL)) && c->file)
@@ -489,7 +489,7 @@ static int fuse_stegfs_fallocate(const char *path, int mode, off_t offset, off_t
 
 	/* this isn't finished or working properly */
 
-	stegfs_cache_t *c = NULL;
+	stegfs_cache_s *c = NULL;
 	while (true)
 	{
 		if ((c = stegfs_cache_exists(path, NULL)) && c->file)
@@ -569,7 +569,7 @@ static int fuse_stegfs_release(const char *path, struct fuse_file_info *info)
 
 	(void)info;
 
-	stegfs_cache_t *c = NULL;
+	stegfs_cache_s *c = NULL;
 	if ((c = stegfs_cache_exists(path, NULL)) && c->file)
 	{
 		if (c->file->write && stegfs_file_will_fit(c->file))
@@ -598,7 +598,7 @@ static int fuse_stegfs_readlink(const char *path, char *buf, size_t size)
 {
 	errno = EXIT_SUCCESS;
 
-	stegfs_t file_system = stegfs_info();
+	stegfs_s file_system = stegfs_info();
 	if (file_system.show_bloc && path_starts_with(PATH_BLOC, path))
 	{
 		char *b = dir_get_name(path, PASSWORD_SEPARATOR);
@@ -654,28 +654,28 @@ int main(int argc, char **argv)
 	fargs[0] = argv[0];
 
 	LIST args = list_init(config_named_compare, false, false);
-	list_add(args, &((config_named_t){ 'c', "cipher",         _("algorithm"),  _("Algorithm to use to encrypt data; use ‘list’ to show available cipher algorithms"), { CONFIG_ARG_REQ_STRING,  { .string  = NULL  } }, false, false, false, false }));
-	list_add(args, &((config_named_t){ 's', "hash",           _("algorithm"),  _("Hash algorithm to generate key; use ‘list’ to show available hash algorithms"),     { CONFIG_ARG_REQ_STRING,  { .string  = NULL  } }, false, false, false, false }));
-	list_add(args, &((config_named_t){ 'm', "mode",           _("mode"),       _("The encryption mode to use; use ‘list’ to show available cipher modes"),            { CONFIG_ARG_REQ_STRING,  { .string  = NULL  } }, false, false, false, false }));
-	list_add(args, &((config_named_t){ 'a', "mac",            _("mac"),        _("The MAC algorithm to use; use ‘list’ to show available MACs"),                      { CONFIG_ARG_REQ_STRING,  { .string  = NULL  } }, false, false, false, false }));
-	list_add(args, &((config_named_t){ 'i', "kdf-iterations", _("iterations"), _("Number of iterations the KDF should use"),                                          { CONFIG_ARG_REQ_INTEGER, { .integer = 0     } }, false, false, false, false }));
-	list_add(args, &((config_named_t){ 'p', "paranoid",       NULL,            _("Enable paranoia mode"),                                                             { CONFIG_ARG_BOOLEAN,     { .boolean = false } }, false, true,  false, false }));
-	list_add(args, &((config_named_t){ 'x', "duplicates",     "#",             _("Number of times each file should be duplicated"),                                   { CONFIG_ARG_REQ_INTEGER, { .integer = 0     } }, false, true,  false, false }));
-	list_add(args, &((config_named_t){ 'b', "show-bloc",      NULL,            _("Expose the /bloc/ in-use block list directory"),                                    { CONFIG_ARG_BOOLEAN,     { .boolean = false } }, false, true,  false, false }));
-	list_add(args, &((config_named_t){ 'd', NULL,             NULL,            _("Enable debug output (forces foreground and single-thread)"),                        { CONFIG_ARG_BOOLEAN,     { .boolean = false } }, false, false, false, false }));
-	list_add(args, &((config_named_t){ 'f', NULL,             NULL,            _("Foreground operation"),                                                             { CONFIG_ARG_BOOLEAN,     { .boolean = false } }, false, false, false, false }));
-	list_add(args, &((config_named_t){ 't', NULL,             NULL,            _("Disable multi-threaded operation (FUSE option -s)"),                                { CONFIG_ARG_BOOLEAN,     { .boolean = false } }, false, false, false, false }));
-	list_add(args, &((config_named_t){ 'o', NULL,             "opt,[opt...]",  _("FUSE mount options--see FUSE documentation for details"),                           { CONFIG_ARG_LIST_STRING, { .list    = NULL  } }, false, false, false, false }));
+	list_add(args, &((config_named_s){ 'c', "cipher",         _("algorithm"),  _("Algorithm to use to encrypt data; use ‘list’ to show available cipher algorithms"), { CONFIG_ARG_REQ_STRING,  { .string  = NULL  } }, false, false, false, false }));
+	list_add(args, &((config_named_s){ 's', "hash",           _("algorithm"),  _("Hash algorithm to generate key; use ‘list’ to show available hash algorithms"),     { CONFIG_ARG_REQ_STRING,  { .string  = NULL  } }, false, false, false, false }));
+	list_add(args, &((config_named_s){ 'm', "mode",           _("mode"),       _("The encryption mode to use; use ‘list’ to show available cipher modes"),            { CONFIG_ARG_REQ_STRING,  { .string  = NULL  } }, false, false, false, false }));
+	list_add(args, &((config_named_s){ 'a', "mac",            _("mac"),        _("The MAC algorithm to use; use ‘list’ to show available MACs"),                      { CONFIG_ARG_REQ_STRING,  { .string  = NULL  } }, false, false, false, false }));
+	list_add(args, &((config_named_s){ 'i', "kdf-iterations", _("iterations"), _("Number of iterations the KDF should use"),                                          { CONFIG_ARG_REQ_INTEGER, { .integer = 0     } }, false, false, false, false }));
+	list_add(args, &((config_named_s){ 'p', "paranoid",       NULL,            _("Enable paranoia mode"),                                                             { CONFIG_ARG_BOOLEAN,     { .boolean = false } }, false, true,  false, false }));
+	list_add(args, &((config_named_s){ 'x', "duplicates",     "#",             _("Number of times each file should be duplicated"),                                   { CONFIG_ARG_REQ_INTEGER, { .integer = 0     } }, false, true,  false, false }));
+	list_add(args, &((config_named_s){ 'b', "show-bloc",      NULL,            _("Expose the /bloc/ in-use block list directory"),                                    { CONFIG_ARG_BOOLEAN,     { .boolean = false } }, false, true,  false, false }));
+	list_add(args, &((config_named_s){ 'd', NULL,             NULL,            _("Enable debug output (forces foreground and single-thread)"),                        { CONFIG_ARG_BOOLEAN,     { .boolean = false } }, false, false, false, false }));
+	list_add(args, &((config_named_s){ 'f', NULL,             NULL,            _("Foreground operation"),                                                             { CONFIG_ARG_BOOLEAN,     { .boolean = false } }, false, false, false, false }));
+	list_add(args, &((config_named_s){ 't', NULL,             NULL,            _("Disable multi-threaded operation (FUSE option -s)"),                                { CONFIG_ARG_BOOLEAN,     { .boolean = false } }, false, false, false, false }));
+	list_add(args, &((config_named_s){ 'o', NULL,             "opt,[opt...]",  _("FUSE mount options--see FUSE documentation for details"),                           { CONFIG_ARG_LIST_STRING, { .list    = NULL  } }, false, false, false, false }));
 
 	LIST extra = list_default();
-	list_add(extra, &((config_unnamed_t){ "file system", { CONFIG_ARG_STRING,  { .string = NULL } }, true,  false }));
-	list_add(extra, &((config_unnamed_t){ "mount point", { CONFIG_ARG_STRING,  { .string = NULL } }, true,  false }));
+	list_add(extra, &((config_unnamed_s){ "file system", { CONFIG_ARG_STRING,  { .string = NULL } }, true,  false }));
+	list_add(extra, &((config_unnamed_s){ "mount point", { CONFIG_ARG_STRING,  { .string = NULL } }, true,  false }));
 
 	LIST notes = list_default();
 	list_add(notes, _("It doesn't matter which order the file system and mount point are specified as stegfs will figure that out. All other options are passed to FUSE."));
 	list_add(notes, _("If you’re feeling extra paranoid you can now disable to stegfs file system header. This will also disable the checks when mounting and thus anything could happen ;-)"));
 
-	config_about_t about =
+	config_about_s about =
 	{
 		STEGFS_NAME,
 		STEGFS_VERSION,
@@ -690,17 +690,17 @@ int main(int argc, char **argv)
 	char *fs  = NULL;
 	char *mnt = NULL;
 	struct stat s = { 0x0 };
-	stat(((config_unnamed_t *)list_get(extra, 0))->response.value.string, &s);
+	stat(((config_unnamed_s *)list_get(extra, 0))->response.value.string, &s);
 	if (S_ISDIR(s.st_mode))
 	{
 		// 1st argument is directory, so it's the mount point
-		mnt = ((config_unnamed_t *)list_get(extra, 0))->response.value.string;
-		fs  = ((config_unnamed_t *)list_get(extra, 1))->response.value.string;
+		mnt = ((config_unnamed_s *)list_get(extra, 0))->response.value.string;
+		fs  = ((config_unnamed_s *)list_get(extra, 1))->response.value.string;
 	}
 	else
 	{
-		fs  = ((config_unnamed_t *)list_get(extra, 0))->response.value.string;
-		mnt = ((config_unnamed_t *)list_get(extra, 1))->response.value.string;
+		fs  = ((config_unnamed_s *)list_get(extra, 0))->response.value.string;
+		mnt = ((config_unnamed_s *)list_get(extra, 1))->response.value.string;
 	}
 	list_deinit(extra);
 
@@ -710,27 +710,27 @@ int main(int argc, char **argv)
 	enum gcry_md_algos     hash   = DEFAULT_HASH;
 	enum gcry_mac_algos    mac    = DEFAULT_MAC;
 	uint64_t kdf_iters            = DEFAULT_KDF_ITERATIONS;
-	bool paranoid                 = ((config_named_t *)list_get(args, 5))->response.value.boolean;
+	bool paranoid                 = ((config_named_s *)list_get(args, 5))->response.value.boolean;
 	uint8_t duplicates            = COPIES_DEFAULT;
-	bool show_bloc                = ((config_named_t *)list_get(args, 7))->response.value.boolean;
+	bool show_bloc                = ((config_named_s *)list_get(args, 7))->response.value.boolean;
 
 	if (paranoid)
 	{
-		cipher     = cipher_id_from_name(((config_named_t *)list_get(args, 0))->response.value.string);
-		mode       =   mode_id_from_name(((config_named_t *)list_get(args, 1))->response.value.string);
-		hash       =   hash_id_from_name(((config_named_t *)list_get(args, 2))->response.value.string);
-		mac        =    mac_id_from_name(((config_named_t *)list_get(args, 3))->response.value.string);
-		kdf_iters  =                     ((config_named_t *)list_get(args, 4))->response.value.integer;
-		duplicates =            (uint8_t)((config_named_t *)list_get(args, 6))->response.value.integer;
+		cipher     = cipher_id_from_name(((config_named_s *)list_get(args, 0))->response.value.string);
+		mode       =   mode_id_from_name(((config_named_s *)list_get(args, 1))->response.value.string);
+		hash       =   hash_id_from_name(((config_named_s *)list_get(args, 2))->response.value.string);
+		mac        =    mac_id_from_name(((config_named_s *)list_get(args, 3))->response.value.string);
+		kdf_iters  =                     ((config_named_s *)list_get(args, 4))->response.value.integer;
+		duplicates =            (uint8_t)((config_named_s *)list_get(args, 6))->response.value.integer;
 	}
 
 	/*
 	 * deal with FUSE options
 	 */
 
-	bool debug         =          ((config_named_t *)list_get(args,  8))->response.value.boolean;
-	bool foreground    = debug || ((config_named_t *)list_get(args,  9))->response.value.boolean;
-	bool single_thread = debug || ((config_named_t *)list_get(args, 10))->response.value.boolean;
+	bool debug         =          ((config_named_s *)list_get(args,  8))->response.value.boolean;
+	bool foreground    = debug || ((config_named_s *)list_get(args,  9))->response.value.boolean;
+	bool single_thread = debug || ((config_named_s *)list_get(args, 10))->response.value.boolean;
 
 	int fuse_argc = 3;
 	char **fuse_argv = m_calloc(fuse_argc, sizeof (char *));
@@ -754,7 +754,7 @@ int main(int argc, char **argv)
 		fuse_argv = m_realloc(fuse_argv, fuse_argc * sizeof (char *));
 		fuse_argv[fuse_argc - 2] = "-s";
 	}
-	LIST fuse_options = ((config_named_t *)list_get(args, 11))->response.value.list;
+	LIST fuse_options = ((config_named_s *)list_get(args, 11))->response.value.list;
 	ITER iter = list_iterator(fuse_options);
 	while (list_has_next(iter))
 	{

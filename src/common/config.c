@@ -72,10 +72,10 @@ static bool  parse_integer(const char *, const char *, int64_t   *);
 static bool  parse_decimal(const char *, const char *, long double *);
 static char *parse_string (const char *, const char *, char      *);
 
-static bool parse_pair_boolean(const char *c, const char *l, pair_boolean_t *);
-static bool parse_pair_integer(const char *c, const char *l, pair_integer_t *);
-static bool parse_pair_decimal(const char *c, const char *l, pair_decimal_t *);
-static bool parse_pair_string (const char *c, const char *l, pair_string_t  *);
+static bool parse_pair_boolean(const char *c, const char *l, pair_boolean_s *);
+static bool parse_pair_integer(const char *c, const char *l, pair_integer_s *);
+static bool parse_pair_decimal(const char *c, const char *l, pair_decimal_s *);
+static bool parse_pair_string (const char *c, const char *l, pair_string_s  *);
 
 static pair_u *parse_pair(const char *c, const char *l);
 
@@ -88,10 +88,10 @@ static void parse_list_decimal(const char *, LIST list);
 static void parse_list(config_arg_e, const char *, LIST);
 
 static bool init = false;
-static config_about_t about = { 0x0 };
+static config_about_s about = { 0x0 };
 
 
-extern void config_init(config_about_t a)
+extern void config_init(config_about_s a)
 {
 	init = true;
 	memcpy(&about, &a, sizeof about);
@@ -100,21 +100,21 @@ extern void config_init(config_about_t a)
 
 extern int config_named_compare(const void *a, const void *b)
 {
-	const config_named_t *x = a;
-	const config_named_t *y = b;
+	const config_named_s *x = a;
+	const config_named_s *y = b;
 	return x->short_option - y->short_option;
 }
 
 extern int config_unnamed_compare(const void *a, const void *b)
 {
-	const config_unnamed_t *x = a;
-	const config_unnamed_t *y = b;
+	const config_unnamed_s *x = a;
+	const config_unnamed_s *y = b;
 	return strcmp(x->description, y->description);
 }
 
 extern void config_named_free(void *f)
 {
-	config_named_t *x = (config_named_t *)f;
+	config_named_s *x = (config_named_s *)f;
 	if (x->response.type & CONFIG_ARG_LIST)
 		list_deinit(x->response.value.list, free);
 	else if (x->response.type & CONFIG_ARG_STRING)
@@ -125,7 +125,7 @@ extern void config_named_free(void *f)
 
 extern void config_unnamed_free(void *f)
 {
-	config_unnamed_t *x = (config_unnamed_t *)f;
+	config_unnamed_s *x = (config_unnamed_s *)f;
 	if (x->response.type & CONFIG_ARG_STRING)
 		free(x->response.value.string);
 	free(x);
@@ -209,7 +209,7 @@ extern int config_parse_aux(int argc, char **argv, LIST args, LIST extra, LIST n
 				ITER iter = list_iterator(args);
 				while (list_has_next(iter))
 				{
-					config_named_t *arg = (config_named_t *)list_get_next(iter);
+					config_named_s *arg = (config_named_s *)list_get_next(iter);
 					if (arg->long_option && !strncmp(arg->long_option, line, strlen(arg->long_option)) && isspace((unsigned char)line[strlen(arg->long_option)]))
 						switch (arg->response.type)
 						{
@@ -343,7 +343,7 @@ extern int config_parse_aux(int argc, char **argv, LIST args, LIST extra, LIST n
 									if (!arg->response.value.list)
 										arg->response.value.list = list_default();
 									// would this not be a map?
-									pair_string_t *pair = m_malloc(sizeof( pair_string_t ));
+									pair_string_s *pair = m_malloc(sizeof( pair_string_s ));
 									if (parse_pair_string(arg->long_option, line, pair))
 										if (!list_append(arg->response.value.list, pair))
 											free(pair);
@@ -375,7 +375,7 @@ end_line:
 		ITER iter = list_iterator(args);
 		while (list_has_next(iter))
 		{
-			config_named_t *arg = (config_named_t *)list_get_next(iter);
+			config_named_s *arg = (config_named_s *)list_get_next(iter);
 			if (is_argument(arg->short_option, arg->long_option, curr))
 			{
 				unknown = false;
@@ -520,11 +520,11 @@ end_line:
 			{
 				if (j >= list_size(extra))
 				{
-					config_unnamed_t *new = m_calloc(1, sizeof( config_unnamed_t ));
+					config_unnamed_s *new = m_calloc(1, sizeof( config_unnamed_s ));
 					new->response.type = CONFIG_ARG_STRING;
 					list_append(extra, new);
 				}
-				config_unnamed_t *x = (config_unnamed_t *)list_get(extra, j);
+				config_unnamed_s *x = (config_unnamed_s *)list_get(extra, j);
 				switch (x->response.type)
 				{
 					case CONFIG_ARG_BOOLEAN:
@@ -554,7 +554,7 @@ end_line:
 	ITER iter = list_iterator(args);
 	while (list_has_next(iter))
 	{
-		config_named_t *arg = (config_named_t *)list_get_next(iter);
+		config_named_s *arg = (config_named_s *)list_get_next(iter);
 		if (arg->seen)
 			r++;
 		else if (arg->required && !arg->seen && warn)
@@ -570,7 +570,7 @@ end_line:
 		iter = list_iterator(extra);
 		while (list_has_next(iter))
 		{
-			config_unnamed_t *arg = (config_unnamed_t *)list_get_next(iter);
+			config_unnamed_s *arg = (config_unnamed_s *)list_get_next(iter);
 			if (arg->seen)
 				r++;
 		}
@@ -627,7 +627,7 @@ inline static void print_usage(LIST args, LIST extra)
 		ITER iter = list_iterator(extra);
 		while (list_has_next(iter))
 		{
-			const config_unnamed_t *x = (config_unnamed_t *)list_get_next(iter);
+			const config_unnamed_s *x = (config_unnamed_s *)list_get_next(iter);
 			if (x->required)
 				j += cli_eprintf(ANSI_COLOUR_RED " <%s>" ANSI_COLOUR_RESET, x->description);
 			else
@@ -642,7 +642,7 @@ inline static void print_usage(LIST args, LIST extra)
 		ITER iter = list_iterator(args);
 		while (list_has_next(iter))
 		{
-			const config_named_t *arg = list_get_next(iter);
+			const config_named_s *arg = list_get_next(iter);
 			if (!arg->hidden)
 			{
 				if ((int)(j + 4 + (arg->option_type ? strlen(arg->option_type) : 0)) > max_width)
@@ -890,7 +890,7 @@ static void show_help(LIST args, LIST largs, LIST notes, LIST extra)
 		ITER iter = list_iterator(args);
 		while (list_has_next(iter))
 		{
-			const config_named_t *arg = list_get_next(iter);
+			const config_named_s *arg = list_get_next(iter);
 			int w = 10 + (arg->long_option ? strlen(arg->long_option) : 0);
 			if (arg->option_type)
 				w += 3 + strlen(arg->option_type);
@@ -913,7 +913,7 @@ static void show_help(LIST args, LIST largs, LIST notes, LIST extra)
 		ITER iter = list_iterator(args);
 		while (list_has_next(iter))
 		{
-			const config_named_t *arg = list_get_next(iter);
+			const config_named_s *arg = list_get_next(iter);
 			if (!arg->hidden && !arg->advanced)
 			{
 				char *def = parse_default(arg->response.type, arg->response.value);
@@ -931,7 +931,7 @@ static void show_help(LIST args, LIST largs, LIST notes, LIST extra)
 		ITER iter = list_iterator(args);
 		while (list_has_next(iter))
 		{
-			const config_named_t *arg = list_get_next(iter);
+			const config_named_s *arg = list_get_next(iter);
 			if (!arg->hidden && arg->advanced)
 			{
 				char *def = parse_default(arg->response.type, arg->response.value);
@@ -1185,7 +1185,7 @@ static char *parse_tail(const char *c, const char *l)
 	return tail;
 }
 
-static bool parse_pair_boolean(const char *c, const char *l, pair_boolean_t *pair)
+static bool parse_pair_boolean(const char *c, const char *l, pair_boolean_s *pair)
 {
 	pair_u *p = parse_pair(c, l);
 	bool p1 = parse_boolean(NULL, p->string.s1, &pair->b1);
@@ -1196,7 +1196,7 @@ static bool parse_pair_boolean(const char *c, const char *l, pair_boolean_t *pai
 	return p1 && p2;
 }
 
-static bool parse_pair_integer(const char *c, const char *l, pair_integer_t *pair)
+static bool parse_pair_integer(const char *c, const char *l, pair_integer_s *pair)
 {
 	pair_u *p = parse_pair(c, l);
 	bool p1 = parse_integer(NULL, p->string.s1, &pair->i1);
@@ -1207,7 +1207,7 @@ static bool parse_pair_integer(const char *c, const char *l, pair_integer_t *pai
 	return p1 && p2;
 }
 
-static bool parse_pair_decimal(const char *c, const char *l, pair_decimal_t *pair)
+static bool parse_pair_decimal(const char *c, const char *l, pair_decimal_s *pair)
 {
 	pair_u *p = parse_pair(c, l);
 	bool p1 = parse_decimal(NULL, p->string.s1, &pair->d1);
@@ -1218,7 +1218,7 @@ static bool parse_pair_decimal(const char *c, const char *l, pair_decimal_t *pai
 	return p1 && p2;
 }
 
-static bool parse_pair_string(const char *c, const char *l, pair_string_t *pair)
+static bool parse_pair_string(const char *c, const char *l, pair_string_s *pair)
 {
 	pair_u *p = parse_pair(c, l);
 	pair->s1 = p->string.s1;

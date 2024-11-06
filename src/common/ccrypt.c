@@ -58,9 +58,9 @@ typedef struct
 	enum gcry_cipher_modes id;
 	const char name[9];
 }
-block_mode_t;
+block_mode_s;
 
-static const block_mode_t MODES[] =
+static const block_mode_s MODES[] =
 {
 	//{ GCRY_CIPHER_MODE_AESWRAP,        "AESWRAP"  }, // This will require more work in crypt_io
 	{ GCRY_CIPHER_MODE_CBC,            "CBC"      },
@@ -177,7 +177,7 @@ extern LIST list_of_modes(void)
 	static LIST *l = NULL;
 	if (!l)
 	{
-		unsigned m = sizeof MODES / sizeof( block_mode_t );
+		unsigned m = sizeof MODES / sizeof( block_mode_s );
 		l = list_init((int (*)(const void *, const void *))strcmp, false, true);
 		for (unsigned i = 0; i < m; i++)
 		{
@@ -288,7 +288,7 @@ extern enum gcry_cipher_modes mode_id_from_name(const char * const restrict n)
 	if (!n)
 		return GCRY_CIPHER_MODE_NONE;
 #endif
-	for (unsigned i = 0; i < sizeof MODES / sizeof( block_mode_t ); i++)
+	for (unsigned i = 0; i < sizeof MODES / sizeof( block_mode_s ); i++)
 		if (!strcasecmp(n, MODES[i].name))
 			return MODES[i].id;
 	return GCRY_CIPHER_MODE_NONE;
@@ -347,7 +347,7 @@ extern const char *hash_name_from_id(enum gcry_md_algos h)
 
 extern const char *mode_name_from_id(enum gcry_cipher_modes m)
 {
-	for (unsigned i = 0; i < sizeof MODES / sizeof( block_mode_t ); i++)
+	for (unsigned i = 0; i < sizeof MODES / sizeof( block_mode_s ); i++)
 		if (MODES[i].id == m)
 			return MODES[i].name;
 	return NULL;

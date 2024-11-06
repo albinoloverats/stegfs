@@ -155,7 +155,7 @@ stegfs_init_e;
  * Public file information structure containing an easy-to-access
  * representation of all important details about a file.
  */
-typedef struct stegfs_file_t
+typedef struct stegfs_file_s
 {
 	char      *path;               /*!< The path component of /path/file:password */
 	char      *name;               /*!< The file name part of /path/file:password */
@@ -168,7 +168,7 @@ typedef struct stegfs_file_t
 	uint64_t  *blocks[COPIES_MAX]; /*!< The complete list of used blocks */
 	bool       write;              /*!< Whether the file was opened for write access */
 }
-stegfs_file_t;
+stegfs_file_s;
 
 /*!
  * \brief  Cache structure
@@ -183,9 +183,9 @@ typedef struct _stegfs_cache
 	char *name;                   /*!< The name of the directory/file */
 	uint64_t ents;                /*!< The number of child elements */
 	struct _stegfs_cache **child; /*!< Array of pointers to child elements */
-	stegfs_file_t *file;          /*!< File details (if applicable) */
+	stegfs_file_s *file;          /*!< File details (if applicable) */
 }
-stegfs_cache_t;
+stegfs_cache_s;
 
 /*!
  * \brief  A "bitmap" of in-use blocks
@@ -194,13 +194,13 @@ stegfs_cache_t;
  * file system. When debugging, keep track of which file a particular
  * block is being used by.
  */
-typedef struct stegfs_blocks_t
+typedef struct stegfs_blocks_s
 {
 	uint64_t used; /*!< Count of used blocks */
 	bool *in_use;  /*!< Used block tracker */
 	char **file;   /*!< File using the given block */
 }
-stegfs_blocks_t;
+stegfs_blocks_s;
 
 /*!
  * \brief  Structure to hold file system information
@@ -208,7 +208,7 @@ stegfs_blocks_t;
  * Static data structure stored in the backend, which holds information
  * about the currently mounted file system.
  */
-typedef struct stegfs_t
+typedef struct stegfs_s
 {
 	int64_t                handle;         /*!< Handle to file system file/device */
 	uint64_t               size;           /*!< Size of file system in bytes (not capacity) */
@@ -221,12 +221,12 @@ typedef struct stegfs_t
 	uint32_t               copies;         /*!< File duplication */
 	size_t                 blocksize;      /*!< File system block size; if it needs to be bigger than 4,294,967,295 we have issues */
 	off_t                  head_offset;    /*!< Start location of file data in header blocks; only 32 bits (like blocksize) */
-	stegfs_blocks_t        blocks;         /*!< In use block tracker */
-	stegfs_cache_t         cache;          /*!< File cache version 2 */
+	stegfs_blocks_s        blocks;         /*!< In use block tracker */
+	stegfs_cache_s         cache;          /*!< File cache version 2 */
 	version_e              version;        /*!< File system version */
 	bool                   show_bloc;      /*!< Expose the /bloc/ block list */
 }
-stegfs_t;
+stegfs_s;
 
 /*!
  * \brief  Structure for each file system block
@@ -234,14 +234,14 @@ stegfs_t;
  * Simple structure which represents an individual file system data
  * block.
  */
-typedef struct stegfs_block_t
+typedef struct stegfs_block_s
 {
 	uint64_t path[SIZE_LONG_PATH]; /*!< Hash of block path    */
 	uint8_t  data[SIZE_BYTE_DATA]; /*!< Block data (1,976 bytes or 247 64-bit words */
 	uint64_t hash[SIZE_LONG_HASH]; /*!< Hash of block data    */
 	uint64_t next;                 /*!< Address of next block */
 } __attribute__((packed))
-stegfs_block_t;
+stegfs_block_s;
 
 /*!
  * \brief         Initialise stegfs library, set internal data structures
@@ -273,7 +273,7 @@ extern stegfs_init_e stegfs_init(const char * const restrict f, bool p,
  * Details returned are the file system ID, size in bytes, and size in
  * blocks.
  */
-extern stegfs_t stegfs_info(void);
+extern stegfs_s stegfs_info(void);
 
 /*
  * \brief         Deinitialise the file system
@@ -291,7 +291,7 @@ extern void stegfs_deinit(void);
  * for the given file to fit. It takes in to account the size of the
  * file, duplicated and all known files and their duplicates.
  */
-extern bool stegfs_file_will_fit(stegfs_file_t *f);
+extern bool stegfs_file_will_fit(stegfs_file_s *f);
 
 /*!
  * \brief         Create a new file
@@ -321,7 +321,7 @@ extern void stegfs_file_create(const char * const restrict p, bool w);
  * found. Otherwise it will keep going to attempt to find all blocks
  * used by all copies of the file.
  */
-extern bool stegfs_file_stat_aux(stegfs_file_t *f, bool q);
+extern bool stegfs_file_stat_aux(stegfs_file_s *f, bool q);
 
 /*!
  * \brief         Read a file from the file system
@@ -330,7 +330,7 @@ extern bool stegfs_file_stat_aux(stegfs_file_t *f, bool q);
  *
  * Read a file from the file system.
  */
-extern bool stegfs_file_read(stegfs_file_t *f);
+extern bool stegfs_file_read(stegfs_file_s *f);
 
 /*!
  * \brief         Write a file to the file system
@@ -338,7 +338,7 @@ extern bool stegfs_file_read(stegfs_file_t *f);
  *
  * Write a file to the file system.
  */
-extern bool stegfs_file_write(stegfs_file_t *f);
+extern bool stegfs_file_write(stegfs_file_s *f);
 
 /*!
  * \brief         Delete a file from the file system
@@ -346,7 +346,7 @@ extern bool stegfs_file_write(stegfs_file_t *f);
  *
  * Delete a file from the file system.
  */
-extern void stegfs_file_delete(stegfs_file_t *f);
+extern void stegfs_file_delete(stegfs_file_s *f);
 
 /*!
  * \brief         Add a entry to the cache
@@ -356,7 +356,7 @@ extern void stegfs_file_delete(stegfs_file_t *f);
  * Add an entry to the in-memory file system cache. This allows things
  * like directory look-ups to work.
  */
-extern void stegfs_cache_add(const char * const restrict p, stegfs_file_t *f);
+extern void stegfs_cache_add(const char * const restrict p, stegfs_file_s *f);
 
 /*!
  * \brief         Check the cache for an particular entry
@@ -369,7 +369,7 @@ extern void stegfs_cache_add(const char * const restrict p, stegfs_file_t *f);
  * as the return value points to the one used by the caching code - do
  * not modify.
  */
-extern stegfs_cache_t *stegfs_cache_exists(const char * const restrict p, stegfs_cache_t *f) __attribute__((nonnull(1)));
+extern stegfs_cache_s *stegfs_cache_exists(const char * const restrict p, stegfs_cache_s *f) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Remove an entry from the cache

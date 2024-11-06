@@ -95,7 +95,7 @@ typedef struct
 	char *check_url;
 	char *update_url;
 }
-version_check_t;
+version_check_s;
 
 extern void version_print(char *name, char *version, char *url)
 {
@@ -176,7 +176,7 @@ extern void version_check_for_update(char *current_version, char *check_url, cha
 		return;
 	version_is_checking = true;
 
-	version_check_t *info = m_malloc(sizeof( version_check_t ));
+	version_check_s *info = m_malloc(sizeof( version_check_s ));
 	info->current    = strdup(current_version);
 	info->check_url  = strdup(check_url);
 	info->update_url = download_url ? strdup(download_url) : NULL;
@@ -199,7 +199,7 @@ static void *version_check(void *n)
 	struct timespec vc = { 1, 0 };
 	nanosleep(&vc, NULL);
 
-	version_check_t *info = n;
+	version_check_s *info = n;
 	curl_global_init(CURL_GLOBAL_ALL);
 	CURL *ccheck = curl_easy_init();
 	curl_easy_setopt(ccheck, CURLOPT_URL, info->check_url);

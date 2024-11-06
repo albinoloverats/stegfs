@@ -96,7 +96,7 @@ typedef struct
 	config_arg_e type;
 	config_arg_u value;
 }
-config_arg_t;
+config_arg_s;
 
 /*!
  * \brief  A named command line parameter.
@@ -109,13 +109,13 @@ typedef struct
 	char *long_option;           /*!< The command line long option */
 	char *option_type;           /*!< What the expected parameter should be */
 	char *description;           /*!< A description of the argument */
-	config_arg_t response;       /*!< The expected repsonse type and value */
+	config_arg_s response;       /*!< The expected repsonse type and value */
 	bool required:1;             /*!< Whether this option is required */
 	bool advanced:1;             /*!< Whether this option is considered advanced */
 	bool hidden:1;               /*!< Whether this option should be hidden */
 	bool seen:1;                 /*!< Whether the argument was detected */
 }
-config_named_t;
+config_named_s;
 
 /*!
  * \brief  An unnamed command line parameter.
@@ -126,11 +126,11 @@ config_named_t;
 typedef struct
 {
 	char *description;           /*!< A description of the argument */
-	config_arg_t response;       /*!< The expected repsonse type and value */
+	config_arg_s response;       /*!< The expected repsonse type and value */
 	bool required:1;             /*!< Whether this option is required */
 	bool seen:1;                 /*!< Whether this argument was detected */
 }
-config_unnamed_t;
+config_unnamed_s;
 
 typedef struct
 {
@@ -139,10 +139,10 @@ typedef struct
 	char *url;
 	char *config;
 }
-config_about_t;
+config_about_s;
 
 
-extern void config_init(config_about_t about);
+extern void config_init(config_about_s about);
 
 extern void config_show_usage(LIST args, LIST extra);
 
@@ -183,23 +183,23 @@ extern void update_config(const char * const restrict o, const char * const rest
 
 
 /*!
- * \brief         Compare config_named_t's
- * \param[in]  a  First config_named_t
- * \param[in]  b  Second config_named_t
+ * \brief         Compare config_named_s's
+ * \param[in]  a  First config_named_s
+ * \param[in]  b  Second config_named_s
  * \return        The difference between the two
  *
- * Compare two config_named_t using the short_option. Used to ensure that
+ * Compare two config_named_s using the short_option. Used to ensure that
  * only one of each argument is in the LIST.
  */
 extern int config_named_compare(const void *a, const void *b);
 
 /*!
- * \brief         Compare config_unnamed_t's
- * \param[in]  a  First config_unnamed_t
- * \param[in]  b  Second config_unnamed_t
+ * \brief         Compare config_unnamed_s's
+ * \param[in]  a  First config_unnamed_s
+ * \param[in]  b  Second config_unnamed_s
  * \return        The difference between the two
  *
- * Compare two config_unnamed_t using the description.
+ * Compare two config_unnamed_s using the description.
  */
 extern int config_unnamed_compare(const void *a, const void *b);
 

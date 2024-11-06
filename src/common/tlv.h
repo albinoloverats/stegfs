@@ -50,7 +50,7 @@ typedef struct
 	uint16_t length; /*!< The length of the value */
 	void    *value;  /*!< The actual data */
 }
-tlv_t;
+tlv_s;
 
 /*!
  * \brief         Create a new TLV array
@@ -83,7 +83,7 @@ extern void tlv_deinit(TLV h);
  * yourself. Duplicate tags are ignored. Will return true if the item
  * was added, false if it was a duplicate and ignored.
  */
-extern bool tlv_append(TLV h, tlv_t t) __attribute__((nonnull(1)));
+extern bool tlv_append(TLV h, tlv_s t) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Remove a TLV triple from the array
@@ -92,7 +92,7 @@ extern bool tlv_append(TLV h, tlv_t t) __attribute__((nonnull(1)));
  *
  * Remove the given TLV triple from the TLV array.
  */
-extern const tlv_t *tlv_remove(TLV h, tlv_t t) __attribute__((nonnull(1)));
+extern const tlv_s *tlv_remove(TLV h, tlv_s t) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Remove a TLV triple from the array
@@ -101,7 +101,7 @@ extern const tlv_t *tlv_remove(TLV h, tlv_t t) __attribute__((nonnull(1)));
  *
  * Remove the given tag from the TLV array.
  */
-extern const tlv_t * tlv_remove_tag(TLV h, uint8_t t) __attribute__((nonnull(1)));
+extern const tlv_s * tlv_remove_tag(TLV h, uint8_t t) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Get TLV structure for tag
@@ -112,7 +112,7 @@ extern const tlv_t * tlv_remove_tag(TLV h, uint8_t t) __attribute__((nonnull(1))
  * Return the TLV structure for the given tag value. NB Do not free the
  * returned TLV pointer: bad things will happen.
  */
-extern const tlv_t *tlv_get(TLV h, uint8_t t) __attribute__((nonnull(1)));
+extern const tlv_s *tlv_get(TLV h, uint8_t t) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Check whether a TLV array has a particular tag
@@ -208,7 +208,7 @@ extern ITER tlv_iterator(TLV h) __attribute__((nonnull(1)));
  *
  * Allow iterating through the TLV, this returns the next item.
  */
-extern const tlv_t *tlv_get_next(ITER h) __attribute__((nonnull(1)));
+extern const tlv_s *tlv_get_next(ITER h) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Indicates if there is another item in the TLV
