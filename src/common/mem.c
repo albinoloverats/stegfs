@@ -1,5 +1,5 @@
 /*
- * Common code for memory handling
+ * Common code for memory handling (in a do-or-die kind of way).
  * Copyright © 2024-2024, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *
@@ -54,7 +54,7 @@ extern void *mem_rod(const char *file, int line, const char *func, void *ptr, si
 	return m;
 }
 
-extern void *mem_sod(const char *file, int line, const char *func, const char *str)
+extern char *mem_sod(const char *file, int line, const char *func, const char *str)
 {
 	size_t len = strlen(str);
 	char *new = strdup(str);
@@ -63,7 +63,7 @@ extern void *mem_sod(const char *file, int line, const char *func, const char *s
 	return new;
 }
 
-extern void *mem_nod(const char *file, int line, const char *func, const char *str, size_t len)
+extern char *mem_nod(const char *file, int line, const char *func, const char *str, size_t len)
 {
 	size_t olen = strlen(str);
 	char *new = strndup(str, len);
@@ -88,6 +88,25 @@ extern int mem_aod(const char *file, int line, const char *func, char **ptr, con
 	if (r < 0)
 		die(_("Out of memory @ %s:%d:%s [%zu]"), file, line, func, l);
 	return r;
+}
+
+extern char *mem_fod(const char *file, int line, const char *func, const char *template, ...)
+{
+	int r = 0;
+	size_t l = strlen(template);
+	va_list ap;
+	va_start(ap, template);
+	char *ptr = NULL;
+#ifndef _WIN32
+	r = vasprintf(&ptr, template, ap);
+#else
+	ptr = m_calloc(l, 8);
+	r = vsnprintf(*ptr, (l * 8) - 1, template, ap);
+#endif
+	va_end(ap);
+	if (r < 0)
+		die(_("Out of memory @ %s:%d:%s [%zu]"), file, line, func, l);
+	return ptr;
 }
 
 #ifdef USE_GCRYPT

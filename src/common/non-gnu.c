@@ -1,5 +1,5 @@
 /*
- * Common code which is typically missing on MS Windows
+ * Common code which is typically missing on MS Windows.
  * Copyright © 2005-2024, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *

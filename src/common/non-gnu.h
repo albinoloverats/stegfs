@@ -1,5 +1,5 @@
 /*
- * Common code which is typically missing on Apple OS X
+ * Common code which is typically missing on Apple OS X.
  * Copyright © 2005-2024, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *

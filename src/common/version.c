@@ -100,15 +100,14 @@ version_check_t;
 extern void version_print(char *name, char *version, char *url)
 {
 	int indent = strlen(name) + 8;
-	char *av = NULL;
-	m_asprintf(&av, _("%s version"), name);
+	char *av = m_strdupf(_("%s version"), name);
 	char *runtime = NULL;
 #ifndef _WIN32
 	struct utsname un;
 	uname(&un);
-	m_asprintf(&runtime, "%s %s %s %s", un.sysname, un.release, un.version, un.machine);
+	runtime = m_strdupf("%s %s %s %s", un.sysname, un.release, un.version, un.machine);
 #else
-	m_asprintf(&runtime, "%s", windows_version());
+	runtime = m_strdupf("%s", windows_version());
 #endif
 	version_format(indent, av,              version);
 	version_format(indent, _("built on"),   __DATE__ " " __TIME__);
@@ -119,8 +118,7 @@ extern void version_print(char *name, char *version, char *url)
 	version_format(indent, _("cppflags"),   ALL_CPPFLAGS);
 	version_format(indent, _("runtime"),    runtime);
 #ifdef USE_GCRYPT
-	char *gcv = NULL;
-	m_asprintf(&gcv, "%s (compiled) %s (runtime) %s (required)", GCRYPT_VERSION, gcry_check_version(NULL), NEED_LIBGCRYPT_VERSION);
+	char *gcv = m_strdupf("%s (compiled) %s (runtime) %s (required)", GCRYPT_VERSION, gcry_check_version(NULL), NEED_LIBGCRYPT_VERSION);
 	version_format(indent, _("libgcrypt"), gcv);
 	free(gcv);
 #endif
@@ -145,9 +143,9 @@ extern char *version_build_info(void)
 #ifndef _WIN32
 	struct utsname un;
 	uname(&un);
-	m_asprintf(&runtime, "%s %s %s %s", un.sysname, un.release, un.version, un.machine);
+	runtime = m_strdupf("%s %s %s %s", un.sysname, un.release, un.version, un.machine);
 #else
-	m_asprintf(&runtime, "%s", windows_version());
+	runtime = m_strdupf("%s", windows_version());
 #endif
 
 #define AA_GW 80
@@ -162,9 +160,7 @@ extern char *version_build_info(void)
 	version_format_line(&info, AA_GW, AA_GI, _("runtime"),    runtime);
 
 #ifdef USE_GCRYPT
-	char *gcv = NULL;
-	m_asprintf(&gcv, "%s (compiled) %s (runtime)", GCRYPT_VERSION, gcry_check_version(NULL));
-	//m_asprintf(&info, "%s%s: %s\n", info, _("libgcrypt"), gcv);
+	char *gcv = m_strdupf("%s (compiled) %s (runtime)", GCRYPT_VERSION, gcry_check_version(NULL));
 	version_format_line(&info, AA_GW, AA_GI, _("libgcrypt"), gcv);
 	free(gcv);
 #endif
@@ -298,8 +294,7 @@ static void version_install_latest(char *u)
 	unlink(u2);
 	free(u2);
 #elif defined __APPLE__
-	char *dmg = NULL;
-	m_asprintf(&dmg, "%s.dmg", u);
+	char *dmg = m_strdupf("%s.dmg", u);
 	rename(u, dmg);
 	execl("/usr/bin/open", dmg, NULL);
 	unlink(dmg);
@@ -386,8 +381,7 @@ static void version_format(int indent, char *id, char *value)
 
 static void version_format_line(char **buffer, int max_width, int indent, char *id, char *value)
 {
-	char *new = NULL;
-	m_asprintf(&new, "%s%*s: ", *buffer ? *buffer : "", indent, id);
+	char *new = m_strdupf("%s%*s: ", *buffer ? *buffer : "", indent, id);
 	free(*buffer);
 	*buffer = new;
 	for (; isspace(*value); value++)
@@ -395,8 +389,7 @@ static void version_format_line(char **buffer, int max_width, int indent, char *
 	int l = strlen(value);
 	if (l < max_width)
 	{
-		new = NULL;
-		m_asprintf(&new, "%s%s", *buffer, value);
+		new = m_strdupf("%s%s", *buffer, value);
 		free(*buffer);
 		*buffer = new;
 	}
@@ -414,21 +407,18 @@ static void version_format_line(char **buffer, int max_width, int indent, char *
 						break;
 			if (s)
 			{
-				new = NULL;
-				m_asprintf(&new, "%s\n%*s  ", *buffer, indent, " ");
+				new = m_strdupf("%s\n%*s  ", *buffer, indent, " ");
 				free(*buffer);
 				*buffer = new;
 			}
-			new = NULL;
-			m_asprintf(&new, "%s%.*s", *buffer, e - s, value + s);
+			new = m_strdupf("%s%.*s", *buffer, e - s, value + s);
 			free(*buffer);
 			*buffer = new;
 			s = e + 1;
 		}
 		while (s < l);
 	}
-	new = NULL;
-	m_asprintf(&new, "%s\n", *buffer);
+	new = m_strdupf("%s\n", *buffer);
 	free(*buffer);
 	*buffer = new;
 	return;

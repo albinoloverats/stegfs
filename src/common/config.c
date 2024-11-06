@@ -1,4 +1,5 @@
 /*
+ * Common code for hanlding command line arguments and config files.
  * Copyright © 2005-2024, albinoloverats ~ Software Development
  * email: encrypt@albinoloverats.net
  *
@@ -183,7 +184,7 @@ extern int config_parse_aux(int argc, char **argv, LIST args, LIST extra, LIST n
 		if (about.config[0] == '/' || (about.config[0] == '.' && about.config[1] == '/'))
 			rc = m_strdup(about.config);
 		else
-			m_asprintf(&rc, "%s/%s", getenv("HOME") ? : ".", about.config);
+			rc = m_strdupf("%s/%s", getenv("HOME") ? : ".", about.config);
 	#else
 		rc = m_calloc(MAX_PATH, sizeof( char ));
 		SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, rc);
@@ -731,7 +732,7 @@ static void print_option(int indent, char sopt, char *lopt, char *type, char *de
 #endif
 	char *x_desc = NULL;
 	if (def)
-		m_asprintf(&x_desc, "%s" ANSI_COLOUR_WHITE " (default:" ANSI_COLOUR_GREEN " %s" ANSI_COLOUR_WHITE ")", desc, def);
+		x_desc = m_strdupf("%s" ANSI_COLOUR_WHITE " (default:" ANSI_COLOUR_GREEN " %s" ANSI_COLOUR_WHITE ")", desc, def);
 	else
 		x_desc = desc;
 	l = strlen(x_desc);
@@ -849,7 +850,7 @@ static char *parse_default(config_arg_e type, config_arg_u value)
 			(void)0; // for Slackware's older GCC
 			__attribute__((fallthrough)); /* allow fall-through */
 		case CONFIG_ARG_REQ_INTEGER:
-			m_asprintf(&d, "%'" PRIi64, (int64_t)value.integer);
+			d = m_strdupf("%'" PRIi64, (int64_t)value.integer);
 			break;
 		case CONFIG_ARG_OPT_DECIMAL:
 			(void)0; // for Slackware's older GCC
@@ -858,9 +859,9 @@ static char *parse_default(config_arg_e type, config_arg_u value)
 			//{
 			//	char buf[0xFF] = { 0x00 };
 			//	strfromf128(buf, sizeof buf, "%'.9f", (__float128)value.decimal);
-			//	m_asprintf(&d, "%s", buf);
+			//	d = m_strdupf("%s", buf);
 			//}
-			m_asprintf(&d, "%'Lf", (long double)value.decimal);
+			d = m_strdupf("%'Lf", (long double)value.decimal);
 			break;
 		case CONFIG_ARG_OPT_STRING:
 			(void)0; // for Slackware's older GCC
@@ -980,7 +981,7 @@ extern void update_config(const char * const restrict o, const char * const rest
 	}
 	char *rc = NULL;
 #ifndef _WIN32
-	m_asprintf(&rc, "%s/%s", getenv("HOME") ? : ".", about.config);
+	rc = m_strdupf("%s/%s", getenv("HOME") ? : ".", about.config);
 #else
 	rc = m_calloc(MAX_PATH, sizeof( char ));
 	SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, rc);
@@ -1008,7 +1009,7 @@ extern void update_config(const char * const restrict o, const char * const rest
 				if (!i && (!strncmp(o, line, strlen(o)) && isspace((unsigned char)line[strlen(o)])))
 				{
 					free(line);
-					m_asprintf(&line, "%s %s\n", o, v);
+					line = m_strdupf("%s %s\n", o, v);
 					found = true;
 				}
 				cli_fprintf(t, "%s", line);

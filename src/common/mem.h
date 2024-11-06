@@ -1,5 +1,5 @@
 /*
- * Common code for memory handling
+ * Common code for memory handling (in a do-or-die kind of way).
  * Copyright © 2024-2024, albinoloverats ~ Software Development
  * email: encrypt@albinoloverats.net
  *
@@ -26,18 +26,24 @@
 #define m_malloc(S)            mem_mod(__FILE__, __LINE__, __func__, S)
 #define m_calloc(C, S)         mem_cod(__FILE__, __LINE__, __func__, C, S)
 #define m_realloc(P, S)        mem_rod(__FILE__, __LINE__, __func__, P, S)
+
 #define m_strdup(S)            mem_sod(__FILE__, __LINE__, __func__, S)
 #define m_strndup(S, L)        mem_nod(__FILE__, __LINE__, __func__, S, L)
+
 #define m_asprintf(P, F, ...)  mem_aod(__FILE__, __LINE__, __func__, P, F, __VA_ARGS__)
+
+#define m_strdupf(F, ...)      mem_fod(__FILE__, __LINE__, __func__, F, __VA_ARGS__)
 
 extern void *mem_mod(const char *, int, const char *, size_t);
 extern void *mem_cod(const char *, int, const char *, size_t, size_t);
 extern void *mem_rod(const char *, int, const char *, void *, size_t);
 
-extern void *mem_sod(const char *, int, const char *, const char *);
-extern void *mem_nod(const char *, int, const char *, const char *, size_t);
+extern char *mem_sod(const char *, int, const char *, const char *);
+extern char *mem_nod(const char *, int, const char *, const char *, size_t);
 
-extern int mem_aod(const char *, int, const char *, char **, const char *, ...);
+extern int mem_aod(const char *, int, const char *, char **, const char *, ...) __attribute__((nonnull(5), format(printf, 5, 6)));
+
+extern char *mem_fod(const char *, int, const char *, const char *, ...) __attribute__((nonnull(4), format(printf, 4, 5)));
 
 #ifdef USE_GCRYPT
 

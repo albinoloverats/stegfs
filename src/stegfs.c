@@ -706,7 +706,6 @@ extern bool stegfs_file_write(stegfs_file_t *file)
 
 extern void stegfs_file_delete(stegfs_file_t *file)
 {
-	char *p = NULL;
 	if (!stegfs_file_stat(file))
 		goto rfc;
 	stegfs_block_t block;
@@ -719,7 +718,7 @@ extern void stegfs_file_delete(stegfs_file_t *file)
 			block_delete(file->blocks[i][j]);
 	}
 rfc:
-	m_asprintf(&p, "%s/%s", path_equals(file->path, DIR_SEPARATOR) ? "" : file->path, file->name);
+	char *p = m_strdupf("%s/%s", path_equals(file->path, DIR_SEPARATOR) ? "" : file->path, file->name);
 	stegfs_cache_remove(p);
 	free(p);
 	return;
@@ -1020,7 +1019,7 @@ extern void stegfs_cache_add(const char * const restrict path, stegfs_file_t *fi
 	if (path)
 		p = m_strdup(path);
 	else
-		m_asprintf(&p, "%s/%s", path_equals(file->path, DIR_SEPARATOR) ? "" : file->path, file->name);
+		p = m_strdupf("%s/%s", path_equals(file->path, DIR_SEPARATOR) ? "" : file->path, file->name);
 	if ((ptr = stegfs_cache_exists(p, NULL)))
 		goto c2a3; /* already in cache */
 
@@ -1205,8 +1204,7 @@ extern void stegfs_cache_remove(const char * const restrict path)
 		for (uint64_t i = 0; i < ptr->ents; i++)
 			if (ptr->child[i])
 			{
-				char *c = NULL;
-				m_asprintf(&c, "%s/%s", path, ptr->child[i]->name);
+				char *c = m_strdupf("%s/%s", path, ptr->child[i]->name);
 				stegfs_cache_remove(c);
 				free(c);
 			}

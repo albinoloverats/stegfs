@@ -1,5 +1,5 @@
 /*
- * Common code for working with libgcrypt
+ * Common code for working with libgcrypt.
  * Copyright © 2005-2024, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *

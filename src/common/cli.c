@@ -1,5 +1,5 @@
 /*
- * Common code for providing a cmomand line progress bar
+ * Common code for providing a command line progress bar.
  * Copyright © 2005-2024, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *

@@ -37,37 +37,21 @@
 
 static void copy(const char *from_prefix, const char *from, const char *to_prefix, const char *to)
 {
-	struct dirent **eps = NULL;
-	int n = 0;
-	if ((n = scandir(from, &eps, NULL, NULL)))
+	DIR_SCAN_TOP;
+
+	struct stat s;
+	lstat(file, &s);
+	if (S_ISDIR(s.st_mode))
 	{
-		for (int i = 0; i < n; ++i)
-		{
-			if (!strcmp(".", eps[i]->d_name) || !strcmp("..", eps[i]->d_name))
-				continue;
-
-			char *dir = NULL;
-			m_asprintf(&dir, "%s/%s", from, eps[i]->d_name);
-
-			struct stat s;
-			lstat(dir, &s);
-			if (S_ISDIR(s.st_mode))
-			{
-				printf("%s/%s --> %s/%s\n", from_prefix, dir, to, dir);
-				char *new = NULL;
-				m_asprintf(&new, "%s/%s/%s", to_prefix, to, dir);
-				dir_mk_recursive(new, S_IRUSR | S_IWUSR | S_IXUSR);
-				copy(from_prefix, dir, to_prefix, to);
-			}
-			free(dir);
-		}
-		/*
-		 * no more files in this directory
-		 */
+		printf("%s/%s --> %s/%s\n", from_prefix, file, to, file);
+		char *new = NULL;
+		m_asprintf(&new, "%s/%s/%s", to_prefix, to, file);
+		dir_mk_recursive(new, S_IRUSR | S_IWUSR | S_IXUSR);
+		copy(from_prefix, file, to_prefix, to);
 	}
-	for (int i = 0; i < n; ++i)
-		free(eps[i]);
-	free(eps);
+
+	DIR_SCAN_END;
+
 	return;
 }
 

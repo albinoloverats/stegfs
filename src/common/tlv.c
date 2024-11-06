@@ -1,5 +1,5 @@
 /*
- * Common code for dealing with tag, length, value arrays
+ * Common code for dealing with tag, length, value arrays.
  * Copyright © 2009-2024, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *

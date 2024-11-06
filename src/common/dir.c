@@ -1,5 +1,5 @@
 /*
- * stegfs ~ a steganographic file system for unix-like systems
+ * Common code for working with directory trees.
  * Copyright © 2007-2024, albinoloverats ~ Software Development
  * email: stegfs@albinoloverats.net
  *
@@ -121,63 +121,54 @@ extern void dir_mk_recursive(const char *path, mode_t mode)
 
 static void get_tree(LIST l, const char *path, dir_type_e type)
 {
-	struct dirent **eps = NULL;
-	int n = 0;
-	if ((n = scandir(path, &eps, NULL, alphasort)))
-		for (int i = 0; i < n; i++)
-		{
-			if (!strcmp(".", eps[i]->d_name) || !strcmp("..", eps[i]->d_name))
-				continue;
-			char *full_path = NULL;
-			m_asprintf(&full_path, "%s/%s", path, eps[i]->d_name);
-			bool add = false;
-			bool dir = false;
-			/*
-			 * eps[i]->d_type doesn't always give a proper
-			 * answer, so we've gotta stat
-			 */
-			struct stat s;
-			lstat(full_path, &s);
-			switch (s.st_mode & S_IFMT)
-			{
-				case S_IFDIR:
-					add = type & DIR_FOLDER;
-					dir = true;
-					break;
-				case S_IFCHR:
-					add = type & DIR_CHAR;
-					break;
-				case S_IFBLK:
-					add = type & DIR_BLOCK;
-					break;
-				case S_IFREG:
-					add = type & DIR_FILE;
-					break;
+	DIR_SCAN_TOP;
+
+	bool add = false;
+	bool dir = false;
+	/*
+	 * eps[i]->d_type doesn't always give a proper
+	 * answer, so we've gotta stat
+	 */
+	struct stat s;
+	lstat(file, &s);
+	switch (s.st_mode & S_IFMT)
+	{
+		case S_IFDIR:
+			add = type & DIR_FOLDER;
+			dir = true;
+			break;
+		case S_IFCHR:
+			add = type & DIR_CHAR;
+			break;
+		case S_IFBLK:
+			add = type & DIR_BLOCK;
+			break;
+		case S_IFREG:
+			add = type & DIR_FILE;
+			break;
 #ifndef _WIN32
-				case S_IFLNK:
-					add = type & DIR_LINK;
-					break;
-				case S_IFSOCK:
-					add = type & DIR_SOCKET;
-					break;
+		case S_IFLNK:
+			add = type & DIR_LINK;
+			break;
+		case S_IFSOCK:
+			add = type & DIR_SOCKET;
+			break;
 #endif
-				case S_IFIFO:
-					add = type & DIR_PIPE;
-					break;
-			}
-			if (add)
-			{
-				char *f = m_strdup(full_path);
-				if (!list_add(l, f))
-					free(f);
-			}
-			if (dir)
-				get_tree(l, full_path, type);
-			free(full_path);
-		}
-	for (int i = 0; i < n; i++)
-		free(eps[i]);
-	free(eps);
+		case S_IFIFO:
+			add = type & DIR_PIPE;
+			break;
+	}
+	if (add)
+	{
+		char *f = m_strdup(file);
+		if (!list_add(l, f))
+			free(f);
+	}
+	if (dir)
+		get_tree(l, file, type);
+
+	DIR_SCAN_END;
+
 	return;
 }
 
