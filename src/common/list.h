@@ -122,7 +122,7 @@ extern LIST list_init(int c(const void *, const void *), bool d, bool s) __attri
  * functions will not result in undefined behaviour. If called with a
  * NULL function f then data items will not be freed.
  */
-extern void list_deinit_aux(LIST h, void f(void *)) __attribute__((nonnull(1)));
+extern void list_deinit_aux(LIST h, void f(void *));
 
 /*!
  * \brief         Copy an existing list

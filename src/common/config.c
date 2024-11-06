@@ -1,5 +1,4 @@
 /*
- * encrypt ~ a simple, multi-OS encryption utility
  * Copyright © 2005-2024, albinoloverats ~ Software Development
  * email: encrypt@albinoloverats.net
  *
@@ -42,6 +41,7 @@
 #include "common.h"
 #include "non-gnu.h"
 #include "error.h"
+#include "mem.h"
 #include "ccrypt.h"
 #include "version.h"
 #include "cli.h"
@@ -149,20 +149,20 @@ extern int config_parse_aux(int argc, char **argv, LIST args, LIST extra, LIST n
 			char *o = strchr(x, '=');
 			if (o)
 			{
-				list_append(largs, strndup(x, o - x));
-				list_append(largs, strdup(o + 1));
+				list_append(largs, m_strndup(x, o - x));
+				list_append(largs, m_strdup(o + 1));
 			}
 			else
-				list_append(largs, strdup(argv[i]));
+				list_append(largs, m_strdup(argv[i]));
 		}
 		else if (x[0] == '-' && strlen(x) > 2)
 		{
 			// short option, check for anything after '-x...'
-			list_append(largs, strndup(x, 2));
-			list_append(largs, strdup(x + 2));
+			list_append(largs, m_strndup(x, 2));
+			list_append(largs, m_strdup(x + 2));
 		}
 		else
-			list_append(largs, strdup(argv[i]));
+			list_append(largs, m_strdup(argv[i]));
 	}
 	/* handle help et al first */
 	if (list_contains(largs, "-h") || list_contains(largs, "--help"))
@@ -181,22 +181,17 @@ extern int config_parse_aux(int argc, char **argv, LIST args, LIST extra, LIST n
 #ifndef __DEBUG__
 	#ifndef _WIN32
 		if (about.config[0] == '/' || (about.config[0] == '.' && about.config[1] == '/'))
-		{
-			if (!(rc = strdup(about.config)))
-				die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(about.config) + 1);
-		}
-		else if (!asprintf(&rc, "%s/%s", getenv("HOME") ? : ".", about.config))
-			die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(getenv("HOME")) + strlen(about.config) + 2);
+			rc = m_strdup(about.config);
+		else
+			m_asprintf(&rc, "%s/%s", getenv("HOME") ? : ".", about.config);
 	#else
-		if (!(rc = calloc(MAX_PATH, sizeof( char ))))
-			die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, MAX_PATH);
+		rc = m_calloc(MAX_PATH, sizeof( char ));
 		SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, rc);
 		strcat(rc, "\\");
 		strcat(rc, about.config);
 	#endif
 #else
-		if (!(rc = strdup(about.config)))
-			die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(about.config) + 1);
+		rc = m_strdup(about.config);
 #endif
 		FILE *f = fopen(rc, "rb");
 		if (f)
@@ -347,9 +342,7 @@ extern int config_parse_aux(int argc, char **argv, LIST args, LIST extra, LIST n
 									if (!arg->response.value.list)
 										arg->response.value.list = list_default();
 									// would this not be a map?
-									pair_string_t *pair = malloc(sizeof( pair_string_t ));
-									if (!pair)
-										die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof( pair_string_t ));
+									pair_string_t *pair = m_malloc(sizeof( pair_string_t ));
 									if (parse_pair_string(arg->long_option, line, pair))
 										if (!list_append(arg->response.value.list, pair))
 											free(pair);
@@ -429,8 +422,7 @@ end_line:
 						arg->seen = true;
 						if (arg->response.value.string)
 							free(arg->response.value.string);
-						if (!(arg->response.value.string = strdup(next)))
-							die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(next) + 1);
+						arg->response.value.string = m_strdup(next);
 						break;
 
 					case CONFIG_ARG_LIST_BOOLEAN:
@@ -489,16 +481,14 @@ end_line:
 							arg->response.value.list = list_default();
 						if (strchr(next, ','))
 						{
-							char *s = strdup(next);
-							if (!s)
-								die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(next) + 1);
-							char *u = strdup(strtok(s, ","));
+							char *s = m_strdup(next);
+							char *u = m_strdup(strtok(s, ","));
 							if (!list_append(arg->response.value.list, u))
 								free(u);
 							char *t = NULL;
 							while ((t = strtok(NULL, ",")))
 							{
-								char *v = strdup(t);
+								char *v = m_strdup(t);
 								if (!list_append(arg->response.value.list, v))
 									free(v);
 							}
@@ -506,7 +496,7 @@ end_line:
 						}
 						else
 						{
-							char *x = strdup(next);
+							char *x = m_strdup(next);
 							if (!list_append(arg->response.value.list, x))
 								free(x);
 						}
@@ -529,7 +519,7 @@ end_line:
 			{
 				if (j >= list_size(extra))
 				{
-					config_unnamed_t *new = calloc(1, sizeof( config_unnamed_t ));
+					config_unnamed_t *new = m_calloc(1, sizeof( config_unnamed_t ));
 					new->response.type = CONFIG_ARG_STRING;
 					list_append(extra, new);
 				}
@@ -546,8 +536,7 @@ end_line:
 						x->seen = parse_decimal(NULL, curr, &x->response.value.decimal);
 						break;
 					case CONFIG_ARG_STRING:
-						if (!(x->response.value.string = strdup(curr)))
-							die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(curr));
+						x->response.value.string = m_strdup(curr);
 						break;
 					default:
 						break;
@@ -729,9 +718,7 @@ static void print_option(int indent, char sopt, char *lopt, char *type, char *de
 	int l = strlen(desc);
 
 #ifdef _WIN32
-	char *tmp = calloc(l + 1, 1);
-	if (!tmp)
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, l + 1);
+	char *tmp = m_calloc(l + 1, 1);
 	for (int i = 0, j = 0; i < l; i++, j++)
 		if (!strncmp(desc + i, "‘", strlen("‘")) || !strncmp(desc + i, "’", strlen("‘")))
 		{
@@ -744,7 +731,7 @@ static void print_option(int indent, char sopt, char *lopt, char *type, char *de
 #endif
 	char *x_desc = NULL;
 	if (def)
-		asprintf(&x_desc, "%s" ANSI_COLOUR_WHITE " (default:" ANSI_COLOUR_GREEN " %s" ANSI_COLOUR_WHITE ")", desc, def);
+		m_asprintf(&x_desc, "%s" ANSI_COLOUR_WHITE " (default:" ANSI_COLOUR_GREEN " %s" ANSI_COLOUR_WHITE ")", desc, def);
 	else
 		x_desc = desc;
 	l = strlen(x_desc);
@@ -856,13 +843,13 @@ static char *parse_default(config_arg_e type, config_arg_u value)
 			(void)0; // for Slackware's older GCC
 			__attribute__((fallthrough)); /* allow fall-through */
 		case CONFIG_ARG_REQ_BOOLEAN:
-			d = strdup(value.boolean ? "true" : "false");
+			d = m_strdup(value.boolean ? "true" : "false");
 			break;
 		case CONFIG_ARG_OPT_INTEGER:
 			(void)0; // for Slackware's older GCC
 			__attribute__((fallthrough)); /* allow fall-through */
 		case CONFIG_ARG_REQ_INTEGER:
-			asprintf(&d, "%'" PRIi64, (int64_t)value.integer);
+			m_asprintf(&d, "%'" PRIi64, (int64_t)value.integer);
 			break;
 		case CONFIG_ARG_OPT_DECIMAL:
 			(void)0; // for Slackware's older GCC
@@ -871,19 +858,19 @@ static char *parse_default(config_arg_e type, config_arg_u value)
 			//{
 			//	char buf[0xFF] = { 0x00 };
 			//	strfromf128(buf, sizeof buf, "%'.9f", (__float128)value.decimal);
-			//	asprintf(&d, "%s", buf);
+			//	m_asprintf(&d, "%s", buf);
 			//}
-			asprintf(&d, "%'Lf", (long double)value.decimal);
+			m_asprintf(&d, "%'Lf", (long double)value.decimal);
 			break;
 		case CONFIG_ARG_OPT_STRING:
 			(void)0; // for Slackware's older GCC
 			__attribute__((fallthrough)); /* allow fall-through */
 		case CONFIG_ARG_REQ_STRING:
-			d = strdup(value.string ? : "(null)");
+			d = m_strdup(value.string ? : "(null)");
 			break;
 		default: // all other defaults to be displayed should be string
 			if (value.string)
-				d = strdup((char *)value.string);
+				d = m_strdup((char *)value.string);
 			break;
 	}
 	return d;
@@ -993,11 +980,9 @@ extern void update_config(const char * const restrict o, const char * const rest
 	}
 	char *rc = NULL;
 #ifndef _WIN32
-	if (!asprintf(&rc, "%s/%s", getenv("HOME") ? : ".", about.config))
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(getenv("HOME")) + strlen(about.config) + 2);
+	m_asprintf(&rc, "%s/%s", getenv("HOME") ? : ".", about.config);
 #else
-	if (!(rc = calloc(MAX_PATH, sizeof( char ))))
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, MAX_PATH);
+	rc = m_calloc(MAX_PATH, sizeof( char ));
 	SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, rc);
 	strcat(rc, "\\");
 	strcat(rc, about.config);
@@ -1023,7 +1008,7 @@ extern void update_config(const char * const restrict o, const char * const rest
 				if (!i && (!strncmp(o, line, strlen(o)) && isspace((unsigned char)line[strlen(o)])))
 				{
 					free(line);
-					asprintf(&line, "%s %s\n", o, v);
+					m_asprintf(&line, "%s %s\n", o, v);
 					found = true;
 				}
 				cli_fprintf(t, "%s", line);
@@ -1186,22 +1171,16 @@ static char *parse_tail(const char *c, const char *l)
 {
 	if (!l)
 		return NULL;
-	char *x = strdup(l + (c ? strlen(c) : 0));
-	if (!x)
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(l) - strlen(c) + 1);
+	char *x = m_strdup(l + (c ? strlen(c) : 0));
 	size_t i = 0;
 	for (i = 0; i < strlen(x) && isspace((unsigned char)x[i]); i++)
 		;
-	char *y = strdup(x + i);
-	if (!y)
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(x) - i + 1);
+	char *y = m_strdup(x + i);
 	free(x);
 	for (i = strlen(y) - 1; i > 0 && isspace((unsigned char)y[i]); i--)
 		;//y[i] = '\0';
-	char *tail = strndup(y, i + 1);
+	char *tail = m_strndup(y, i + 1);
 	free(y);
-	if (!tail)
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, i + 1);
 	return tail;
 }
 
@@ -1249,13 +1228,9 @@ static bool parse_pair_string(const char *c, const char *l, pair_string_t *pair)
 
 static pair_u *parse_pair(const char *c, const char *l)
 {
-	pair_u *pair = calloc(1, sizeof (pair_u));
-	if (!pair)
-		die("Out of memory @ %s:%d:%s [%zu]", __FILE__, __LINE__, __func__, sizeof (pair_u));
+	pair_u *pair = m_calloc(1, sizeof (pair_u));
 	/* get everything after the parameter name */
-	char *x = strdup(l + strlen(c));
-	if (!x)
-		die("Out of memory @ %s:%d:%s [%zu]", __FILE__, __LINE__, __func__, strlen(l) - strlen(c) + 1);
+	char *x = m_strdup(l + strlen(c));
 	size_t i = 0, j = 0;
 	/* skip past all whitespace */
 	for (i = 0; i < strlen(x) && isspace((unsigned char)x[i]); i++)
@@ -1268,8 +1243,7 @@ static pair_u *parse_pair(const char *c, const char *l)
 	else
 		for (; i < strlen(y) && !isspace(y[i]); i++)
 			;
-	if (!(pair->string.s1 = strndup(y + j, i - j)))
-		die("Out of memory @ %s:%d:%s [%zu]", __FILE__, __LINE__, __func__, i - j);
+	pair->string.s1 = m_strndup(y + j, i - j);
 	/* skip past all whitespace */
 	for (; i < strlen(y) && isspace((unsigned char)y[i]); i++)
 		;
@@ -1279,8 +1253,7 @@ static pair_u *parse_pair(const char *c, const char *l)
 		;//y[i] = '\0';
 	if (z[j] == '"')
 		j++;
-	if (!(pair->string.s2 = strndup(z + j, i + (j ? -j : 1))))
-		die("Out of memory @ %s:%d:%s [%zu]", __FILE__, __LINE__, __func__, i + (j ? -j : 1));
+	pair->string.s2 = m_strndup(z + j, i + (j ? -j : 1));
 	/* all done */
 	free(x);
 	return pair;
@@ -1288,9 +1261,7 @@ static pair_u *parse_pair(const char *c, const char *l)
 
 static void parse_list_boolean(const char *text, LIST list)
 {
-	bool *r = malloc(sizeof( bool ));
-	if (!r)
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof( bool ));
+	bool *r = m_malloc(sizeof( bool ));
 	if (parse_boolean(NULL, text, r))
 	{
 		if (!list_append(list, r))
@@ -1303,9 +1274,7 @@ static void parse_list_boolean(const char *text, LIST list)
 
 static void parse_list_integer(const char *text, LIST list)
 {
-	int64_t *r = malloc(sizeof( int64_t ));
-	if (!r)
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof( int64_t ));
+	int64_t *r = m_malloc(sizeof( int64_t ));
 	if (parse_integer(NULL, text, r))
 	{
 		if (!list_append(list, r))
@@ -1318,11 +1287,8 @@ static void parse_list_integer(const char *text, LIST list)
 
 static void parse_list_decimal(const char *text, LIST list)
 {
-	//__float128 *r = malloc(sizeof( __float128 ));
-	long double *r = malloc(sizeof( long double ));
-	if (!r)
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof( long double ));
-	//die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof( __float128 ));
+	//__float128 *r = m_malloc(sizeof( __float128 ));
+	long double *r = m_malloc(sizeof( long double ));
 	if (parse_decimal(NULL, text, r))
 	{
 		if (!list_append(list, r))
@@ -1337,9 +1303,7 @@ static void parse_list(config_arg_e type, const char *text, LIST list)
 {
 	while (*text && isspace(*text))
 		text++;
-	char *s = strdup(text);
-	if (!s)
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(text) + 1);
+	char *s = m_strdup(text);
 	char *t = s;
 	char *u = s;
 	while ((t = strtok(u, ",")))
@@ -1360,7 +1324,7 @@ static void parse_list(config_arg_e type, const char *text, LIST list)
 
 			case CONFIG_ARG_STRING:
 				{
-					char *v = strdup(t);
+					char *v = m_strdup(t);
 					if (!list_append(list, v))
 						free(v);
 				}

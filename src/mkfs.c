@@ -38,6 +38,7 @@
 
 #include "common/common.h"
 #include "common/error.h"
+#include "common/mem.h"
 #include "common/ccrypt.h"
 #include "common/tlv.h"
 #include "common/config.h"
@@ -180,13 +181,13 @@ static gcry_cipher_hd_t crypto_init(enum gcry_cipher_algos c, enum gcry_cipher_m
 	gcry_cipher_open(&cipher_handle, c, m, GCRY_CIPHER_SECURE);
 	/* create the initial key for the encryption algorithm */
 	size_t key_length = gcry_cipher_get_algo_keylen(c);
-	uint8_t *key = gcry_calloc_secure(key_length, sizeof( uint8_t ));
+	uint8_t *key = m_gcry_calloc_secure(key_length, sizeof( uint8_t ));
 	gcry_create_nonce(key, key_length);
 	gcry_cipher_setkey(cipher_handle, key, key_length);
 	gcry_free(key);
 	/* create the iv for the encryption algorithm */
 	size_t iv_length = gcry_cipher_get_algo_blklen(c);
-	uint8_t *iv = gcry_calloc_secure(iv_length, sizeof( uint8_t ));
+	uint8_t *iv = m_gcry_calloc_secure(iv_length, sizeof( uint8_t ));
 	gcry_create_nonce(iv, iv_length);
 	gcry_cipher_setiv(cipher_handle, iv, iv_length);
 	return cipher_handle;
@@ -207,7 +208,7 @@ static void superblock_info(stegfs_block_t *sb, const char *cipher, const char *
 	t.tag = TAG_BLOCKSIZE;
 	uint32_t blocksize = htonl(SIZE_BYTE_BLOCK);
 	t.length = sizeof blocksize;
-	t.value = malloc(sizeof blocksize);
+	t.value = m_malloc(sizeof blocksize);
 	memcpy(t.value, &blocksize, sizeof blocksize);
 	tlv_append(tlv, t);
 	free(t.value);
@@ -215,7 +216,7 @@ static void superblock_info(stegfs_block_t *sb, const char *cipher, const char *
 	t.tag = TAG_HEADER_OFFSET;
 	uint32_t head_offset = htonl(OFFSET_BYTE_HEAD);
 	t.length = sizeof head_offset;
-	t.value = malloc(sizeof head_offset);
+	t.value = m_malloc(sizeof head_offset);
 	memcpy(t.value, &head_offset, sizeof head_offset);
 	tlv_append(tlv, t);
 	free(t.value);
@@ -242,14 +243,14 @@ static void superblock_info(stegfs_block_t *sb, const char *cipher, const char *
 
 	t.tag = TAG_DUPLICATION;
 	t.length = sizeof copies;
-	t.value = malloc(sizeof copies);
+	t.value = m_malloc(sizeof copies);
 	memcpy(t.value, &copies, sizeof copies);
 	tlv_append(tlv, t);
 	free(t.value);
 
 	t.tag = TAG_KDF;
 	t.length = sizeof kdf;
-	t.value = malloc(sizeof kdf);
+	t.value = m_malloc(sizeof kdf);
 	uint64_t k = htonll(kdf);
 	memcpy(t.value, &k, sizeof kdf);
 	tlv_append(tlv, t);

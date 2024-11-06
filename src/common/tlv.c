@@ -29,6 +29,7 @@
 #endif
 
 #include "common.h"
+#include "mem.h"
 #include "non-gnu.h"
 #include "tlv.h"
 #include "list.h"
@@ -49,9 +50,7 @@ static void tlv_free(void *tlv);
 
 extern TLV tlv_init(void)
 {
-	tlv_private_t *t = calloc(sizeof( tlv_private_t ), sizeof( byte_t ));
-	if (!t)
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof( tlv_private_t ));
+	tlv_private_t *t = m_calloc(sizeof( tlv_private_t ), sizeof( byte_t ));
 	t->tags = list_init(tlv_compare, false, false);
 	return t;
 }
@@ -73,13 +72,10 @@ extern bool tlv_append(TLV ptr, tlv_t tlv)
 	tlv_private_t *tlv_ptr = (tlv_private_t *)ptr;
 	if (!tlv_ptr)
 		return false;
-	tlv_t *t  = malloc(sizeof tlv);
-	if (!t)
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof tlv );
+	tlv_t *t  = m_malloc(sizeof tlv);
 	t->tag    = tlv.tag;
 	t->length = tlv.length;
-	if (!(t->value  = malloc(t->length)))
-		die(_("Out of memory @ %s:%d:%s [%du]"), __FILE__, __LINE__, __func__, t->length);
+	t->value  = m_malloc(t->length);
 	memcpy(t->value, tlv.value, t->length);
 	bool r = list_append(tlv_ptr->tags, t);
 	if (!r)
@@ -142,8 +138,7 @@ extern byte_t *tlv_export_aux(TLV ptr, bool nbo)
 	size_t size = tlv_length(tlv_ptr);
 	if (tlv_ptr->export)
 		free(tlv_ptr->export);
-	if (!(tlv_ptr->export = malloc(size)))
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, size);
+	tlv_ptr->export = m_malloc(size);
 	size_t off = 0;
 	ITER iter = list_iterator(tlv_ptr->tags);
 	while (list_has_next(iter))

@@ -58,6 +58,7 @@
 #endif
 
 #include "common.h"
+#include "mem.h"
 #include "version.h"
 #include "error.h"
 #include "cli.h"
@@ -100,14 +101,14 @@ extern void version_print(char *name, char *version, char *url)
 {
 	int indent = strlen(name) + 8;
 	char *av = NULL;
-	asprintf(&av, _("%s version"), name);
+	m_asprintf(&av, _("%s version"), name);
 	char *runtime = NULL;
 #ifndef _WIN32
 	struct utsname un;
 	uname(&un);
-	asprintf(&runtime, "%s %s %s %s", un.sysname, un.release, un.version, un.machine);
+	m_asprintf(&runtime, "%s %s %s %s", un.sysname, un.release, un.version, un.machine);
 #else
-	asprintf(&runtime, "%s", windows_version());
+	m_asprintf(&runtime, "%s", windows_version());
 #endif
 	version_format(indent, av,              version);
 	version_format(indent, _("built on"),   __DATE__ " " __TIME__);
@@ -119,7 +120,7 @@ extern void version_print(char *name, char *version, char *url)
 	version_format(indent, _("runtime"),    runtime);
 #ifdef USE_GCRYPT
 	char *gcv = NULL;
-	asprintf(&gcv, "%s (compiled) %s (runtime) %s (required)", GCRYPT_VERSION, gcry_check_version(NULL), NEED_LIBGCRYPT_VERSION);
+	m_asprintf(&gcv, "%s (compiled) %s (runtime) %s (required)", GCRYPT_VERSION, gcry_check_version(NULL), NEED_LIBGCRYPT_VERSION);
 	version_format(indent, _("libgcrypt"), gcv);
 	free(gcv);
 #endif
@@ -144,9 +145,9 @@ extern char *version_build_info(void)
 #ifndef _WIN32
 	struct utsname un;
 	uname(&un);
-	asprintf(&runtime, "%s %s %s %s", un.sysname, un.release, un.version, un.machine);
+	m_asprintf(&runtime, "%s %s %s %s", un.sysname, un.release, un.version, un.machine);
 #else
-	asprintf(&runtime, "%s", windows_version());
+	m_asprintf(&runtime, "%s", windows_version());
 #endif
 
 #define AA_GW 80
@@ -162,8 +163,8 @@ extern char *version_build_info(void)
 
 #ifdef USE_GCRYPT
 	char *gcv = NULL;
-	asprintf(&gcv, "%s (compiled) %s (runtime)", GCRYPT_VERSION, gcry_check_version(NULL));
-	//asprintf(&info, "%s%s: %s\n", info, _("libgcrypt"), gcv);
+	m_asprintf(&gcv, "%s (compiled) %s (runtime)", GCRYPT_VERSION, gcry_check_version(NULL));
+	//m_asprintf(&info, "%s%s: %s\n", info, _("libgcrypt"), gcv);
 	version_format_line(&info, AA_GW, AA_GI, _("libgcrypt"), gcv);
 	free(gcv);
 #endif
@@ -179,9 +180,7 @@ extern void version_check_for_update(char *current_version, char *check_url, cha
 		return;
 	version_is_checking = true;
 
-	version_check_t *info = malloc(sizeof( version_check_t ));
-	if (!info)
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof( version_check_t ));
+	version_check_t *info = m_malloc(sizeof( version_check_t ));
 	info->current    = strdup(current_version);
 	info->check_url  = strdup(check_url);
 	info->update_url = download_url ? strdup(download_url) : NULL;
@@ -255,13 +254,13 @@ static void version_download_latest(char *update_url)
 #endif
 	curl_easy_setopt(cupdate, CURLOPT_NOPROGRESS, 1L);
 #ifndef _WIN32
-	asprintf(&update, "%s/update-%s-XXXXXX", P_tmpdir ,version_available);
+	m_asprintf(&update, "%s/update-%s-XXXXXX", P_tmpdir ,version_available);
 	int64_t fd = mkstemp(update);
 	fchmod(fd, S_IRUSR | S_IWUSR | S_IXUSR);
 #else
 	char p[MAX_PATH] = { 0x0 };
 	GetTempPath(sizeof p, p);
-	asprintf(&update, "%supdate-%s.exe", p, version_available);
+	m_asprintf(&update, "%supdate-%s.exe", p, version_available);
 	int64_t fd = open(update, O_CREAT | O_WRONLY | O_BINARY);
 #endif
 	if (fd > 0)
@@ -284,9 +283,7 @@ static void version_install_latest(char *u)
 	if (!version_new_available)
 		return;
 #if !defined __APPLE__ && !defined _WIN32
-	char *u2 = strdup(u);
-	if (!u2)
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(u) + 1);
+	char *u2 = m_strdup(u);
 
 	pid_t pid = fork();
 	if (pid == 0)
@@ -302,7 +299,7 @@ static void version_install_latest(char *u)
 	free(u2);
 #elif defined __APPLE__
 	char *dmg = NULL;
-	asprintf(&dmg, "%s.dmg", u);
+	m_asprintf(&dmg, "%s.dmg", u);
 	rename(u, dmg);
 	execl("/usr/bin/open", dmg, NULL);
 	unlink(dmg);
@@ -318,9 +315,7 @@ static void version_install_latest(char *u)
 
 static size_t version_verify(void *p, size_t s, size_t n, void *v)
 {
-	char *b = calloc(s + 1, n);
-	if (!b)
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, (s + 1) * n);
+	char *b = m_calloc(s + 1, n);
 	memcpy(b, p, s * n);
 	char *l = strrchr(b, '\n');
 	if (l)
@@ -391,12 +386,20 @@ static void version_format(int indent, char *id, char *value)
 
 static void version_format_line(char **buffer, int max_width, int indent, char *id, char *value)
 {
-	asprintf(buffer, "%s%*s: ", *buffer ? *buffer : "", indent, id);
+	char *new = NULL;
+	m_asprintf(&new, "%s%*s: ", *buffer ? *buffer : "", indent, id);
+	free(*buffer);
+	*buffer = new;
 	for (; isspace(*value); value++)
 		;
 	int l = strlen(value);
 	if (l < max_width)
-		asprintf(buffer, "%s%s", *buffer, value);
+	{
+		new = NULL;
+		m_asprintf(&new, "%s%s", *buffer, value);
+		free(*buffer);
+		*buffer = new;
+	}
 	else
 	{
 		int s = 0;
@@ -410,12 +413,23 @@ static void version_format_line(char **buffer, int max_width, int indent, char *
 					if (isspace(value[e]))
 						break;
 			if (s)
-				asprintf(buffer, "%s\n%*s  ", *buffer, indent, " ");
-			asprintf(buffer, "%s%.*s", *buffer, e - s, value + s);
+			{
+				new = NULL;
+				m_asprintf(&new, "%s\n%*s  ", *buffer, indent, " ");
+				free(*buffer);
+				*buffer = new;
+			}
+			new = NULL;
+			m_asprintf(&new, "%s%.*s", *buffer, e - s, value + s);
+			free(*buffer);
+			*buffer = new;
 			s = e + 1;
 		}
 		while (s < l);
 	}
-	asprintf(buffer, "%s\n", *buffer);
+	new = NULL;
+	m_asprintf(&new, "%s\n", *buffer);
+	free(*buffer);
+	*buffer = new;
 	return;
 }

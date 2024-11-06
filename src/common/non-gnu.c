@@ -313,6 +313,8 @@ extern int strverscmp(const char *s1, const char *s2)
 
 #include <dirent.h>
 
+#include "mem.h"
+
 char *program_invocation_short_name = NULL;
 
 extern ssize_t getline(char **lineptr, size_t *n, FILE *stream)
@@ -320,9 +322,7 @@ extern ssize_t getline(char **lineptr, size_t *n, FILE *stream)
 	bool e = false;
 	ssize_t r = 0;
 	int32_t step = 0xFF;
-	char *buffer = malloc(step);
-	if (!buffer)
-		die(_("out of memory @ %s:%d:%s [%d]"), __FILE__, __LINE__, __func__, step);
+	char *buffer = m_malloc(step);
 	for (r = 0; ; r++)
 	{
 		int c = fgetc(stream);
@@ -337,8 +337,7 @@ extern ssize_t getline(char **lineptr, size_t *n, FILE *stream)
 		if (r >= step - 0x10)
 		{
 			step += 0xFF;
-			if (!(buffer = realloc(buffer, step)))
-				die(_("out of memory @ %s:%d:%s [%d]"), __FILE__, __LINE__, __func__, step);
+			buffer = m_realloc(buffer, step);
 		}
 	}
 	buffer[r + 1] = 0x00;
@@ -387,7 +386,7 @@ extern char *strndup(const char *s, size_t l)
 extern int scandir(const char *path, struct dirent ***res, int (*sel)(const struct dirent *), int (*cmp)(const struct dirent **, const struct dirent **))
 {
 	DIR *d = opendir(path);
-	struct dirent *de, **names = 0, **tmp;
+	struct dirent *de, **names = 0;
 	size_t cnt = 0, len = 0;
 	int old_errno = errno;
 
@@ -405,13 +404,10 @@ extern int scandir(const char *path, struct dirent ***res, int (*sel)(const stru
 			if (len > SIZE_MAX / sizeof *names)
 				break;
 
-			if (!(tmp = realloc(names, len * sizeof *names)))
-				die(_("out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, len * sizeof *names);
-			names = tmp;
+			names = m_realloc(names, len * sizeof *names);
 		}
 
-		if (!(names[cnt] = malloc(sizeof( struct dirent ))))
-			die(_("out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof *names);
+		names[cnt] = malloc(sizeof( struct dirent ));
 
 		memcpy(names[cnt++], de, sizeof( struct dirent ));
 	}

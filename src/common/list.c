@@ -23,6 +23,7 @@
 #include <stdbool.h>
 
 #include "common.h"
+#include "mem.h"
 #include "non-gnu.h"
 #include "list.h"
 #include "error.h"
@@ -53,9 +54,7 @@ iterator_t;
 
 extern LIST list_init(int comparison_fn_t(const void *, const void *), bool dupes, bool sorted)
 {
-	list_t *list = calloc(sizeof( list_t ), sizeof( byte_t ));
-	if (!list)
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof( list_t ));
+	list_t *list = m_calloc(sizeof( list_t ), sizeof( byte_t ));
 	list->size = 0;
 	list->compare = comparison_fn_t;
 	list->duplicates = dupes;
@@ -119,9 +118,7 @@ extern bool list_append(LIST ptr, const void *d)
 		return list_add(ptr, d);
 	if (!list_ptr->duplicates && list_contains(ptr, d))
 		return false;
-	item_t *new = calloc(sizeof( item_t ), sizeof( byte_t ));
-	if (!new)
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof( item_t ));
+	item_t *new = m_calloc(sizeof( item_t ), sizeof( byte_t ));
 	new->data = d;
 	item_t *end = list_ptr->tail;
 	if (end)
@@ -144,9 +141,7 @@ extern bool list_insert(LIST ptr, size_t i, const void *d)
 		return list_append(ptr, d);
 	if (!list_ptr->duplicates && list_contains(ptr, d))
 		return false;
-	item_t *new = calloc(sizeof( item_t ), sizeof( byte_t ));
-	if (!new)
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof( item_t ));
+	item_t *new = m_calloc(sizeof( item_t ), sizeof( byte_t ));
 	new->data = d;
 	item_t *prev = list_ptr->head;
 	if (i == 0)
@@ -175,9 +170,7 @@ extern bool list_add(LIST ptr, const void *d)
 		return list_append(ptr, d);
 	if (!list_ptr->duplicates && list_contains(ptr, d))
 		return false;
-	item_t *new = calloc(sizeof( item_t ), sizeof( byte_t ));
-	if (!new)
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof( item_t ));
+	item_t *new = m_calloc(sizeof( item_t ), sizeof( byte_t ));
 	new->data = d;
 	if (list_ptr->size == 0)
 	{
@@ -347,9 +340,7 @@ extern ITER list_iterator(LIST ptr)
 	list_t *list_ptr = (list_t *)ptr;
 	if (!list_ptr)
 		return NULL;
-	iterator_t *iter = malloc(sizeof (iterator_t));
-	if (!iter)
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, sizeof( iterator_t ));
+	iterator_t *iter = m_malloc(sizeof (iterator_t));
 	iter->next = list_ptr->head;
 	return iter;
 }

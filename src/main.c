@@ -40,6 +40,7 @@
 
 #include <gcrypt.h>
 
+#include "common/mem.h"
 #include "common/config.h"
 #include "common/ccrypt.h"
 #include "common/dir.h"
@@ -248,7 +249,7 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
 	else if (stbuf->st_mode & S_IFDIR)
 	{
 		size_t hash_length = gcry_md_get_algo_dlen(file_system.hash);
-		uint8_t *hash_buffer = gcry_malloc_secure(hash_length);
+		uint8_t *hash_buffer = m_gcry_malloc_secure(hash_length);
 		gcry_md_hash_buffer(file_system.hash, hash_buffer, path, strlen(path));
 		memcpy(&(stbuf->st_ino), hash_buffer, sizeof stbuf->st_ino);
 		gcry_free(hash_buffer);
@@ -398,7 +399,7 @@ static int fuse_stegfs_write(const char *path, const char *buf, size_t size, off
 			if (!c->file->write)
 				return errno = EBADF, -errno;
 			c->file->size = c->file->size > size + offset ? c->file->size : size + offset;
-			c->file->data = realloc(c->file->data, c->file->size);
+			c->file->data = m_realloc(c->file->data, c->file->size);
 			c->file->time = time(NULL);
 			memcpy(c->file->data + offset, buf, size);
 			return size;
@@ -464,7 +465,7 @@ static int fuse_stegfs_ftruncate(const char *path, off_t offset, struct fuse_fil
 	{
 		if ((c = stegfs_cache_exists(path, NULL)) && c->file)
 		{
-			char *buf = calloc(offset, sizeof(uint8_t));
+			char *buf = m_calloc(offset, sizeof(uint8_t));
 			fuse_stegfs_read(path, buf, offset, 0, info);
 			fuse_stegfs_unlink(path);
 			fuse_stegfs_write(path, buf, offset, 0, info);
@@ -511,7 +512,7 @@ static int fuse_stegfs_fallocate(const char *path, int mode, off_t offset, off_t
 				case FALLOC_FL_ZERO_RANGE:      /* does nothing here, but zeros later */
 					break;
 			}
-			char *buf = calloc(sz, sizeof(uint8_t));
+			char *buf = m_calloc(sz, sizeof(uint8_t));
 			fuse_stegfs_read(path, buf, sz, 0, info);
 			fuse_stegfs_unlink(path);
 			switch (mode)
@@ -649,7 +650,7 @@ static int fuse_stegfs_chown(const char *path, uid_t uid, gid_t gid)
 
 int main(int argc, char **argv)
 {
-	char **fargs = calloc(argc, sizeof( char * ));
+	char **fargs = m_calloc(argc, sizeof( char * ));
 	fargs[0] = argv[0];
 
 	LIST args = list_init(config_named_compare, false, false);
@@ -732,25 +733,25 @@ int main(int argc, char **argv)
 	bool single_thread = debug || ((config_named_t *)list_get(args, 10))->response.value.boolean;
 
 	int fuse_argc = 3;
-	char **fuse_argv = calloc(fuse_argc, sizeof (char *));
+	char **fuse_argv = m_calloc(fuse_argc, sizeof (char *));
 	fuse_argv[0] = argv[0];
 	fuse_argv[1] = mnt;
 	if (debug)
 	{
 		fuse_argc++;
-		fuse_argv = realloc(fuse_argv, fuse_argc * sizeof (char *));
+		fuse_argv = m_realloc(fuse_argv, fuse_argc * sizeof (char *));
 		fuse_argv[fuse_argc - 2] = "-d";
 	}
 	if (foreground)
 	{
 		fuse_argc++;
-		fuse_argv = realloc(fuse_argv, fuse_argc * sizeof (char *));
+		fuse_argv = m_realloc(fuse_argv, fuse_argc * sizeof (char *));
 		fuse_argv[fuse_argc - 2] = "-f";
 	}
 	if (single_thread)
 	{
 		fuse_argc++;
-		fuse_argv = realloc(fuse_argv, fuse_argc * sizeof (char *));
+		fuse_argv = m_realloc(fuse_argv, fuse_argc * sizeof (char *));
 		fuse_argv[fuse_argc - 2] = "-s";
 	}
 	LIST fuse_options = ((config_named_t *)list_get(args, 11))->response.value.list;
@@ -758,7 +759,7 @@ int main(int argc, char **argv)
 	while (list_has_next(iter))
 	{
 		fuse_argc += 2;
-		fuse_argv = realloc(fuse_argv, fuse_argc * sizeof (char *));
+		fuse_argv = m_realloc(fuse_argv, fuse_argc * sizeof (char *));
 		fuse_argv[fuse_argc - 3] = "-o";
 		fuse_argv[fuse_argc - 2] = (char *)list_get_next(iter);
 	}

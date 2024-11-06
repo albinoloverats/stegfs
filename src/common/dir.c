@@ -30,6 +30,7 @@
 #include "non-gnu.h"
 #include "common.h"
 #include "error.h"
+#include "mem.h"
 #include "dir.h"
 #include "list.h"
 
@@ -43,10 +44,7 @@ extern char *dir_get_name_aux(const char * const path, const char ext)
 	const char *pass = strrchr(path, ext);
 	if (!pass)
 		pass = strchr(file, '\0');
-	char *r = strndup(file, pass - file);
-	if (!r)
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, pass - file);
-	return r;
+	return m_strndup(file, pass - file);
 }
 
 extern uint16_t dir_get_deep(const char * const path)
@@ -64,12 +62,7 @@ extern uint16_t dir_get_deep(const char * const path)
 extern char *dir_get_part(const char * const path, const uint16_t index)
 {
 	if (!index)
-	{
-		char *r = strdup(DIR_SEPARATOR);
-		if (!r)
-			die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(DIR_SEPARATOR));
-		return r;
-	}
+		return m_strdup(DIR_SEPARATOR);
 	char *ptr = (char *)path;
 	for (uint16_t i = 0; i < index; i++)
 	{
@@ -78,45 +71,26 @@ extern char *dir_get_part(const char * const path, const uint16_t index)
 			break;
 		ptr++;
 	}
-	char *r = strndup(ptr, strchrnul(ptr, DIR_SEPARATOR_CHAR) - ptr);
-	if (!r)
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strchrnul(ptr, DIR_SEPARATOR_CHAR) - ptr);
-	return r;
+	return m_strndup(ptr, strchrnul(ptr, DIR_SEPARATOR_CHAR) - ptr);
 }
 
 extern char *dir_get_pass(const char * const restrict path)
 {
 	if (!strrchr(path, ':'))
-	{
-		char *r = strdup("");
-		if (!r)
-			die(_("Out of memory @ %s:%d:%s [%u]"), __FILE__, __LINE__, __func__, 2);
-		return r;
-	}
-	char *r = strdup(strrchr(path, ':') + 1);
-	if (!r)
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(strrchr(path, ':') + 1));
-	return r;
+		return m_strdup("");
+	return m_strdup(strrchr(path, ':') + 1);
 }
 
 extern char *dir_get_path(const char * const restrict path)
 {
 	char *s = strrchr(path, DIR_SEPARATOR_CHAR);
 	if (!s)
-	{
-		char *r = strdup("");
-		if (!r)
-			die(_("Out of memory @ %s:%d:%s [%u]"), __FILE__, __LINE__, __func__, 2);
-		return r;
-	}
+		return m_strdup("");
 	char *p = strndup(path, s - path);
 	if (strlen(p))
 		return p;
 	free(p);
-	char *r = strdup(DIR_SEPARATOR);
-	if (!r)
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(DIR_SEPARATOR));
-	return r;
+	return m_strdup(DIR_SEPARATOR);
 }
 
 /*
@@ -127,9 +101,7 @@ extern void dir_mk_recursive(const char *path, mode_t mode)
 #ifdef _WIN32
 	(void)mode;
 #endif
-	char *opath = strdup(path);
-	if (!opath)
-		die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(path));
+	char *opath = m_strdup(path);
 	size_t len = strlen(opath);
 	if (opath[len - 1] == '/')
 		opath[len - 1] = '\0';
@@ -157,8 +129,7 @@ static void get_tree(LIST l, const char *path, dir_type_e type)
 			if (!strcmp(".", eps[i]->d_name) || !strcmp("..", eps[i]->d_name))
 				continue;
 			char *full_path = NULL;
-			if (!asprintf(&full_path, "%s/%s", path, eps[i]->d_name))
-				die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(path) + strlen(eps[i]->d_name) + 2);
+			m_asprintf(&full_path, "%s/%s", path, eps[i]->d_name);
 			bool add = false;
 			bool dir = false;
 			/*
@@ -196,9 +167,7 @@ static void get_tree(LIST l, const char *path, dir_type_e type)
 			}
 			if (add)
 			{
-				char *f = strdup(full_path);
-				if (!f)
-					die(_("Out of memory @ %s:%d:%s [%zu]"), __FILE__, __LINE__, __func__, strlen(full_path));
+				char *f = m_strdup(full_path);
 				if (!list_add(l, f))
 					free(f);
 			}

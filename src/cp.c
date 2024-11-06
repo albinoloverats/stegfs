@@ -29,6 +29,7 @@
 
 #include "common/common.h"
 #include "common/error.h"
+#include "common/mem.h"
 #include "common/dir.h"
 #include "common/config.h"
 
@@ -46,8 +47,7 @@ static void copy(const char *from_prefix, const char *from, const char *to_prefi
 				continue;
 
 			char *dir = NULL;
-			if (!asprintf(&dir, "%s/%s", from, eps[i]->d_name))
-				die(_("Out of memory @ %s:%d:%s"), __FILE__, __LINE__, __func__);
+			m_asprintf(&dir, "%s/%s", from, eps[i]->d_name);
 
 			struct stat s;
 			lstat(dir, &s);
@@ -55,7 +55,7 @@ static void copy(const char *from_prefix, const char *from, const char *to_prefi
 			{
 				printf("%s/%s --> %s/%s\n", from_prefix, dir, to, dir);
 				char *new = NULL;
-				asprintf(&new, "%s/%s/%s", to_prefix, to, dir);
+				m_asprintf(&new, "%s/%s/%s", to_prefix, to, dir);
 				dir_mk_recursive(new, S_IRUSR | S_IWUSR | S_IXUSR);
 				copy(from_prefix, dir, to_prefix, to);
 			}
@@ -74,9 +74,9 @@ static void copy(const char *from_prefix, const char *from, const char *to_prefi
 int main(int argc, char **argv)
 {
 	char **extra = NULL;
-	extra = calloc(2, sizeof (char *));
-	extra[0] = strdup("+source");
-	extra[0] = strdup("+destination");
+	extra = m_calloc(2, sizeof (char *));
+	extra[0] = m_strdup("+source");
+	extra[0] = m_strdup("+destination");
 
 	config_about_t about =
 	{
