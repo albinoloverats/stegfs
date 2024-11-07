@@ -87,7 +87,7 @@ typedef union
 	long double decimal;
 	char *string;
 	pair_u pair;
-	LIST *list;
+	list_t *list;
 }
 config_arg_u;
 
@@ -144,7 +144,7 @@ config_about_s;
 
 extern void config_init(config_about_s about);
 
-extern void config_show_usage(LIST args, LIST extra);
+extern void config_show_usage(list_t args, list_t extra);
 
 #define CONFIG_PARSE_COUNT(...) CONFIG_PARSE_COUNT2(__VA_ARGS__, 6, 5, 4, 3, 2, 1)
 #define CONFIG_PARSE_COUNT2(_1, _2, _3, _4, _5, _6, _, ...) _
@@ -170,7 +170,7 @@ extern void config_show_usage(LIST args, LIST extra);
  * options where set. Removes a lot of the cruft from the legacy common
  * code that used to exist here.
  */
-extern int config_parse_aux(int c, char **v, LIST a, LIST x, LIST t, bool w);
+extern int config_parse_aux(int c, char **v, list_t a, list_t x, list_t t, bool w);
 
 /*!
  * \brief         Update configuration file
@@ -189,7 +189,7 @@ extern void update_config(const char * const restrict o, const char * const rest
  * \return        The difference between the two
  *
  * Compare two config_named_s using the short_option. Used to ensure that
- * only one of each argument is in the LIST.
+ * only one of each argument is in the list_t.
  */
 extern int config_named_compare(const void *a, const void *b);
 

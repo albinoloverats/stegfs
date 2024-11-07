@@ -195,9 +195,9 @@ static gcry_cipher_hd_t crypto_init(enum gcry_cipher_algos c, enum gcry_cipher_m
 
 static void superblock_info(stegfs_block_s *sb, const char *cipher, const char *mode, const char *hash, const char *mac, uint8_t copies, uint64_t kdf)
 {
-	TLV tlv = tlv_init();
+	tlv_t tlv = tlv_init();
 
-	tlv_s t = { TAG_STEGFS, strlen(STEGFS_NAME), (byte_t *)STEGFS_NAME };
+	tlv_entry_s t = { TAG_STEGFS, strlen(STEGFS_NAME), (byte_t *)STEGFS_NAME };
 	tlv_append(tlv, t);
 
 	t.tag = TAG_VERSION;
@@ -266,7 +266,7 @@ static void superblock_info(stegfs_block_s *sb, const char *cipher, const char *
 int main(int argc, char **argv)
 {
 
-	LIST args = list_init(config_named_compare, false, false);
+	list_t args = list_init(config_named_compare, false, false);
 	list_add(args, &((config_named_s){ 'c', "cipher",         _("algorithm"),  _("Algorithm to use to encrypt data; use ‘list’ to show available cipher algorithms"),        { CONFIG_ARG_REQ_STRING,  { .string  = NULL  } }, false, false, false, false }));
 	list_add(args, &((config_named_s){ 's', "hash",           _("algorithm"),  _("Hash algorithm to generate key; use ‘list’ to show available hash algorithms"),            { CONFIG_ARG_REQ_STRING,  { .string  = NULL  } }, false, false, false, false }));
 	list_add(args, &((config_named_s){ 'm', "mode",           _("mode"),       _("The encryption mode to use; use ‘list’ to show available cipher modes"),                   { CONFIG_ARG_REQ_STRING,  { .string  = NULL  } }, false, false, false, false }));
@@ -279,10 +279,10 @@ int main(int argc, char **argv)
 	list_add(args, &((config_named_s){ 'r', "rewrite-sb",     NULL,            _("Rewrite the superblock (perhaps it became corrupt)"),                                      { CONFIG_ARG_REQ_BOOLEAN, { .boolean = false } }, false, true,  false, false }));
 	list_add(args, &((config_named_s){ 'd', "dry-run",        NULL,            _("Dry run - print details about the file system that would have been created"),              { CONFIG_ARG_REQ_BOOLEAN, { .boolean = false } }, false, false, false, false }));
 
-	LIST extra = list_default();
+	list_t extra = list_default();
 	list_add(extra, &((config_unnamed_s){ "device", { CONFIG_ARG_STRING,  { 0x0 } }, true,  false }));
 
-	LIST notes = list_default();
+	list_t notes = list_default();
 	list_add(notes, _("If you’re feeling extra paranoid you can now disable to stegfs file system header. This will also disable the checks when mounting; therefore anything could happen ;-)"));
 
 	config_about_s about =

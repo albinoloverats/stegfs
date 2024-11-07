@@ -44,7 +44,7 @@ typedef struct
 	bool duplicates:1;                          /*!< Whether to allow duplicate items in the list */
 	bool sorted:1;                              /*!< Whether the items should be sorted */
 }
-list_s;
+list_private_s;
 
 typedef struct
 {
@@ -52,9 +52,9 @@ typedef struct
 }
 iterator_s;
 
-extern LIST list_init(int c(const void *, const void *), bool dupes, bool sorted)
+extern list_t list_init(int c(const void *, const void *), bool dupes, bool sorted)
 {
-	list_s *list = m_calloc(sizeof( list_s ), sizeof( byte_t ));
+	list_private_s *list = m_calloc(sizeof( list_private_s ), sizeof( byte_t ));
 	list->size = 0;
 	list->compare = c;
 	list->duplicates = dupes;
@@ -62,9 +62,9 @@ extern LIST list_init(int c(const void *, const void *), bool dupes, bool sorted
 	return list;
 }
 
-extern void list_deinit_aux(LIST ptr, void f(void *))
+extern void list_deinit_aux(list_t ptr, void f(void *))
 {
-	list_s *list_ptr = (list_s *)ptr;
+	list_private_s *list_ptr = (list_private_s *)ptr;
 	if (!list_ptr)
 		return;
 	item_s *item = list_ptr->head;
@@ -80,12 +80,12 @@ extern void list_deinit_aux(LIST ptr, void f(void *))
 	return;
 }
 
-extern LIST list_copy(LIST ptr, void *c(const void *))
+extern list_t list_copy(list_t ptr, void *c(const void *))
 {
-	list_s *list_ptr = (list_s *)ptr;
+	list_private_s *list_ptr = (list_private_s *)ptr;
 	if (!list_ptr)
 		return NULL;
-	LIST copy = list_init(list_ptr->compare, list_ptr->duplicates, list_ptr->sorted);
+	list_t copy = list_init(list_ptr->compare, list_ptr->duplicates, list_ptr->sorted);
 	if (!list_ptr->size)
 		return copy;
 	item_s *item = list_ptr->head;
@@ -101,17 +101,17 @@ extern LIST list_copy(LIST ptr, void *c(const void *))
 /*
  * TODO see whether this could be better as a macro
  */
-extern size_t list_size(LIST ptr)
+extern size_t list_size(list_t ptr)
 {
-	list_s *list_ptr = (list_s *)ptr;
+	list_private_s *list_ptr = (list_private_s *)ptr;
 	if (!list_ptr)
 		return 0;
 	return list_ptr->size;
 }
 
-extern bool list_append(LIST ptr, const void *d)
+extern bool list_append(list_t ptr, const void *d)
 {
-	list_s *list_ptr = (list_s *)ptr;
+	list_private_s *list_ptr = (list_private_s *)ptr;
 	if (!list_ptr)
 		return false;
 	if (list_ptr->sorted)
@@ -130,9 +130,9 @@ extern bool list_append(LIST ptr, const void *d)
 	return true;
 }
 
-extern bool list_insert(LIST ptr, size_t i, const void *d)
+extern bool list_insert(list_t ptr, size_t i, const void *d)
 {
-	list_s *list_ptr = (list_s *)ptr;
+	list_private_s *list_ptr = (list_private_s *)ptr;
 	if (!list_ptr)
 		return false;
 	if (list_ptr->sorted)
@@ -161,9 +161,9 @@ extern bool list_insert(LIST ptr, size_t i, const void *d)
 	return true;
 }
 
-extern bool list_add(LIST ptr, const void *d)
+extern bool list_add(list_t ptr, const void *d)
 {
-	list_s *list_ptr = (list_s *)ptr;
+	list_private_s *list_ptr = (list_private_s *)ptr;
 	if (!list_ptr)
 		return false;
 	if (!list_ptr->sorted)
@@ -224,12 +224,12 @@ extern bool list_add(LIST ptr, const void *d)
 	return true;
 }
 
-extern int list_add_all(LIST ptr, LIST otr, void *c(const void *))
+extern int list_add_all(list_t ptr, list_t otr, void *c(const void *))
 {
-	list_s *list_ptr = (list_s *)ptr;
+	list_private_s *list_ptr = (list_private_s *)ptr;
 	if (!list_ptr)
 		return -1;
-	list_s *list_otr = (list_s *)otr;
+	list_private_s *list_otr = (list_private_s *)otr;
 	if (!list_otr)
 		return -1;
 	if (!list_otr->size)
@@ -246,9 +246,9 @@ extern int list_add_all(LIST ptr, LIST otr, void *c(const void *))
 	return r;
 }
 
-extern const void *list_get(LIST ptr, size_t i)
+extern const void *list_get(list_t ptr, size_t i)
 {
-	list_s *list_ptr = (list_s *)ptr;
+	list_private_s *list_ptr = (list_private_s *)ptr;
 	if (!list_ptr)
 		return NULL;
 	if (i >= list_ptr->size)
@@ -259,9 +259,9 @@ extern const void *list_get(LIST ptr, size_t i)
 	return item->data;
 }
 
-extern const void *list_contains(LIST ptr, const void *d)
+extern const void *list_contains(list_t ptr, const void *d)
 {
-	list_s *list_ptr = (list_s *)ptr;
+	list_private_s *list_ptr = (list_private_s *)ptr;
 	if (!list_ptr)
 		return NULL;
 	if (!list_ptr->size)
@@ -277,9 +277,9 @@ extern const void *list_contains(LIST ptr, const void *d)
 	return NULL;
 }
 
-extern const void *list_remove_item(LIST ptr, const void *d)
+extern const void *list_remove_item(list_t ptr, const void *d)
 {
-	list_s *list_ptr = (list_s *)ptr;
+	list_private_s *list_ptr = (list_private_s *)ptr;
 	if (!list_ptr)
 		return NULL;
 	if (!list_ptr->size)
@@ -310,9 +310,9 @@ extern const void *list_remove_item(LIST ptr, const void *d)
 	return data;
 }
 
-extern const void *list_remove_index(LIST ptr, size_t i)
+extern const void *list_remove_index(list_t ptr, size_t i)
 {
-	list_s *list_ptr = (list_s *)ptr;
+	list_private_s *list_ptr = (list_private_s *)ptr;
 	if (!list_ptr)
 		return NULL;
 	if (i >= list_ptr->size)
@@ -335,9 +335,9 @@ extern const void *list_remove_index(LIST ptr, size_t i)
 	return data;
 }
 
-extern ITER list_iterator(LIST ptr)
+extern iter_t list_iterator(list_t ptr)
 {
-	list_s *list_ptr = (list_s *)ptr;
+	list_private_s *list_ptr = (list_private_s *)ptr;
 	if (!list_ptr)
 		return NULL;
 	iterator_s *iter = m_malloc(sizeof (iterator_s));
@@ -345,7 +345,7 @@ extern ITER list_iterator(LIST ptr)
 	return iter;
 }
 
-extern const void *list_get_next(ITER ptr)
+extern const void *list_get_next(iter_t ptr)
 {
 	iterator_s *iter_ptr = (iterator_s *)ptr;
 	if (!iter_ptr)
@@ -357,7 +357,7 @@ extern const void *list_get_next(ITER ptr)
 	return next->data;
 }
 
-extern bool list_has_next(ITER ptr)
+extern bool list_has_next(iter_t ptr)
 {
 	iterator_s *iter_ptr = (iterator_s *)ptr;
 	if (!iter_ptr)
@@ -365,9 +365,9 @@ extern bool list_has_next(ITER ptr)
 	return iter_ptr->next;
 }
 
-extern void list_for_each(LIST ptr, void f(const void *))
+extern void list_for_each(list_t ptr, void f(const void *))
 {
-	list_s *list_ptr = (list_s *)ptr;
+	list_private_s *list_ptr = (list_private_s *)ptr;
 	if (!list_ptr)
 		return;
 	if (!list_ptr->size)
@@ -387,9 +387,9 @@ static void *list_sort_noop(const void *x)
 	return (void *)x;
 }
 
-extern void list_sort(LIST ptr)
+extern void list_sort(list_t ptr)
 {
-	list_s *list_ptr = (list_s *)ptr;
+	list_private_s *list_ptr = (list_private_s *)ptr;
 	if (!list_ptr)
 		return;
 	if (!list_ptr->compare)
@@ -397,7 +397,7 @@ extern void list_sort(LIST ptr)
 	if (!list_ptr->size)
 		return;
 
-	list_s *copy = list_init(list_ptr->compare, list_ptr->duplicates, true);
+	list_private_s *copy = list_init(list_ptr->compare, list_ptr->duplicates, true);
 	list_add_all(copy, list_ptr, list_sort_noop);
 
 	size_t z = list_ptr->size;
@@ -412,9 +412,9 @@ extern void list_sort(LIST ptr)
 	return;
 }
 
-extern void list_add_comparator(LIST ptr, int c(const void *, const void *))
+extern void list_add_comparator(list_t ptr, int c(const void *, const void *))
 {
-	list_s *list_ptr = (list_s *)ptr;
+	list_private_s *list_ptr = (list_private_s *)ptr;
 	if (!list_ptr)
 		return;
 	list_ptr->compare = c;

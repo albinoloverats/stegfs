@@ -653,7 +653,7 @@ int main(int argc, char **argv)
 	char **fargs = m_calloc(argc, sizeof( char * ));
 	fargs[0] = argv[0];
 
-	LIST args = list_init(config_named_compare, false, false);
+	list_t args = list_init(config_named_compare, false, false);
 	list_add(args, &((config_named_s){ 'c', "cipher",         _("algorithm"),  _("Algorithm to use to encrypt data; use ‘list’ to show available cipher algorithms"), { CONFIG_ARG_REQ_STRING,  { .string  = NULL  } }, false, false, false, false }));
 	list_add(args, &((config_named_s){ 's', "hash",           _("algorithm"),  _("Hash algorithm to generate key; use ‘list’ to show available hash algorithms"),     { CONFIG_ARG_REQ_STRING,  { .string  = NULL  } }, false, false, false, false }));
 	list_add(args, &((config_named_s){ 'm', "mode",           _("mode"),       _("The encryption mode to use; use ‘list’ to show available cipher modes"),            { CONFIG_ARG_REQ_STRING,  { .string  = NULL  } }, false, false, false, false }));
@@ -667,11 +667,11 @@ int main(int argc, char **argv)
 	list_add(args, &((config_named_s){ 't', NULL,             NULL,            _("Disable multi-threaded operation (FUSE option -s)"),                                { CONFIG_ARG_BOOLEAN,     { .boolean = false } }, false, false, false, false }));
 	list_add(args, &((config_named_s){ 'o', NULL,             "opt,[opt...]",  _("FUSE mount options--see FUSE documentation for details"),                           { CONFIG_ARG_LIST_STRING, { .list    = NULL  } }, false, false, false, false }));
 
-	LIST extra = list_default();
+	list_t extra = list_default();
 	list_add(extra, &((config_unnamed_s){ "file system", { CONFIG_ARG_STRING,  { .string = NULL } }, true,  false }));
 	list_add(extra, &((config_unnamed_s){ "mount point", { CONFIG_ARG_STRING,  { .string = NULL } }, true,  false }));
 
-	LIST notes = list_default();
+	list_t notes = list_default();
 	list_add(notes, _("It doesn't matter which order the file system and mount point are specified as stegfs will figure that out. All other options are passed to FUSE."));
 	list_add(notes, _("If you’re feeling extra paranoid you can now disable to stegfs file system header. This will also disable the checks when mounting and thus anything could happen ;-)"));
 
@@ -754,8 +754,8 @@ int main(int argc, char **argv)
 		fuse_argv = m_realloc(fuse_argv, fuse_argc * sizeof (char *));
 		fuse_argv[fuse_argc - 2] = "-s";
 	}
-	LIST fuse_options = ((config_named_s *)list_get(args, 11))->response.value.list;
-	ITER iter = list_iterator(fuse_options);
+	list_t fuse_options = ((config_named_s *)list_get(args, 11))->response.value.list;
+	iter_t iter = list_iterator(fuse_options);
 	while (list_has_next(iter))
 	{
 		fuse_argc += 2;

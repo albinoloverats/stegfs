@@ -40,7 +40,7 @@
  */
 typedef struct
 {
-	LIST    tags;
+	list_t  tags;
 	byte_t *export;
 }
 tlv_private_s;
@@ -48,14 +48,14 @@ tlv_private_s;
 static int tlv_compare(const void *a, const void *b);
 static void tlv_free(void *tlv);
 
-extern TLV tlv_init(void)
+extern tlv_t tlv_init(void)
 {
 	tlv_private_s *t = m_calloc(sizeof( tlv_private_s ), sizeof( byte_t ));
 	t->tags = list_init(tlv_compare, false, false);
 	return t;
 }
 
-extern void tlv_deinit(TLV ptr)
+extern void tlv_deinit(tlv_t ptr)
 {
 	tlv_private_s *tlv_ptr = (tlv_private_s *)ptr;
 	if (!tlv_ptr)
@@ -67,12 +67,12 @@ extern void tlv_deinit(TLV ptr)
 	return;
 }
 
-extern bool tlv_append(TLV ptr, tlv_s tlv)
+extern bool tlv_append(tlv_t ptr, tlv_entry_s tlv)
 {
 	tlv_private_s *tlv_ptr = (tlv_private_s *)ptr;
 	if (!tlv_ptr)
 		return false;
-	tlv_s *t  = m_malloc(sizeof tlv);
+	tlv_entry_s *t  = m_malloc(sizeof tlv);
 	t->tag    = tlv.tag;
 	t->length = tlv.length;
 	t->value  = m_malloc(t->length);
@@ -86,7 +86,7 @@ extern bool tlv_append(TLV ptr, tlv_s tlv)
 	return r;
 }
 
-extern const tlv_s *tlv_remove(TLV ptr, tlv_s tlv)
+extern const tlv_entry_s *tlv_remove(tlv_t ptr, tlv_entry_s tlv)
 {
 	tlv_private_s *tlv_ptr = (tlv_private_s *)ptr;
 	if (!tlv_ptr)
@@ -94,43 +94,43 @@ extern const tlv_s *tlv_remove(TLV ptr, tlv_s tlv)
 	return list_remove_item(tlv_ptr->tags, &tlv);
 }
 
-extern const tlv_s *tlv_remove_tag(TLV ptr, uint8_t tag)
+extern const tlv_entry_s *tlv_remove_tag(tlv_t ptr, uint8_t tag)
 {
-	return tlv_remove(ptr, (tlv_s){ tag, 0, NULL });
+	return tlv_remove(ptr, (tlv_entry_s){ tag, 0, NULL });
 }
 
-extern const tlv_s *tlv_get(TLV ptr, uint8_t tag)
+extern const tlv_entry_s *tlv_get(tlv_t ptr, uint8_t tag)
 {
 	tlv_private_s *tlv_ptr = (tlv_private_s *)ptr;
 	if (!tlv_ptr)
 		return NULL;
-	return list_contains(tlv_ptr->tags, &((tlv_s){ tag, 0, NULL }));
+	return list_contains(tlv_ptr->tags, &((tlv_entry_s){ tag, 0, NULL }));
 }
 
-extern bool tlv_has_tag(TLV ptr, uint8_t tag)
+extern bool tlv_has_tag(tlv_t ptr, uint8_t tag)
 {
 	return tlv_get(ptr, tag);
 }
 
-extern byte_t *tlv_value_of_aux(TLV ptr, uint8_t tag, uint8_t *def)
+extern byte_t *tlv_value_of_aux(tlv_t ptr, uint8_t tag, uint8_t *def)
 {
 	tlv_private_s *tlv_ptr = (tlv_private_s *)ptr;
 	if (!tlv_ptr)
 		return NULL;
-	const tlv_s *t = tlv_get(ptr, tag);
+	const tlv_entry_s *t = tlv_get(ptr, tag);
 	return t ? t->value : def;
 }
 
-extern uint16_t tlv_length_of(TLV ptr, uint8_t tag)
+extern uint16_t tlv_length_of(tlv_t ptr, uint8_t tag)
 {
 	tlv_private_s *tlv_ptr = (tlv_private_s *)ptr;
 	if (!tlv_ptr)
 		return 0;
-	const tlv_s *t = tlv_get(ptr, tag);
+	const tlv_entry_s *t = tlv_get(ptr, tag);
 	return t ? t->length : 0;
 }
 
-extern byte_t *tlv_export_aux(TLV ptr, bool nbo)
+extern byte_t *tlv_export_aux(tlv_t ptr, bool nbo)
 {
 	tlv_private_s *tlv_ptr = (tlv_private_s *)ptr;
 	if (!tlv_ptr)
@@ -140,10 +140,10 @@ extern byte_t *tlv_export_aux(TLV ptr, bool nbo)
 		free(tlv_ptr->export);
 	tlv_ptr->export = m_malloc(size);
 	size_t off = 0;
-	ITER iter = list_iterator(tlv_ptr->tags);
+	iter_t iter = list_iterator(tlv_ptr->tags);
 	while (list_has_next(iter))
 	{
-		const tlv_s *tlv = list_get_next(iter);
+		const tlv_entry_s *tlv = list_get_next(iter);
 		memcpy(tlv_ptr->export + off, &tlv->tag, sizeof tlv->tag);
 		off += sizeof tlv->tag;
 		uint16_t l = nbo ? htons(tlv->length) : tlv->length;
@@ -155,24 +155,24 @@ extern byte_t *tlv_export_aux(TLV ptr, bool nbo)
 	return tlv_ptr->export;
 }
 
-extern uint16_t tlv_size(TLV ptr)
+extern uint16_t tlv_size(tlv_t ptr)
 {
 	return list_size(((tlv_private_s *)ptr)->tags);
 }
 
-extern size_t tlv_length(TLV ptr)
+extern size_t tlv_length(tlv_t ptr)
 {
 	tlv_private_s *tlv_ptr = (tlv_private_s *)ptr;
 	if (!tlv_ptr)
 		return 0;
 	size_t size = 0;
-	ITER iter = list_iterator(tlv_ptr->tags);
+	iter_t iter = list_iterator(tlv_ptr->tags);
 	while (list_has_next(iter))
-		size += sizeof( uint8_t ) + sizeof( uint16_t ) + ((tlv_s *)list_get_next(iter))->length;
+		size += sizeof( uint8_t ) + sizeof( uint16_t ) + ((tlv_entry_s *)list_get_next(iter))->length;
 	return size;
 }
 
-extern ITER tlv_iterator(TLV ptr)
+extern iter_t tlv_iterator(tlv_t ptr)
 {
 	tlv_private_s *tlv_ptr = (tlv_private_s *)ptr;
 	if (!tlv_ptr)
@@ -180,27 +180,27 @@ extern ITER tlv_iterator(TLV ptr)
 	return list_iterator(tlv_ptr->tags);
 }
 
-extern const tlv_s *tlv_get_next(ITER ptr)
+extern const tlv_entry_s *tlv_get_next(iter_t ptr)
 {
 	return list_get_next(ptr);
 }
 
-extern bool tlv_has_next(ITER ptr)
+extern bool tlv_has_next(iter_t ptr)
 {
 	return list_has_next(ptr);
 }
 
-extern void tlv_for_each(TLV ptr, void f(uint8_t , uint16_t, const void *))
+extern void tlv_for_each(tlv_t ptr, void f(uint8_t , uint16_t, const void *))
 {
 	tlv_private_s *tlv_ptr = (tlv_private_s *)ptr;
 	if (!tlv_ptr)
 		return;
 	if (!list_size(tlv_ptr->tags))
 		return;
-	ITER iter = list_iterator(tlv_ptr->tags);
+	iter_t iter = list_iterator(tlv_ptr->tags);
 	do
 	{
-		const tlv_s *entry = (tlv_s *)list_get_next(iter);
+		const tlv_entry_s *entry = (tlv_entry_s *)list_get_next(iter);
 		f(entry->tag, entry->length, entry->value);
 	}
 	while (list_has_next(iter));
@@ -210,8 +210,8 @@ extern void tlv_for_each(TLV ptr, void f(uint8_t , uint16_t, const void *))
 
 static int tlv_compare(const void *a, const void *b)
 {
-	const tlv_s *x = a;
-	const tlv_s *y = b;
+	const tlv_entry_s *x = a;
+	const tlv_entry_s *y = b;
 	/*
 	 * cast to int allows us to overlook that tags are uint8_t's and
 	 * get a negative result if applicable
@@ -221,7 +221,7 @@ static int tlv_compare(const void *a, const void *b)
 
 static void tlv_free(void *tlv)
 {
-	free(((tlv_s *)tlv)->value);
+	free(((tlv_entry_s *)tlv)->value);
 	free(tlv);
 	return;
 }

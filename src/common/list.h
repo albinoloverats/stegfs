@@ -35,9 +35,9 @@
 
 #include "common.h"
 
-typedef void * LIST; /*!< The user visible LIST type */
+typedef void * list_t; /*!< The user visible LIST type */
 
-typedef void * ITER;
+typedef void * iter_t;
 
 #if 0
 #define LIST_INIT_COUNT(...) LIST_INIT_COUNT2(__VA_ARGS__, 3, 2, 1) /*!< Function overloading argument count (part 1) */
@@ -103,7 +103,7 @@ typedef void * ITER;
  * list_default() if you are happy with no comparator and allowing
  * duplicates in your list.
  */
-extern LIST list_init(int c(const void *, const void *), bool d, bool s) __attribute__((malloc));
+extern list_t list_init(int c(const void *, const void *), bool d, bool s) __attribute__((malloc));
 
 #define LIST_DEINIT_ARGS_COUNT(...) LIST_DEINIT_ARGS_COUNT2(__VA_ARGS__, 2, 1) /*!< Function overloading argument count (part 1) */
 #define LIST_DEINIT_ARGS_COUNT2(_1, _2, _, ...) _                              /*!< Function overloading argument count (part 2) */
@@ -122,7 +122,7 @@ extern LIST list_init(int c(const void *, const void *), bool d, bool s) __attri
  * functions will not result in undefined behaviour. If called with a
  * NULL function f then data items will not be freed.
  */
-extern void list_deinit_aux(LIST h, void f(void *));
+extern void list_deinit_aux(list_t h, void f(void *));
 
 /*!
  * \brief         Copy an existing list
@@ -133,7 +133,7 @@ extern void list_deinit_aux(LIST h, void f(void *));
  * Create a new list that is a copy of an existing list. Creating a
  * copy of each item too, hence the function c.
  */
-extern LIST list_copy(LIST h, void *c(const void *)) __attribute__((nonnull(1, 2)));
+extern list_t list_copy(list_t h, void *c(const void *)) __attribute__((nonnull(1, 2)));
 
 /*!
  * \brief         Get the number of items in the list
@@ -141,9 +141,9 @@ extern LIST list_copy(LIST h, void *c(const void *)) __attribute__((nonnull(1, 2
  * \return        The number of items in the list
  *
  * Get the number of item in the list. This is a constant time lookup as
- * the number of items is kept as metadata within the LIST.
+ * the number of items is kept as metadata within the list_t.
  */
-extern size_t list_size(LIST h) __attribute__((nonnull(1)));
+extern size_t list_size(list_t h) __attribute__((nonnull(1)));
 
 //#define LIST_SIZE(l) (((ptrdiff_t)l)+4)
 
@@ -157,7 +157,7 @@ extern size_t list_size(LIST h) __attribute__((nonnull(1)));
  * this just calls list_add(). If duplicates are not allowed, this will
  * return false if the item already exists and was not re-added.
  */
-extern bool list_append(LIST h, const void *d) __attribute__((nonnull(1, 2)));
+extern bool list_append(list_t h, const void *d) __attribute__((nonnull(1, 2)));
 
 /*!
  * \brief         Insert an item into the list
@@ -171,7 +171,7 @@ extern bool list_append(LIST h, const void *d) __attribute__((nonnull(1, 2)));
  * not allowed, this will return false if the item already exists and
  * was not re-added.
  */
-extern bool list_insert(LIST h, size_t i, const void *d) __attribute__((nonnull(1, 3)));
+extern bool list_insert(list_t h, size_t i, const void *d) __attribute__((nonnull(1, 3)));
 
 /*!
  * \brief         Add an item to the sorted list
@@ -184,7 +184,7 @@ extern bool list_insert(LIST h, size_t i, const void *d) __attribute__((nonnull(
  * this will return false if the item already exists and was not
  * re-added.
  */
-extern bool list_add(LIST h, const void *d) __attribute__((nonnull(1, 2)));
+extern bool list_add(list_t h, const void *d) __attribute__((nonnull(1, 2)));
 
 /*!
  * \brief         Add all items to the list
@@ -196,7 +196,7 @@ extern bool list_add(LIST h, const void *d) __attribute__((nonnull(1, 2)));
  * Copy all items from one list to another, existing list. Creating a
  * copy of the data using c.
  */
-extern int list_add_all(LIST h, LIST o, void *c(const void *)) __attribute__((nonnull(1, 2, 3)));
+extern int list_add_all(list_t h, list_t o, void *c(const void *)) __attribute__((nonnull(1, 2, 3)));
 
 /*!
  * \brief         Check if the list contains the item
@@ -210,7 +210,7 @@ extern int list_add_all(LIST h, LIST o, void *c(const void *)) __attribute__((no
  * pointer. Returns a pointer to the existing item or NULL if it doesn't
  * exist in the list.
  */
-extern const void *list_contains(LIST h, const void *d) __attribute__((nonnull(1, 2)));
+extern const void *list_contains(list_t h, const void *d) __attribute__((nonnull(1, 2)));
 
 /*!
  * \brief         Remove an item from within the list
@@ -224,7 +224,7 @@ extern const void *list_contains(LIST h, const void *d) __attribute__((nonnull(1
  * initialisation then that is used instead of just comparing the
  * pointer.
  */
-extern const void *list_remove_item(LIST h, const void *d) __attribute__((nonnull(1, 2)));
+extern const void *list_remove_item(list_t h, const void *d) __attribute__((nonnull(1, 2)));
 
 /*!
  * \brief         Remove an item from within the list
@@ -235,7 +235,7 @@ extern const void *list_remove_item(LIST h, const void *d) __attribute__((nonnul
  * Remove the item at the given index from the list. The item is
  * returned to allow the user to free it if necessary.
  */
-extern const void *list_remove_index(LIST h, size_t i) __attribute__((nonnull(1)));
+extern const void *list_remove_index(list_t h, size_t i) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Get an item from the list
@@ -245,7 +245,7 @@ extern const void *list_remove_index(LIST h, size_t i) __attribute__((nonnull(1)
  *
  * Retrieve the item at the given index within the list.
  */
-extern const void *list_get(LIST h, size_t i) __attribute__((nonnull(1)));
+extern const void *list_get(list_t h, size_t i) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Set the list up for iterating
@@ -255,7 +255,7 @@ extern const void *list_get(LIST h, size_t i) __attribute__((nonnull(1)));
  * Set the list up to be iterated over. The iterator should be freed
  * after use.
  */
-extern ITER list_iterator(LIST h) __attribute__((nonnull(1)));
+extern iter_t list_iterator(list_t h) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Get the next item in the list
@@ -264,7 +264,7 @@ extern ITER list_iterator(LIST h) __attribute__((nonnull(1)));
  *
  * Allow iterating through the list, this returns the next item.
  */
-extern const void *list_get_next(ITER h) __attribute__((nonnull(1)));
+extern const void *list_get_next(iter_t h) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Indicates if there is another item in the list
@@ -274,7 +274,7 @@ extern const void *list_get_next(ITER h) __attribute__((nonnull(1)));
  * Allow iterating through the list, this returns whether there is
  * another item.
  */
-extern bool list_has_next(ITER h) __attribute__((nonnull(1)));
+extern bool list_has_next(iter_t h) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Call the given function for each item in the list
@@ -283,7 +283,7 @@ extern bool list_has_next(ITER h) __attribute__((nonnull(1)));
  *
  * Iterate through the list, calling the given function for each item.
  */
-extern void list_for_each(LIST h, void f(const void *)) __attribute__((nonnull(1, 2)));
+extern void list_for_each(list_t h, void f(const void *)) __attribute__((nonnull(1, 2)));
 
 /*!
  * \brief         Sort the given list
@@ -294,9 +294,9 @@ extern void list_for_each(LIST h, void f(const void *)) __attribute__((nonnull(1
  * will happen. After this call the list will continue to be sorted and
  * items will be inserted where appilcable
  */
-extern void list_sort(LIST h) __attribute__((nonnull(1)));
+extern void list_sort(list_t h) __attribute__((nonnull(1)));
 
-//extern void list_tidy(LIST h) __attribute__((nonnull(1)));
+//extern void list_tidy(list_t h) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Add comparator to the list
@@ -305,7 +305,7 @@ extern void list_sort(LIST h) __attribute__((nonnull(1)));
  *
  * Add a comparator to the list so that items can be compared.
  */
-extern void list_add_comparator(LIST h, int c(const void *, const void *)) __attribute__((nonnull(1, 2)));
+extern void list_add_comparator(list_t h, int c(const void *, const void *)) __attribute__((nonnull(1, 2)));
 
 extern int list_compare_integer(const void *a, const void *b);
 

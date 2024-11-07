@@ -1,5 +1,5 @@
 /*
- * Version checking functions (non-applications specific)
+ * Version checking functions (non-application specific).
  * Copyright © 2005-2024, albinoloverats ~ Software Development
  * email: webmaster@albinoloverats.net
  *

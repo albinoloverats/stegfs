@@ -43,7 +43,7 @@ extern void init_crypto(void);
  * algorithms. NB: The list is allocated statically and SHOULD NOT be
  * free’d (or otherwise altered).
  */
-extern LIST list_of_ciphers(void) __attribute__((pure));
+extern list_t list_of_ciphers(void) __attribute__((pure));
 
 /*!
  * \brief         Get list of usable hashes
@@ -53,7 +53,7 @@ extern LIST list_of_ciphers(void) __attribute__((pure));
  * algorithms. NB: The array is allocated statically and SHOULD NOT be
  * free’d (or otherwise altered).
  */
-extern LIST list_of_hashes(void) __attribute__((pure));
+extern list_t list_of_hashes(void) __attribute__((pure));
 
 /*!
  * \brief         Get list of available cipher modes
@@ -63,7 +63,7 @@ extern LIST list_of_hashes(void) __attribute__((pure));
  * modes. NB: The array is allocated statically and SHOULD NOT be
  * free’d (or otherwise altered).
  */
-extern LIST list_of_modes(void) __attribute__((pure));
+extern list_t list_of_modes(void) __attribute__((pure));
 
 /*!
  * \brief         Get list of available MAC algorithms
@@ -73,7 +73,7 @@ extern LIST list_of_modes(void) __attribute__((pure));
  * algorithms. NB: The array is allocated statically and SHOULD NOT be
  * free’d (or otherwise altered).
  */
-extern LIST list_of_macs(void) __attribute__((pure));
+extern list_t list_of_macs(void) __attribute__((pure));
 
 /*!
  * \brief         Get cipher ID, given its name

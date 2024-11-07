@@ -36,7 +36,7 @@
 
 #include "list.h"
 
-typedef void * TLV; /*<! Handle type for TLV functions */
+typedef void * tlv_t; /*<! Handle type for TLV functions */
 
 /*!
  * \brief  A TLV structure
@@ -50,7 +50,7 @@ typedef struct
 	uint16_t length; /*!< The length of the value */
 	void    *value;  /*!< The actual data */
 }
-tlv_s;
+tlv_entry_s;
 
 /*!
  * \brief         Create a new TLV array
@@ -59,7 +59,7 @@ tlv_s;
  * Create a new TLV array instance; all further operations are then
  * performed against this handle. Returns NULL on error.
  */
-extern TLV tlv_init(void) __attribute__((malloc));
+extern tlv_t tlv_init(void) __attribute__((malloc));
 
 /*!
  * \brief         Destroy a TLV array
@@ -70,7 +70,7 @@ extern TLV tlv_init(void) __attribute__((malloc));
  * Free the memory and sets h to NULL so all subsequent calls to TLV
  * functions will not result in undefined behaviour.
  */
-extern void tlv_deinit(TLV h);
+extern void tlv_deinit(tlv_t h);
 
 /*!
  * \brief         Append a new TLV triple to the array
@@ -83,7 +83,7 @@ extern void tlv_deinit(TLV h);
  * yourself. Duplicate tags are ignored. Will return true if the item
  * was added, false if it was a duplicate and ignored.
  */
-extern bool tlv_append(TLV h, tlv_s t) __attribute__((nonnull(1)));
+extern bool tlv_append(tlv_t h, tlv_entry_s t) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Remove a TLV triple from the array
@@ -92,7 +92,7 @@ extern bool tlv_append(TLV h, tlv_s t) __attribute__((nonnull(1)));
  *
  * Remove the given TLV triple from the TLV array.
  */
-extern const tlv_s *tlv_remove(TLV h, tlv_s t) __attribute__((nonnull(1)));
+extern const tlv_entry_s *tlv_remove(tlv_t h, tlv_entry_s t) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Remove a TLV triple from the array
@@ -101,7 +101,7 @@ extern const tlv_s *tlv_remove(TLV h, tlv_s t) __attribute__((nonnull(1)));
  *
  * Remove the given tag from the TLV array.
  */
-extern const tlv_s * tlv_remove_tag(TLV h, uint8_t t) __attribute__((nonnull(1)));
+extern const tlv_entry_s * tlv_remove_tag(tlv_t h, uint8_t t) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Get TLV structure for tag
@@ -112,7 +112,7 @@ extern const tlv_s * tlv_remove_tag(TLV h, uint8_t t) __attribute__((nonnull(1))
  * Return the TLV structure for the given tag value. NB Do not free the
  * returned TLV pointer: bad things will happen.
  */
-extern const tlv_s *tlv_get(TLV h, uint8_t t) __attribute__((nonnull(1)));
+extern const tlv_entry_s *tlv_get(tlv_t h, uint8_t t) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Check whether a TLV array has a particular tag
@@ -122,7 +122,7 @@ extern const tlv_s *tlv_get(TLV h, uint8_t t) __attribute__((nonnull(1)));
  *
  * Check whether the TLV array has the tag given value.
  */
-extern bool tlv_has_tag(TLV h, uint8_t t) __attribute__((nonnull(1)));
+extern bool tlv_has_tag(tlv_t h, uint8_t t) __attribute__((nonnull(1)));
 
 #define TLV_VALUE_OF_ARGS_COUNT(...) TLV_VALUE_OF_ARGS_COUNT2(__VA_ARGS__, 3, 2, 1) /*!< Function overloading argument count (part 1) */
 #define TLV_VALUE_OF_ARGS_COUNT2(_1, _2, _3, _, ...) _                              /*!< Function overloading argument count (part 2) */
@@ -141,7 +141,7 @@ extern bool tlv_has_tag(TLV h, uint8_t t) __attribute__((nonnull(1)));
  * Get the value for the given tag. If there are duplicates in the array
  * this will return the value of the first.
  */
-extern byte_t *tlv_value_of_aux(TLV h, uint8_t t, uint8_t *d) __attribute__((nonnull(1)));
+extern byte_t *tlv_value_of_aux(tlv_t h, uint8_t t, uint8_t *d) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Get length for tag
@@ -151,7 +151,7 @@ extern byte_t *tlv_value_of_aux(TLV h, uint8_t t, uint8_t *d) __attribute__((non
  *
  * Retrieve the length for the TLV entry with the given tag value.
  */
-extern uint16_t tlv_length_of(TLV ptr, uint8_t t) __attribute__((nonnull(1)));
+extern uint16_t tlv_length_of(tlv_t ptr, uint8_t t) __attribute__((nonnull(1)));
 
 #define TLV_EXPORT_ARGS_COUNT(...) TLV_EXPORT_ARGS_COUNT2(__VA_ARGS__, 2, 1) /*!< Function overloading argument count (part 1) */
 #define TLV_EXPORT_ARGS_COUNT2(_1, _2, _, ...) _                             /*!< Function overloading argument count (part 2) */
@@ -170,7 +170,7 @@ extern uint16_t tlv_length_of(TLV ptr, uint8_t t) __attribute__((nonnull(1)));
  * (defaults to true) specifies wherther to use network byte order for
  * the length value.
  */
-extern byte_t *tlv_export_aux(TLV h, bool e) __attribute__((nonnull(1)));
+extern byte_t *tlv_export_aux(tlv_t h, bool e) __attribute__((nonnull(1)));
 
 /*!
  * \brief         The number of TLV items in the array
@@ -179,7 +179,7 @@ extern byte_t *tlv_export_aux(TLV h, bool e) __attribute__((nonnull(1)));
  *
  * Count the number of TLV elements in the array.
  */
-extern uint16_t tlv_size(TLV h) __attribute__((nonnull(1)));
+extern uint16_t tlv_size(tlv_t h) __attribute__((nonnull(1)));
 
 /*!
  * \brief         The size of TLV array
@@ -189,7 +189,7 @@ extern uint16_t tlv_size(TLV h) __attribute__((nonnull(1)));
  * Return the total size of the TLV array in bytes; useful when calling
  * tlv_export().
  */
-extern size_t tlv_length(TLV h) __attribute__((nonnull(1)));
+extern size_t tlv_length(tlv_t h) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Set the TLV up for iterating
@@ -199,7 +199,7 @@ extern size_t tlv_length(TLV h) __attribute__((nonnull(1)));
  * Set the TLV up to be iterated over. The iterator should be freed
  * after use.
  */
-extern ITER tlv_iterator(TLV h) __attribute__((nonnull(1)));
+extern iter_t tlv_iterator(tlv_t h) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Get the next item in the TLV
@@ -208,7 +208,7 @@ extern ITER tlv_iterator(TLV h) __attribute__((nonnull(1)));
  *
  * Allow iterating through the TLV, this returns the next item.
  */
-extern const tlv_s *tlv_get_next(ITER h) __attribute__((nonnull(1)));
+extern const tlv_entry_s *tlv_get_next(iter_t h) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Indicates if there is another item in the TLV
@@ -218,7 +218,7 @@ extern const tlv_s *tlv_get_next(ITER h) __attribute__((nonnull(1)));
  * Allow iterating through the TLV, this returns whether there is
  * another item.
  */
-extern bool tlv_has_next(ITER h) __attribute__((nonnull(1)));
+extern bool tlv_has_next(iter_t h) __attribute__((nonnull(1)));
 
 /*!
  * \brief         Call the given function for each item in the TLV
@@ -227,6 +227,6 @@ extern bool tlv_has_next(ITER h) __attribute__((nonnull(1)));
  *
  * Iterate through the TLV, calling the given function for each item.
  */
-extern void tlv_for_each(TLV h, void f(uint8_t, uint16_t, const void *)) __attribute__((nonnull(1, 2)));
+extern void tlv_for_each(tlv_t h, void f(uint8_t, uint16_t, const void *)) __attribute__((nonnull(1, 2)));
 
 #endif /* _COMMON_TLV_H_ */

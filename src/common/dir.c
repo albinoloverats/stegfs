@@ -119,7 +119,7 @@ extern void dir_mk_recursive(const char *path, mode_t mode)
 	return;
 }
 
-static void get_tree(LIST l, const char *path, dir_type_e type)
+static void get_tree(list_t l, const char *path, dir_type_e type)
 {
 	DIR_SCAN_TOP;
 
@@ -172,9 +172,9 @@ static void get_tree(LIST l, const char *path, dir_type_e type)
 	return;
 }
 
-extern LIST dir_get_tree(const char *path, dir_type_e type)
+extern list_t dir_get_tree(const char *path, dir_type_e type)
 {
-	LIST l = list_string();
+	list_t l = list_string();
 	get_tree(l, path, type);
 	return l;
 }

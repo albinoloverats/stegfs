@@ -112,10 +112,10 @@ extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid, 
 			return STEGFS_INIT_NOT_STEGFS;
 	}
 
-	TLV tlv = tlv_init();
+	tlv_t tlv = tlv_init();
 	for (uint64_t i = 0, j = tag_off; i < tags; i++)
 	{
-		tlv_s t;
+		tlv_entry_s t;
 		memcpy(&t.tag, block.data + j, sizeof t.tag);
 		j += sizeof t.tag;
 		memcpy(&t.length, block.data + j, sizeof t.length);

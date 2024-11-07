@@ -56,13 +56,13 @@
 #endif
 
 
-static void show_version(LIST args, LIST largs, LIST notes, LIST extra) __attribute__((noreturn));
-static void show_help(LIST args, LIST largs, LIST notes, LIST extra) __attribute__((noreturn));
-static void show_licence(LIST args, LIST largs, LIST notes, LIST extra) __attribute__((noreturn));
+static void show_version(list_t args, list_t largs, list_t notes, list_t extra) __attribute__((noreturn));
+static void show_help(list_t args, list_t largs, list_t notes, list_t extra) __attribute__((noreturn));
+static void show_licence(list_t args, list_t largs, list_t notes, list_t extra) __attribute__((noreturn));
 
 inline static bool is_argument(char, const char *, const char *);
 inline static void format_section(char *);
-inline static void print_usage(LIST, LIST);
+inline static void print_usage(list_t, list_t);
 
 static int64_t parse_number_size_suffix(const char *s);
 
@@ -81,11 +81,11 @@ static pair_u *parse_pair(const char *c, const char *l);
 
 static char *parse_tail(const char *, const char *);
 
-static void parse_list_boolean(const char *, LIST list);
-static void parse_list_integer(const char *, LIST list);
-static void parse_list_decimal(const char *, LIST list);
+static void parse_list_boolean(const char *, list_t list);
+static void parse_list_integer(const char *, list_t list);
+static void parse_list_decimal(const char *, list_t list);
 
-static void parse_list(config_arg_e, const char *, LIST);
+static void parse_list(config_arg_e, const char *, list_t);
 
 static bool init = false;
 static config_about_s about = { 0x0 };
@@ -132,7 +132,7 @@ extern void config_unnamed_free(void *f)
 	return;
 }
 
-extern int config_parse_aux(int argc, char **argv, LIST args, LIST extra, LIST notes, bool warn)
+extern int config_parse_aux(int argc, char **argv, list_t args, list_t extra, list_t notes, bool warn)
 {
 	if (!init)
 	{
@@ -140,7 +140,7 @@ extern int config_parse_aux(int argc, char **argv, LIST args, LIST extra, LIST n
 		return -1;
 	}
 
-	LIST largs = list_init((void *)strcmp, true, false);
+	list_t largs = list_init((void *)strcmp, true, false);
 	for (int i = 1; i < argc; i++) // from 1, skip invokation name
 	{
 		char *x = argv[i];
@@ -206,7 +206,7 @@ extern int config_parse_aux(int argc, char **argv, LIST args, LIST extra, LIST n
 					goto end_line;
 
 				// TODO handle unknown config file settings
-				ITER iter = list_iterator(args);
+				iter_t iter = list_iterator(args);
 				while (list_has_next(iter))
 				{
 					config_named_s *arg = (config_named_s *)list_get_next(iter);
@@ -372,7 +372,7 @@ end_line:
 		const char *curr = list_get(largs, i);
 		const char *next = list_get(largs, i + 1);
 
-		ITER iter = list_iterator(args);
+		iter_t iter = list_iterator(args);
 		while (list_has_next(iter))
 		{
 			config_named_s *arg = (config_named_s *)list_get_next(iter);
@@ -551,7 +551,7 @@ end_line:
 	list_deinit(largs, free);
 
 	int r = 0;
-	ITER iter = list_iterator(args);
+	iter_t iter = list_iterator(args);
 	while (list_has_next(iter))
 	{
 		config_named_s *arg = (config_named_s *)list_get_next(iter);
@@ -595,7 +595,7 @@ inline static void format_section(char *s)
 	return;
 }
 
-static void show_version(LIST args, LIST largs, LIST notes, LIST extra)
+static void show_version(list_t args, list_t largs, list_t notes, list_t extra)
 {
 	version_print(about.name, about.version, about.url);
 	while (version_is_checking)
@@ -607,7 +607,7 @@ static void show_version(LIST args, LIST largs, LIST notes, LIST extra)
 	exit(EXIT_SUCCESS);
 }
 
-inline static void print_usage(LIST args, LIST extra)
+inline static void print_usage(list_t args, list_t extra)
 {
 #ifndef _WIN32
 	struct winsize ws;
@@ -624,7 +624,7 @@ inline static void print_usage(LIST args, LIST extra)
 	int j = cli_eprintf("  " ANSI_COLOUR_GREEN "%s", about.name) - strlen(ANSI_COLOUR_GREEN) - 2;
 	if (extra)
 	{
-		ITER iter = list_iterator(extra);
+		iter_t iter = list_iterator(extra);
 		while (list_has_next(iter))
 		{
 			const config_unnamed_s *x = (config_unnamed_s *)list_get_next(iter);
@@ -639,7 +639,7 @@ inline static void print_usage(LIST args, LIST extra)
 	}
 	if (args)
 	{
-		ITER iter = list_iterator(args);
+		iter_t iter = list_iterator(args);
 		while (list_has_next(iter))
 		{
 			const config_named_s *arg = list_get_next(iter);
@@ -664,7 +664,7 @@ inline static void print_usage(LIST args, LIST extra)
 	return;
 }
 
-extern void config_show_usage(LIST args, LIST extra)
+extern void config_show_usage(list_t args, list_t extra)
 {
 	print_usage(args, extra);
 	while (version_is_checking)
@@ -877,7 +877,7 @@ static char *parse_default(config_arg_e type, config_arg_u value)
 	return d;
 }
 
-static void show_help(LIST args, LIST largs, LIST notes, LIST extra)
+static void show_help(list_t args, list_t largs, list_t notes, list_t extra)
 {
 	version_print(about.name, about.version, about.url);
 	cli_eprintf("\n");
@@ -887,7 +887,7 @@ static void show_help(LIST args, LIST largs, LIST notes, LIST extra)
 	bool has_advanced = false;
 	if (args)
 	{
-		ITER iter = list_iterator(args);
+		iter_t iter = list_iterator(args);
 		while (list_has_next(iter))
 		{
 			const config_named_s *arg = list_get_next(iter);
@@ -910,7 +910,7 @@ static void show_help(LIST args, LIST largs, LIST notes, LIST extra)
 	print_option(indent, 'v', "version", NULL, NULL, false, "Display application version");
 	if (args)
 	{
-		ITER iter = list_iterator(args);
+		iter_t iter = list_iterator(args);
 		while (list_has_next(iter))
 		{
 			const config_named_s *arg = list_get_next(iter);
@@ -928,7 +928,7 @@ static void show_help(LIST args, LIST largs, LIST notes, LIST extra)
 	{
 		cli_eprintf("\n");
 		format_section(_("Advanced Options"));
-		ITER iter = list_iterator(args);
+		iter_t iter = list_iterator(args);
 		while (list_has_next(iter))
 		{
 			const config_named_s *arg = list_get_next(iter);
@@ -946,7 +946,7 @@ static void show_help(LIST args, LIST largs, LIST notes, LIST extra)
 	{
 		cli_eprintf("\n");
 		format_section(_("Notes"));
-		ITER iter = list_iterator(notes);
+		iter_t iter = list_iterator(notes);
 		while (list_has_next(iter))
 			print_notes(list_get_next(iter));
 		free(iter);
@@ -960,7 +960,7 @@ static void show_help(LIST args, LIST largs, LIST notes, LIST extra)
 	exit(EXIT_SUCCESS);
 }
 
-static void show_licence(LIST args, LIST largs, LIST notes, LIST extra)
+static void show_licence(list_t args, list_t largs, list_t notes, list_t extra)
 {
 	cli_eprintf(_(TEXT_LICENCE));
 	while (version_is_checking)
@@ -1260,7 +1260,7 @@ static pair_u *parse_pair(const char *c, const char *l)
 	return pair;
 }
 
-static void parse_list_boolean(const char *text, LIST list)
+static void parse_list_boolean(const char *text, list_t list)
 {
 	bool *r = m_malloc(sizeof( bool ));
 	if (parse_boolean(NULL, text, r))
@@ -1273,7 +1273,7 @@ static void parse_list_boolean(const char *text, LIST list)
 	return;
 }
 
-static void parse_list_integer(const char *text, LIST list)
+static void parse_list_integer(const char *text, list_t list)
 {
 	int64_t *r = m_malloc(sizeof( int64_t ));
 	if (parse_integer(NULL, text, r))
@@ -1286,7 +1286,7 @@ static void parse_list_integer(const char *text, LIST list)
 	return;
 }
 
-static void parse_list_decimal(const char *text, LIST list)
+static void parse_list_decimal(const char *text, list_t list)
 {
 	//__float128 *r = m_malloc(sizeof( __float128 ));
 	long double *r = m_malloc(sizeof( long double ));
@@ -1300,7 +1300,7 @@ static void parse_list_decimal(const char *text, LIST list)
 	return;
 }
 
-static void parse_list(config_arg_e type, const char *text, LIST list)
+static void parse_list(config_arg_e type, const char *text, list_t list)
 {
 	while (*text && isspace(*text))
 		text++;

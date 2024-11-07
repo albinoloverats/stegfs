@@ -159,6 +159,6 @@ extern void dir_mk_recursive(const char *p, mode_t m) __attribute__((nonnull(1))
  * Return all found files (of a paticular type) in a given directory
  * tree.
  */
-extern LIST dir_get_tree(const char *p, dir_type_e m) __attribute__((nonnull(1)));
+extern list_t dir_get_tree(const char *p, dir_type_e m) __attribute__((nonnull(1)));
 
 #endif /* _DIR_H_ */

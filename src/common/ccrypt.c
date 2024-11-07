@@ -108,7 +108,7 @@ extern void init_crypto(void)
 	return;
 }
 
-extern LIST list_of_ciphers(void)
+extern list_t list_of_ciphers(void)
 {
 	init_crypto();
 
@@ -124,7 +124,7 @@ extern LIST list_of_ciphers(void)
 		}
 		id++;
 	}
-	static LIST *l = NULL;
+	static list_t *l = NULL;
 	if (!l)
 	{
 		l = list_init((int (*)(const void *, const void *))strcmp, false, true);
@@ -139,7 +139,7 @@ extern LIST list_of_ciphers(void)
 	return l;
 }
 
-extern LIST list_of_hashes(void)
+extern list_t list_of_hashes(void)
 {
 	init_crypto();
 
@@ -155,7 +155,7 @@ extern LIST list_of_hashes(void)
 		}
 		id++;
 	}
-	static LIST *l = NULL;
+	static list_t *l = NULL;
 	if (!l)
 	{
 		l = list_init((int (*)(const void *, const void *))strcmp, false, true);
@@ -170,11 +170,11 @@ extern LIST list_of_hashes(void)
 	return l;
 }
 
-extern LIST list_of_modes(void)
+extern list_t list_of_modes(void)
 {
 	init_crypto();
 
-	static LIST *l = NULL;
+	static list_t *l = NULL;
 	if (!l)
 	{
 		unsigned m = sizeof MODES / sizeof( block_mode_s );
@@ -193,7 +193,7 @@ extern LIST list_of_modes(void)
 	return l;
 }
 
-extern LIST list_of_macs(void)
+extern list_t list_of_macs(void)
 {
 	init_crypto();
 
@@ -209,7 +209,7 @@ extern LIST list_of_macs(void)
 		}
 		id++;
 	}
-	static LIST *l = NULL;
+	static list_t *l = NULL;
 	if (!l)
 	{
 		l = list_init((int (*)(const void *, const void *))strcmp, false, true);
