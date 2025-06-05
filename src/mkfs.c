@@ -36,12 +36,16 @@
 
 #include <gcrypt.h>
 
-#include "common/common.h"
-#include "common/error.h"
-#include "common/mem.h"
-#include "common/ccrypt.h"
-#include "common/tlv.h"
-#include "common/config.h"
+/* submodule includes */
+
+#include "common.h"
+#include "error.h"
+#include "mem.h"
+#include "ccrypt.h"
+#include "tlv.h"
+#include "config.h"
+
+/* project includes */
 
 #include "stegfs.h"
 

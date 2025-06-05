@@ -40,10 +40,14 @@
 
 #include <gcrypt.h>
 
-#include "common/mem.h"
-#include "common/config.h"
-#include "common/ccrypt.h"
-#include "common/dir.h"
+/* submodule includes */
+
+#include "mem.h"
+#include "config.h"
+#include "ccrypt.h"
+#include "dir.h"
+
+/* project includes */
 
 #include "stegfs.h"
 

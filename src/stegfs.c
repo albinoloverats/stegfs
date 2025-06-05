@@ -31,11 +31,15 @@
 
 #include <gcrypt.h>
 
-#include "common/common.h"
-#include "common/mem.h"
-#include "common/ccrypt.h"
-#include "common/tlv.h"
-#include "common/dir.h"
+/* submodule includes */
+
+#include "common.h"
+#include "mem.h"
+#include "ccrypt.h"
+#include "tlv.h"
+#include "dir.h"
+
+/* project includes */
 
 #include "stegfs.h"
 

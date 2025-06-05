@@ -7,11 +7,11 @@ CP       = cp_tree
 SOURCE   = src/main.c src/stegfs.c
 MKSRC    = src/mkfs.c
 CPSRC    = src/cp.c
-COMMON   = src/common/error.c src/common/mem.c src/common/ccrypt.c src/common/tlv.c src/common/list.c src/common/dir.c src/common/cli.c src/common/version.c src/common/config.c
-MISC     = src/common/misc.h
+COMMON   = common/src/error.c common/src/mem.c common/src/ccrypt.c common/src/tlv.c common/src/list.c common/src/dir.c common/src/cli.c common/src/version.c common/src/config.c
+MISC     = common/misc.h
 
 CFLAGS   += -Wall -Wextra -std=gnu99 $(shell pkg-config --cflags fuse libgcrypt) -pipe -O2 -I/usr/local/include -Isrc
-CPPFLAGS += -D_GNU_SOURCE -DGCRYPT_NO_DEPRECATED -DUSE_GCRYPT -D_FILE_OFFSET_BITS=64 -DGIT_COMMIT=\"`git log | head -n1 | cut -f2 -d' '`\" -DBUILD_OS=\"$(shell grep PRETTY_NAME /etc/os-release | cut -d= -f2)\"
+CPPFLAGS += -Icommon/src -D_GNU_SOURCE -DGCRYPT_NO_DEPRECATED -DUSE_GCRYPT -D_FILE_OFFSET_BITS=64 -DGIT_COMMIT=\"`git log | head -n1 | cut -f2 -d' '`\" -DBUILD_OS=\"$(shell grep PRETTY_NAME /etc/os-release | cut -d= -f2)\"
 
 DEBUG_CFLAGS   = -O0 -ggdb
 DEBUG_CPPFLAGS = -D__DEBUG__ -DUSE_PROC
@@ -37,7 +37,7 @@ mkfs:
 cp:
 	 @echo "#define ALL_CFLAGS   \"$(strip $(subst \",\',"${CFLAGS}"))\""    > ${MISC}
 	 @echo "#define ALL_CPPFLAGS \"$(strip $(subst \",\',"${CPPFLAGS}"))\"" >> ${MISC}
-	 @${CC} -lcurl -lpthread ${CFLAGS} ${CPPFLAGS} -O0 -ggdb ${CPSRC} src/common/error.c src/common/cli.c src/common/config.c src/common/version.c src/common/fs.c -o ${CP}
+	 @${CC} -lcurl -lpthread ${CFLAGS} ${CPPFLAGS} -O0 -ggdb ${CPSRC} common/src/error.c common/src/cli.c common/src/config.c common/src/version.c common/src/fs.c -o ${CP}
 	-@echo "built ‘${CPSRC} ${COMMON}’ → ‘${CP}’"
 
 debug: debug-stegfs debug-mkfs
@@ -87,3 +87,4 @@ distclean: clean
 	@rm -fvr pkg build
 	@rm -fv ${STEGFS}*.pkg.tar.xz
 	@rm -fv ${STEGFS}*.tgz
+	@rm -fv ${MISC}

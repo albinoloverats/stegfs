@@ -27,11 +27,15 @@
 #include <sys/stat.h>
 #include <dirent.h>
 
-#include "common/common.h"
-#include "common/error.h"
-#include "common/mem.h"
-#include "common/dir.h"
-#include "common/config.h"
+/* submodule includes */
+
+#include "common.h"
+#include "error.h"
+#include "mem.h"
+#include "dir.h"
+#include "config.h"
+
+/* project includes */
 
 #include "stegfs.h"
 
