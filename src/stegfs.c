@@ -60,21 +60,238 @@ static gcry_cipher_hd_t init_cipher(const stegfs_file_s * const restrict, uint8_
 static gcry_mac_hd_t init_mac(const stegfs_file_s * const restrict, uint8_t);
 
 
-static stegfs_s file_system;
+static stegfs_s file_system = { .handle = -1 };
+static bool file_system_mapped;
+static bool file_system_cache_ready;
 
+static void cache_free(stegfs_cache_s *cache)
+{
+	if (!cache)
+		return;
+	for (uint64_t i = 0; i < cache->ents; i++)
+	{
+		stegfs_cache_s *child = cache->child[i];
+		if (!child)
+			continue;
+		cache_free(child);
+		free(child);
+	}
+	free(cache->child);
+	free(cache->name);
+	if (cache->file)
+	{
+		free(cache->file->path);
+		free(cache->file->name);
+		free(cache->file->pass);
+		free(cache->file->data);
+		for (unsigned i = 0; i < COPIES_MAX; i++)
+			free(cache->file->blocks[i]);
+		free(cache->file);
+	}
+	memset(cache, 0, sizeof *cache);
+}
+
+static void file_system_clear(void)
+{
+	if (file_system_cache_ready)
+		cache_free(&file_system.cache);
+	if (file_system.blocks.file)
+	{
+		uint64_t blocks = file_system.blocksize ? file_system.size / file_system.blocksize : 0;
+		for (uint64_t i = 0; i < blocks; i++)
+			free(file_system.blocks.file[i]);
+		free(file_system.blocks.file);
+	}
+	free(file_system.blocks.in_use);
+	if (file_system_mapped)
+		munmap(file_system.memory, file_system.size);
+	if (file_system.handle >= 0)
+		close(file_system.handle);
+	memset(&file_system, 0, sizeof file_system);
+	file_system.handle = -1;
+	file_system_mapped = false;
+	file_system_cache_ready = false;
+}
+
+static stegfs_init_e parse_superblock(const stegfs_block_s *block)
+{
+	if ((block->hash[0] == HASH_MAGIC_201001_0 || htonll(block->hash[0]) == HASH_MAGIC_201001_0)
+			&& (block->hash[1] == HASH_MAGIC_201001_1 || htonll(block->hash[1]) == HASH_MAGIC_201001_1)
+			&& (block->hash[2] == HASH_MAGIC_201001_2 || htonll(block->hash[2]) == HASH_MAGIC_201001_2))
+		return STEGFS_INIT_OLD_STEGFS;
+
+	if (ntohll(block->hash[0]) != HASH_MAGIC_0 || ntohll(block->hash[1]) != HASH_MAGIC_1)
+		return STEGFS_INIT_NOT_STEGFS;
+
+	uint64_t tags;
+	size_t offset;
+	switch (ntohll(block->hash[2]))
+	{
+		case HASH_MAGIC_201508_2:
+			tags = 8;
+			offset = 0;
+			break;
+		case HASH_MAGIC_2:
+			memcpy(&tags, block->data, sizeof tags);
+			tags = ntohll(tags);
+			offset = sizeof tags;
+			break;
+		default:
+			return STEGFS_INIT_NOT_STEGFS;
+	}
+	if (tags > TAG_MAX || offset > sizeof block->data)
+		return STEGFS_INIT_CORRUPT_TAG;
+
+	tlv_t tlv = tlv_init();
+	for (uint64_t i = 0; i < tags; i++)
+	{
+		if (sizeof block->data - offset < sizeof(uint8_t) + sizeof(uint16_t))
+			goto corrupt;
+		tlv_entry_s entry;
+		memcpy(&entry.tag, block->data + offset, sizeof entry.tag);
+		offset += sizeof entry.tag;
+		memcpy(&entry.length, block->data + offset, sizeof entry.length);
+		offset += sizeof entry.length;
+		entry.length = ntohs(entry.length);
+		if (entry.length > sizeof block->data - offset)
+			goto corrupt;
+		entry.value = (byte_t *)block->data + offset;
+		offset += entry.length;
+		if (!tlv_append(tlv, entry))
+			goto corrupt;
+	}
+
+	if (!tlv_has_tag(tlv, TAG_STEGFS)
+			|| tlv_length_of(tlv, TAG_STEGFS) != strlen(STEGFS_NAME)
+			|| memcmp(tlv_value_of(tlv, TAG_STEGFS), STEGFS_NAME, strlen(STEGFS_NAME)))
+		goto invalid;
+
+	if (!tlv_has_tag(tlv, TAG_VERSION))
+		goto missing;
+	char *version_string = m_strndup((char *)tlv_value_of(tlv, TAG_VERSION), tlv_length_of(tlv, TAG_VERSION));
+	file_system.version = parse_version(version_string);
+	free(version_string);
+	if (file_system.version != VERSION_2015_08 && file_system.version != VERSION_202X_XX)
+	{
+		tlv_deinit(tlv);
+		return STEGFS_INIT_OLD_STEGFS;
+	}
+
+#define READ_ALGORITHM_TAG(tag, destination, default_value, convert, none_value) \
+	do { \
+		if (tlv_has_tag(tlv, tag)) { \
+			uint16_t length = tlv_length_of(tlv, tag); \
+			if (!length) goto invalid; \
+			char *name = m_strndup((char *)tlv_value_of(tlv, tag), length); \
+			destination = convert(name); \
+			free(name); \
+		} else destination = default_value; \
+		if (destination == none_value) goto invalid; \
+	} while (0)
+	READ_ALGORITHM_TAG(TAG_CIPHER, file_system.cipher, DEFAULT_CIPHER, cipher_id_from_name, GCRY_CIPHER_NONE);
+	READ_ALGORITHM_TAG(TAG_MODE, file_system.mode, DEFAULT_MODE, mode_id_from_name, GCRY_CIPHER_MODE_NONE);
+	READ_ALGORITHM_TAG(TAG_HASH, file_system.hash, DEFAULT_HASH, hash_id_from_name, GCRY_MD_NONE);
+	if (file_system.version >= VERSION_202X_XX)
+		READ_ALGORITHM_TAG(TAG_MAC, file_system.mac, DEFAULT_MAC, mac_id_from_name, GCRY_MAC_NONE);
+	else
+		file_system.mac = DEFAULT_MAC;
+#undef READ_ALGORITHM_TAG
+
+	if (!tlv_has_tag(tlv, TAG_DUPLICATION))
+		file_system.copies = COPIES_DEFAULT;
+	else if (file_system.version >= VERSION_202X_XX)
+	{
+		if (tlv_length_of(tlv, TAG_DUPLICATION) != sizeof(uint8_t))
+			goto invalid;
+		file_system.copies = *(uint8_t *)tlv_value_of(tlv, TAG_DUPLICATION);
+	}
+	else
+	{
+		uint32_t copies;
+		if (tlv_length_of(tlv, TAG_DUPLICATION) != sizeof copies)
+			goto invalid;
+		memcpy(&copies, tlv_value_of(tlv, TAG_DUPLICATION), sizeof copies);
+		file_system.copies = ntohl(copies);
+	}
+	if (!file_system.copies || file_system.copies > COPIES_MAX)
+		goto invalid;
+
+	uint32_t value;
+	if (!tlv_has_tag(tlv, TAG_BLOCKSIZE))
+		goto missing;
+	if (tlv_length_of(tlv, TAG_BLOCKSIZE) != sizeof value)
+		goto invalid;
+	memcpy(&value, tlv_value_of(tlv, TAG_BLOCKSIZE), sizeof value);
+	file_system.blocksize = ntohl(value);
+	if (file_system.blocksize != sizeof(stegfs_block_s))
+		goto corrupt;
+
+	if (!tlv_has_tag(tlv, TAG_HEADER_OFFSET))
+		goto missing;
+	if (tlv_length_of(tlv, TAG_HEADER_OFFSET) != sizeof value)
+		goto invalid;
+	memcpy(&value, tlv_value_of(tlv, TAG_HEADER_OFFSET), sizeof value);
+	file_system.head_offset = ntohl(value);
+	uint64_t header_offset = (uint64_t)file_system.head_offset;
+	if (header_offset > sizeof block->data
+			|| header_offset < (file_system.copies + 1) * sizeof(uint64_t)
+				+ gcry_mac_get_algo_maclen(file_system.mac))
+		goto corrupt;
+
+	if (tlv_has_tag(tlv, TAG_KDF))
+	{
+		uint64_t kdf;
+		if (tlv_length_of(tlv, TAG_KDF) != sizeof kdf)
+			goto invalid;
+		memcpy(&kdf, tlv_value_of(tlv, TAG_KDF), sizeof kdf);
+		file_system.kdf_iterations = ntohll(kdf);
+	}
+	else
+		file_system.kdf_iterations = DEFAULT_KDF_ITERATIONS;
+	if (!file_system.kdf_iterations)
+		goto invalid;
+
+	if (ntohll(block->next) != file_system.size / file_system.blocksize)
+		goto corrupt;
+	tlv_deinit(tlv);
+	return STEGFS_INIT_OKAY;
+
+missing:
+	tlv_deinit(tlv);
+	return STEGFS_INIT_MISSING_TAG;
+invalid:
+	tlv_deinit(tlv);
+	return STEGFS_INIT_INVALID_TAG;
+corrupt:
+	tlv_deinit(tlv);
+	return STEGFS_INIT_CORRUPT_TAG;
+}
 extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid, enum gcry_cipher_algos cipher, enum gcry_cipher_modes mode, enum gcry_md_algos hash, enum gcry_mac_algos mac, uint64_t kdf, uint32_t dups, bool show_bloc)
 {
-	if ((file_system.handle = open(fs, O_RDWR, S_IRUSR | S_IWUSR)) < 0)
+	if (file_system_mapped || file_system.handle >= 0)
+		file_system_clear();
+	memset(&file_system, 0, sizeof file_system);
+	file_system.handle = -1;
+	if (!fs || (file_system.handle = open(fs, O_RDWR, S_IRUSR | S_IWUSR)) < 0)
 		return STEGFS_INIT_UNKNOWN;
-	lockf(file_system.handle, F_LOCK, 0);
-	file_system.size = lseek(file_system.handle, 0, SEEK_END);
+	if (lockf(file_system.handle, F_LOCK, 0) < 0)
+		goto unknown;
+	off_t size = lseek(file_system.handle, 0, SEEK_END);
+	if (size < (off_t)(2 * SIZE_BYTE_BLOCK) || size % SIZE_BYTE_BLOCK)
+		goto corrupt_image;
+	file_system.size = (uint64_t)size;
 	if ((file_system.memory = mmap(NULL, file_system.size, PROT_READ | PROT_WRITE, MAP_SHARED, file_system.handle, 0)) == MAP_FAILED)
-		return STEGFS_INIT_UNKNOWN;
+	{
+		file_system.memory = NULL;
+		goto unknown;
+	}
+	file_system_mapped = true;
 
 	file_system.cache.name = m_strdup(DIR_SEPARATOR);
 	file_system.cache.ents = 0;
 	file_system.cache.child = NULL;
 	file_system.cache.file = NULL;
+	file_system_cache_ready = true;
 	if ((file_system.show_bloc = show_bloc))
 		stegfs_cache_add(PATH_BLOC, NULL);
 	if (paranoid)
@@ -92,143 +309,26 @@ extern stegfs_init_e stegfs_init(const char * const restrict fs, bool paranoid, 
 
 	stegfs_block_s block;
 	memcpy(&block, file_system.memory, sizeof block);
-	/* quick check for previous version; account for all byte orders */
-	if ((block.hash[0] == HASH_MAGIC_201001_0 || htonll(block.hash[0]) == HASH_MAGIC_201001_0)
-			&& (block.hash[1] == HASH_MAGIC_201001_1 || htonll(block.hash[1]) == HASH_MAGIC_201001_1)
-			&& (block.hash[2] == HASH_MAGIC_201001_2 || htonll(block.hash[2]) == HASH_MAGIC_201001_2))
-		return STEGFS_INIT_OLD_STEGFS;
-
-	if (ntohll(block.hash[0]) != HASH_MAGIC_0 || ntohll(block.hash[1]) != HASH_MAGIC_1)
-		return STEGFS_INIT_NOT_STEGFS;
-	uint64_t tags = TAG_MAX;
-	off_t tag_off = sizeof tags;
-	switch (ntohll(block.hash[2]))
+	stegfs_init_e status = parse_superblock(&block);
+	if (status != STEGFS_INIT_OKAY)
 	{
-		case HASH_MAGIC_201508_2:
-			tags = 8;
-			tag_off = 0;
-			break;
-		case HASH_MAGIC_2:
-			memcpy(&tags, block.data, sizeof tags);
-			tags = ntohll(tags);
-			break; /* save actual version detection until later */
-		default:
-			return STEGFS_INIT_NOT_STEGFS;
+		file_system_clear();
+		return status;
 	}
-
-	tlv_t tlv = tlv_init();
-	for (uint64_t i = 0, j = tag_off; i < tags; i++)
-	{
-		tlv_entry_s t;
-		memcpy(&t.tag, block.data + j, sizeof t.tag);
-		j += sizeof t.tag;
-		memcpy(&t.length, block.data + j, sizeof t.length);
-		j += sizeof t.length;
-		t.length = ntohs(t.length);
-		t.value = m_malloc(t.length);
-		memcpy(t.value, block.data + j, t.length);
-		j += t.length;
-		tlv_append(tlv, t);
-		free(t.value);
-	}
-
-	if (strncmp(STEGFS_NAME, (char *)tlv_value_of(tlv, TAG_STEGFS), strlen(STEGFS_NAME)))
-		return STEGFS_INIT_INVALID_TAG;
-	version_e version = parse_version((char *)tlv_value_of(tlv, TAG_VERSION));
-	switch (version)
-	{
-		case VERSION_2015_08:
-		case VERSION_202X_XX:
-			file_system.version = version;
-			break;
-		default:
-			return STEGFS_INIT_OLD_STEGFS;
-	}
-
-	/* get cipher info */
-	if (tlv_has_tag(tlv, TAG_CIPHER))
-	{
-		char *c = m_strndup((char *)tlv_value_of(tlv, TAG_CIPHER), tlv_length_of(tlv, TAG_CIPHER));
-		file_system.cipher = cipher_id_from_name(c);
-		free(c);
-	}
-	else
-		file_system.cipher = DEFAULT_CIPHER;
-	if (tlv_has_tag(tlv, TAG_MODE))
-	{
-		char *m = m_strndup((char *)tlv_value_of(tlv, TAG_MODE), tlv_length_of(tlv, TAG_MODE));
-		file_system.mode = mode_id_from_name(m);
-		free(m);
-	}
-	else
-		file_system.mode = DEFAULT_MODE;
-	/* get hash info */
-	if (tlv_has_tag(tlv, TAG_HASH))
-	{
-		char *h = m_strndup((char *)tlv_value_of(tlv, TAG_HASH), tlv_length_of(tlv, TAG_HASH));
-		file_system.hash = hash_id_from_name(h);
-		free(h);
-	}
-	else
-		file_system.hash = DEFAULT_HASH;
-	/* get mac info */
-	if (tlv_has_tag(tlv, TAG_MAC))
-	{
-		char *a = m_strndup((char *)tlv_value_of(tlv, TAG_MAC), tlv_length_of(tlv, TAG_MAC));
-		file_system.mac = mac_id_from_name(a);
-		free(a);
-	}
-	else
-		file_system.mac = DEFAULT_MAC;
-	if (file_system.version < VERSION_202X_XX)
-		file_system.mac = DEFAULT_MAC;
-
-	if (file_system.cipher == GCRY_CIPHER_NONE || file_system.hash == GCRY_MD_NONE || file_system.mode == GCRY_CIPHER_MODE_NONE)
-		return STEGFS_INIT_INVALID_TAG;
-	if (file_system.version > VERSION_2015_08 && file_system.mac == GCRY_MAC_NONE)
-		return STEGFS_INIT_INVALID_TAG;
-
-	/* get number of copies */
-	if (tlv_has_tag(tlv, TAG_DUPLICATION))
-		memcpy(&file_system.copies, tlv_value_of(tlv, TAG_DUPLICATION), tlv_length_of(tlv, TAG_DUPLICATION));
-	else
-		file_system.copies = COPIES_DEFAULT;
-	if (file_system.version < VERSION_202X_XX)
-		file_system.copies = ntohl(file_system.copies);
-
-	/* get fs block size */
-	if (!tlv_has_tag(tlv, TAG_BLOCKSIZE))
-		return STEGFS_INIT_MISSING_TAG;
-	memcpy(&file_system.blocksize, tlv_value_of(tlv, TAG_BLOCKSIZE), tlv_length_of(tlv, TAG_BLOCKSIZE));
-	file_system.blocksize = ntohl(file_system.blocksize);
-
-	/* get number of bytes file data in file header */
-	if (!tlv_has_tag(tlv, TAG_HEADER_OFFSET))
-		return STEGFS_INIT_MISSING_TAG;
-	memcpy(&file_system.head_offset, tlv_value_of(tlv, TAG_HEADER_OFFSET), tlv_length_of(tlv, TAG_HEADER_OFFSET));
-	file_system.head_offset = ntohl(file_system.head_offset);
-
-	/* get mac info */
-	if (tlv_has_tag(tlv, TAG_KDF))
-	{
-		uint64_t *k = (uint64_t *)tlv_value_of(tlv, TAG_KDF);
-		memcpy(&file_system.kdf_iterations, k, sizeof file_system.kdf_iterations);
-		file_system.kdf_iterations = ntohll(file_system.kdf_iterations);
-	}
-	else
-		file_system.kdf_iterations = DEFAULT_KDF_ITERATIONS;
-
-
-	if (ntohll(block.next) != file_system.size / file_system.blocksize)
-		return STEGFS_INIT_CORRUPT_TAG;
-	if (file_system.head_offset > (ssize_t)file_system.blocksize)
-		return STEGFS_INIT_CORRUPT_TAG;
-	if (file_system.copies <= 0 || file_system.copies > COPIES_MAX)
-		return STEGFS_INIT_INVALID_TAG;
-
-	tlv_deinit(tlv);
 
 done:
+	if (file_system.blocksize != SIZE_BYTE_BLOCK || file_system.size % file_system.blocksize)
+	{
+		file_system_clear();
+		return STEGFS_INIT_CORRUPT_TAG;
+	}
+	if (!file_system.copies || file_system.copies > COPIES_MAX
+			|| (uint64_t)file_system.head_offset > SIZE_BYTE_DATA
+			|| !file_system.kdf_iterations)
+	{
+		file_system_clear();
+		return STEGFS_INIT_INVALID_TAG;
+	}
 	file_system.blocks.used = 1;
 	file_system.blocks.in_use = m_calloc(file_system.size / file_system.blocksize, sizeof( bool ));
 	if (file_system.show_bloc)
@@ -236,6 +336,13 @@ done:
 
 	init_crypto();
 	return STEGFS_INIT_OKAY;
+
+corrupt_image:
+	file_system_clear();
+	return STEGFS_INIT_CORRUPT_TAG;
+unknown:
+	file_system_clear();
+	return STEGFS_INIT_UNKNOWN;
 }
 
 static version_e parse_version(const char *v)
@@ -256,23 +363,7 @@ static version_e parse_version(const char *v)
 
 extern void stegfs_deinit(void)
 {
-	//msync(file_system.memory, file_system.size,  MS_SYNC);
-	munmap(file_system.memory, file_system.size);
-	close(file_system.handle);
-
-	free(file_system.blocks.in_use);
-	if (file_system.show_bloc)
-	{
-		for (uint64_t i = 0; i < file_system.blocks.used; i++)
-			if (file_system.blocks.file[i])
-				free(file_system.blocks.file[i]);
-		free(file_system.blocks.file);
-	}
-
-	stegfs_cache_remove(DIR_SEPARATOR);
-	free(file_system.cache.name);
-
-	return;
+	file_system_clear();
 }
 
 extern stegfs_s stegfs_info(void)
@@ -282,21 +373,39 @@ extern stegfs_s stegfs_info(void)
 
 extern bool stegfs_file_will_fit(stegfs_file_s *file)
 {
+	if (!file || !file_system.blocksize || file_system.head_offset > SIZE_BYTE_DATA
+			|| !file_system.copies
+			|| file_system.copies > COPIES_MAX)
+		return errno = EINVAL, false;
 	stegfs_block_s block;
-	lldiv_t d = lldiv(file->size - (file->size < (sizeof block.data - file_system.head_offset) ? file->size : (sizeof block.data - file_system.head_offset)), SIZE_BYTE_DATA);
-	uint64_t blocks_needed = (d.quot + (d.rem > 0)) * file_system.copies;
+	uint64_t inline_capacity = sizeof block.data - file_system.head_offset;
+	uint64_t remainder = file->size > inline_capacity ? file->size - inline_capacity : 0;
+	uint64_t blocks_needed = remainder / SIZE_BYTE_DATA + (remainder % SIZE_BYTE_DATA != 0);
+	if (blocks_needed > UINT64_MAX / file_system.copies)
+		return errno = EFBIG, false;
+	blocks_needed *= file_system.copies;
 
-	uint64_t blocks_total = (file_system.size / file_system.blocksize) - 1;
-	if (blocks_needed > blocks_total)
+	uint64_t total_blocks = file_system.size / file_system.blocksize;
+	if (file_system.blocks.used > total_blocks)
+		return errno = EIO, false;
+	uint64_t old_data_blocks = 0;
+	uint64_t old_inodes = 0;
+	for (unsigned i = 0; i < file_system.copies; i++)
 	{
-		stegfs_file_delete(file);
-		return errno = EFBIG, false; /* file would not fit in the file system */
+		old_inodes += file->inodes[i] != 0;
+		if (file->blocks[i])
+		{
+			if (old_data_blocks > UINT64_MAX - file->blocks[i][0])
+				return errno = EFBIG, false;
+			old_data_blocks += file->blocks[i][0];
+		}
 	}
-	if (blocks_needed > blocks_total - file_system.blocks.used)
-	{
-		stegfs_file_delete(file);
-		return errno = ENOSPC, false; /* file won’t fit in remaining space */
-	}
+	uint64_t new_data_blocks = blocks_needed;
+	uint64_t available = total_blocks - file_system.blocks.used;
+	uint64_t required = (file_system.copies - old_inodes)
+		+ (new_data_blocks > old_data_blocks ? new_data_blocks - old_data_blocks : 0);
+	if (required > available)
+		return errno = old_inodes ? ENOSPC : EFBIG, false;
 	return errno = EXIT_SUCCESS, true;
 }
 
@@ -307,10 +416,16 @@ extern void stegfs_file_create(const char * const restrict path, bool write)
 	file.path = dir_get_path(path);
 	file.name = dir_get_name(path, PASSWORD_SEPARATOR);
 	file.pass = dir_get_pass(path);
+	memset(file.inodes, 0, sizeof file.inodes);
+	memset(file.blocks, 0, sizeof file.blocks);
+	file.data = NULL;
 	file.write = write;
 	file.size = 0;
 	file.time = time(NULL);
 	stegfs_cache_add(NULL, &file);
+	free(file.path);
+	free(file.name);
+	free(file.pass);
 	return;
 }
 
@@ -328,7 +443,8 @@ extern bool stegfs_file_stat_aux(stegfs_file_s *file, bool quick)
 	gcry_md_open(&hash, GCRY_MD_SHA512, GCRY_MD_FLAG_SECURE);
 	gcry_md_write(hash, file->path, strlen(file->path));
 	gcry_md_write(hash, file->name, strlen(file->name));
-	uint8_t *inodes = gcry_md_read(hash, GCRY_MD_SHA512);
+	uint8_t digest[64];
+	memcpy(digest, gcry_md_read(hash, GCRY_MD_SHA512), sizeof digest);
 	size_t len = gcry_md_get_algo_dlen(GCRY_MD_SHA512);
 	/*
 	 * calculate inode values; must be done here, so we have all of
@@ -337,10 +453,10 @@ extern bool stegfs_file_stat_aux(stegfs_file_s *file, bool quick)
 	 */
 	for (unsigned i = 0; i < file_system.copies; i++)
 	{
-		memcpy(&file->inodes[i], inodes, sizeof file->inodes[i]);
-		uint8_t b = inodes[0];
-		memmove(inodes, inodes + 1, len - 1);
-		inodes[len] = b;
+		memcpy(&file->inodes[i], digest, sizeof file->inodes[i]);
+		uint8_t b = digest[0];
+		memmove(digest, digest + 1, len - 1);
+		digest[len - 1] = b;
 	}
 	gcry_md_close(hash);
 	/*
@@ -363,12 +479,19 @@ extern bool stegfs_file_stat_aux(stegfs_file_s *file, bool quick)
 				gcry_cipher_close(cipher_handle);
 				continue;
 			}
-			file_system.blocks.in_use[normalize(file->inodes[i])] = true;
-			if (file_system.show_bloc)
-				m_asprintf(&file_system.blocks.file[normalize(file->inodes[i])], "../%s/%s", file->path, file->name);
-			file_system.blocks.used++;
+			uint64_t inode_block = normalize(file->inodes[i]);
+			if (!file_system.blocks.in_use[inode_block])
+			{
+				file_system.blocks.in_use[inode_block] = true;
+				file_system.blocks.used++;
+			}
+			if (file_system.show_bloc && !file_system.blocks.file[inode_block])
+				m_asprintf(&file_system.blocks.file[inode_block], "../%s/%s", file->path, file->name);
 			if (!quick && found)
+			{
+				gcry_cipher_close(cipher_handle);
 				continue;
+			}
 
 			uint64_t first[SIZE_LONG_DATA];
 			memcpy(first, inode.data, sizeof first);
@@ -385,10 +508,14 @@ extern bool stegfs_file_stat_aux(stegfs_file_s *file, bool quick)
 				{
 					/* first full block of file data */
 					file->blocks[j][1] = htonll(first[l]);
-					file_system.blocks.in_use[normalize(file->blocks[j][1])] = true;
-					if (file_system.show_bloc)
-						m_asprintf(&file_system.blocks.file[normalize(file->inodes[i])], "../%s/%s", file->path, file->name);
-					file_system.blocks.used++;
+					uint64_t data_block = normalize(file->blocks[j][1]);
+					if (!file_system.blocks.in_use[data_block])
+					{
+						file_system.blocks.in_use[data_block] = true;
+						file_system.blocks.used++;
+					}
+					if (file_system.show_bloc && !file_system.blocks.file[data_block])
+						m_asprintf(&file_system.blocks.file[data_block], "../%s/%s", file->path, file->name);
 				}
 				/*
 				 * traverse file block tree; whilst the
@@ -401,10 +528,14 @@ extern bool stegfs_file_stat_aux(stegfs_file_s *file, bool quick)
 					//memset(&block, 0x00, sizeof block);
 					if (block_read(file->blocks[j][k - 1], &block, another_cipher, file->path))
 					{
-						file_system.blocks.in_use[normalize(file->blocks[j][k - 1])] = true;
-						if (file_system.show_bloc)
-							m_asprintf(&file_system.blocks.file[normalize(file->inodes[i])], "../%s/%s", file->path, file->name);
-						file_system.blocks.used++;
+						uint64_t data_block = normalize(file->blocks[j][k - 1]);
+						if (!file_system.blocks.in_use[data_block])
+						{
+							file_system.blocks.in_use[data_block] = true;
+							file_system.blocks.used++;
+						}
+						if (file_system.show_bloc && !file_system.blocks.file[data_block])
+							m_asprintf(&file_system.blocks.file[data_block], "../%s/%s", file->path, file->name);
 						file->blocks[j][k] = ntohll(block.next);
 					}
 					else
@@ -444,7 +575,8 @@ extern bool stegfs_file_stat_aux(stegfs_file_s *file, bool quick)
 					free(file_system.blocks.file[normalize(file->blocks[i][j])]);
 					file_system.blocks.file[normalize(file->blocks[i][j])] = NULL;
 				}
-				file_system.blocks.used--;
+				if (file_system.blocks.used > 1)
+					file_system.blocks.used--;
 			}
 			free(file->blocks[i]);
 			file->blocks[i] = NULL;
@@ -461,7 +593,14 @@ extern bool stegfs_file_read(stegfs_file_s *file)
 	/*
 	 * read the start of the file data
 	 */
-	file->data = m_realloc(file->data, file->size);
+	if (file->size)
+		file->data = m_realloc(file->data, file->size);
+	else
+	{
+		free(file->data);
+		file->data = NULL;
+	}
+	bool inode_found = false;
 	for (unsigned i = 0, c = 0; i < file_system.copies && !c; i++)
 	{
 		gcry_cipher_hd_t cipher_handle = init_cipher(file, i);
@@ -469,21 +608,31 @@ extern bool stegfs_file_read(stegfs_file_s *file)
 		//memset(&inode, 0x00, sizeof inode);
 		if (block_read(file->inodes[i], &inode, cipher_handle, file->path))
 		{
-			memcpy(file->data, inode.data + file_system.head_offset, file->size < (sizeof inode.data - file_system.head_offset) ? file->size : (sizeof inode.data - file_system.head_offset));
+			size_t inline_size = file->size < (sizeof inode.data - file_system.head_offset)
+				? file->size : (sizeof inode.data - file_system.head_offset);
+			if (inline_size)
+				memcpy(file->data, inode.data + file_system.head_offset, inline_size);
 			memcpy(mac_data, inode.data + ((file_system.copies + 1) * sizeof( uint64_t )), mac_length);
+			inode_found = true;
 			c = 1;
 		}
 		gcry_cipher_close(cipher_handle);
+	}
+	if (!inode_found)
+	{
+		gcry_free(mac_data);
+		return errno = EIO, false;
 	}
 	/*
 	 * and then the rest of it
 	 */
 	stegfs_block_s block;
+	bool read_successfully = false;
 	for (unsigned i = 0, corrupt_copies = 0; i < file_system.copies; i++)
 	{
 		lldiv_t d = lldiv(file->size - (file->size < (sizeof block.data - file_system.head_offset) ? file->size : (sizeof block.data - file_system.head_offset)), SIZE_BYTE_DATA);
 		uint64_t blocks = d.quot + (d.rem > 0);
-		if (file->blocks[i][0] != blocks)
+		if (!file->blocks[i] || file->blocks[i][0] != blocks)
 			continue; /* this copy is corrupt; try the next */
 		bool failed = false;
 		gcry_cipher_hd_t cipher_handle = init_cipher(file, i);
@@ -516,12 +665,15 @@ extern bool stegfs_file_read(stegfs_file_s *file)
 		if (file_system.version >= VERSION_202X_XX && gcry_mac_verify(mac_handle, mac_data, mac_length) == GPG_ERR_CHECKSUM)
 			failed = true;
 		gcry_mac_close(mac_handle);
-		gcry_free(mac_data);
 		if (failed)
 			continue;
 		stegfs_cache_add(NULL, file);
-		return corrupt_copies < file_system.copies;
+		read_successfully = corrupt_copies < file_system.copies;
+		break;
 	}
+	gcry_free(mac_data);
+	if (read_successfully)
+		return true;
 	/*
 	 * somehow we failed to read a complete copy of the file, despite
 	 * knowing that a complete copy existed when stat’d
@@ -814,10 +966,12 @@ static bool block_write(uint64_t bid, stegfs_block_s block, gcry_cipher_hd_t cip
 static void block_delete(uint64_t bid)
 {
 	bid %= (file_system.size / file_system.blocksize);
+	if (!bid || !file_system.blocks.in_use[bid])
+		return;
 	stegfs_block_s block;
 	memcpy(&block, file_system.memory + (bid * file_system.blocksize), sizeof block);
 	gcry_create_nonce(&block, file_system.blocksize);
-	if (!bid || (bid * file_system.blocksize + file_system.blocksize > file_system.size))
+	if (bid * file_system.blocksize + file_system.blocksize > file_system.size)
 		return;
 	memcpy(file_system.memory + (bid * file_system.blocksize), &block, sizeof block);
 	//msync(file_system.memory + (bid * file_system.blocksize), sizeof block, MS_SYNC);
@@ -853,7 +1007,9 @@ static bool block_in_use(uint64_t bid, const char * const restrict path)
 	for (uint16_t i = 1; i < hierarchy; i++)
 	{
 		char *e = dir_get_part(path, i);
-		m_asprintf(&p, "%s/%s", p ? : "", e ? : "");
+		char *previous = p;
+		m_asprintf(&p, "%s/%s", previous ? : "", e ? : "");
+		free(previous);
 		if (e)
 			free(e);
 		gcry_md_hash_buffer(file_system.hash, hash_buffer, p, strlen(p));
@@ -866,6 +1022,7 @@ static bool block_in_use(uint64_t bid, const char * const restrict path)
 			 */
 			file_system.blocks.in_use[bid] = true;
 			file_system.blocks.used++;
+			free(p);
 			return true;
 		}
 	}
@@ -890,7 +1047,7 @@ static uint64_t block_assign(const char * const restrict path)
 	uint64_t tries = 0;
 	do
 	{
-		block = (lrand48() << 32 | lrand48());// % (file_system.size / file_system.blocksize);
+		block = ((uint64_t)(uint32_t)lrand48() << 32) | (uint32_t)lrand48();
 		/* eventually “timeout” after trying as many blocks as exists */
 		if ((++tries) > file_system.size / file_system.blocksize)
 			return 0;
@@ -1082,6 +1239,12 @@ c2a3:
 		if (!ptr->file)
 			ptr->file = m_calloc(sizeof( stegfs_file_s ), sizeof( uint8_t ));
 		/* set path and name */
+		free(ptr->file->path);
+		free(ptr->file->name);
+		free(ptr->file->pass);
+		ptr->file->path = NULL;
+		ptr->file->name = NULL;
+		ptr->file->pass = NULL;
 		m_asprintf(&ptr->file->path, "%s", file->path);
 		m_asprintf(&ptr->file->name, "%s", file->name);
 		m_asprintf(&ptr->file->pass, "%s", file->pass);
@@ -1106,11 +1269,21 @@ c2a3:
 			uint64_t blocks = d.quot + (d.rem > 0);
 			for (unsigned i = 0; i < file_system.copies; i++)
 			{
-				ptr->file->blocks[i] = m_realloc(ptr->file->blocks[i], (blocks + 1) * sizeof blocks);
-				//memset(ptr->file->blocks[i], 0x00, blocks * sizeof blocks);
+				free(ptr->file->blocks[i]);
+				ptr->file->blocks[i] = m_calloc(blocks + 2, sizeof blocks);
 				ptr->file->blocks[i][0] = blocks;
 				for (uint64_t j = 1 ; j <= blocks && file->blocks[i] && file->blocks[i][j]; j++)
 					ptr->file->blocks[i][j] = file->blocks[i][j];
+			}
+		}
+		else
+		{
+			free(ptr->file->data);
+			ptr->file->data = NULL;
+			for (unsigned i = 0; i < file_system.copies; i++)
+			{
+				free(ptr->file->blocks[i]);
+				ptr->file->blocks[i] = NULL;
 			}
 		}
 	}

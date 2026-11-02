@@ -82,6 +82,25 @@ static int fuse_stegfs_chmod(const char *, mode_t);
 static int fuse_stegfs_chown(const char *, uid_t, gid_t);
 static int fuse_stegfs_flush(const char *, struct fuse_file_info *);
 
+static bool block_index_from_path(const char *path, uint64_t *index)
+{
+	char *name = dir_get_name(path, PASSWORD_SEPARATOR);
+	if (!name || !*name)
+	{
+		free(name);
+		return false;
+	}
+	char *end = NULL;
+	errno = 0;
+	uintmax_t value = strtoumax(name, &end, 10);
+	bool valid = !errno && end && !*end && value <= UINT64_MAX;
+	free(name);
+	if (!valid)
+		return false;
+	*index = (uint64_t)value;
+	return true;
+}
+
 static struct fuse_operations fuse_stegfs_functions =
 {
 	.statfs    = fuse_stegfs_statfs,
@@ -127,8 +146,11 @@ static int fuse_stegfs_statfs(const char *path, struct statvfs *stvbuf)
 
 	stvbuf->f_bsize   = SIZE_BYTE_BLOCK;
 	stvbuf->f_frsize  = SIZE_BYTE_DATA;
-	stvbuf->f_blocks  = (file_system.size / SIZE_BYTE_BLOCK) - 1;
-	stvbuf->f_bfree   = stvbuf->f_blocks - file_system.blocks.used;
+	stvbuf->f_blocks  = file_system.size / SIZE_BYTE_BLOCK - 1;
+	stvbuf->f_bfree   = file_system.blocks.used > 0
+		? (stvbuf->f_blocks > file_system.blocks.used - 1
+			? stvbuf->f_blocks - (file_system.blocks.used - 1) : 0)
+		: stvbuf->f_blocks;
 	stvbuf->f_bavail  = stvbuf->f_bfree;
 	stvbuf->f_files   = stvbuf->f_blocks;
 	stvbuf->f_ffree   = stvbuf->f_bfree;
@@ -145,7 +167,6 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
 	errno = EXIT_SUCCESS;
 
 	stegfs_s file_system = stegfs_info();
-	char *f = dir_get_name(path, PASSWORD_SEPARATOR); /* used to check for symlink */
 	/* common attributes for root/files/directories */
 	stbuf->st_dev     = (dev_t)HASH_MAGIC_2;
 	stbuf->st_ino     = 0;
@@ -180,12 +201,12 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
 		stbuf->st_mode  = S_IFLNK | S_IRUSR;
 		stbuf->st_nlink = 1;
 
-		char *b = dir_get_name(path, PASSWORD_SEPARATOR);
-		uint64_t ino = strtol(b, NULL, 0);
-		char *f = file_system.blocks.file[ino];
-		if (f)
-			stbuf->st_size = strlen(f);
-		free(b);
+		uint64_t ino;
+		uint64_t block_count = file_system.blocksize ? file_system.size / file_system.blocksize : 0;
+		if (!block_index_from_path(path, &ino) || ino >= block_count)
+			errno = ENOENT;
+		else if (file_system.blocks.file[ino])
+			stbuf->st_size = strlen(file_system.blocks.file[ino]);
 	}
 	else
 	{
@@ -243,14 +264,14 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
 			free(file.pass);
 		}
 	}
-	if (stbuf->st_mode & S_IFREG)
+	if (S_ISREG(stbuf->st_mode))
 	{
 		stbuf->st_nlink = 1;
 		stbuf->st_blksize = SIZE_BYTE_DATA;
 		lldiv_t d = lldiv(stbuf->st_size, stbuf->st_blksize);
 		stbuf->st_blocks = d.quot + (d.rem > 0);
 	}
-	else if (stbuf->st_mode & S_IFDIR)
+	else if (S_ISDIR(stbuf->st_mode))
 	{
 		size_t hash_length = gcry_md_get_algo_dlen(file_system.hash);
 		uint8_t *hash_buffer = m_gcry_malloc_secure(hash_length);
@@ -260,8 +281,6 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
 		stbuf->st_ino %= (file_system.size / SIZE_BYTE_BLOCK);
 		stbuf->st_size = SIZE_BYTE_DATA;
 	}
-	free(f);
-
 	return -errno;
 }
 
@@ -271,6 +290,8 @@ static int fuse_stegfs_mkdir(const char *path, mode_t mode)
 
 	(void)mode;
 
+	if (stegfs_cache_exists(path, NULL))
+		return errno = EEXIST, -errno;
 	stegfs_cache_add(path, NULL);
 
 	return -errno;
@@ -293,7 +314,7 @@ static int fuse_stegfs_rmdir(const char *path)
 		{
 			bool empty = true;
 			for (uint64_t i = 0; i < c->ents; i++)
-				if (c->child[i]->name)
+				if (c->child[i] && c->child[i]->name)
 					empty = false;
 			if (!empty)
 				errno = ENOTEMPTY;
@@ -301,6 +322,8 @@ static int fuse_stegfs_rmdir(const char *path)
 				stegfs_cache_remove(path);
 		}
 	}
+	else
+		errno = ENOENT;
 
 	return -errno;
 }
@@ -309,11 +332,16 @@ static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t fill
 {
 	errno = EXIT_SUCCESS;
 
-	(void)offset;
 	(void)info;
 
-	filler(buf,  ".", NULL, 0);
-	filler(buf, "..", NULL, 0);
+	if (offset < 0)
+		return errno = EINVAL, -errno;
+	off_t cookie = 1;
+	if (offset < cookie && filler(buf, ".", NULL, cookie))
+		return 0;
+	cookie++;
+	if (offset < cookie && filler(buf, "..", NULL, cookie))
+		return 0;
 
 	stegfs_s file_system = stegfs_info();
 
@@ -321,7 +349,11 @@ static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t fill
 	{
 		for (uint64_t i = 0; i < file_system.cache.ents; i++)
 			if (file_system.cache.child[i]->name)
-				filler(buf, file_system.cache.child[i]->name, NULL, 0);
+			{
+				cookie = (off_t)i + 3;
+				if (offset < cookie && filler(buf, file_system.cache.child[i]->name, NULL, cookie))
+					break;
+			}
 	}
 	else if (file_system.show_bloc && path_equals(PATH_BLOC, path))
 	{
@@ -330,7 +362,9 @@ static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t fill
 			{
 				char b[21] = { 0x0 }; // max digits for UINT64_MAX
 				snprintf(b, sizeof b, "%ju", i);
-				filler(buf, b, NULL, 0);
+				cookie = (off_t)i + 3;
+				if (offset < cookie && filler(buf, b, NULL, cookie))
+					break;
 			}
 	}
 	else
@@ -340,7 +374,11 @@ static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t fill
 		if (stegfs_cache_exists(path, &c))
 			for (uint64_t i = 0; i < c.ents; i++)
 				if (c.child[i]->name)
-					filler(buf, c.child[i]->name, NULL, 0);
+				{
+					cookie = (off_t)i + 3;
+					if (offset < cookie && filler(buf, c.child[i]->name, NULL, cookie))
+						break;
+				}
 	}
 
 	return -errno;
@@ -349,6 +387,14 @@ static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t fill
 static int fuse_stegfs_unlink(const char *path)
 {
 	errno = EXIT_SUCCESS;
+	stegfs_cache_s *cached = stegfs_cache_exists(path, NULL);
+	if (cached && !cached->file)
+		return errno = EISDIR, -errno;
+	if (cached && cached->file && !cached->file->inodes[0])
+	{
+		stegfs_cache_remove(path);
+		return 0;
+	}
 
 	stegfs_file_s file;
 	memset(&file, 0x00, sizeof file);
@@ -356,7 +402,11 @@ static int fuse_stegfs_unlink(const char *path)
 	file.name = dir_get_name(path, PASSWORD_SEPARATOR);
 	file.pass = dir_get_pass(path);
 
-	stegfs_file_delete(&file);
+	bool exists = stegfs_file_stat(&file);
+	if (exists)
+		stegfs_file_delete(&file);
+	else
+		errno = ENOENT;
 
 	free(file.path);
 	free(file.name);
@@ -370,12 +420,21 @@ static int fuse_stegfs_read(const char *path, char *buf, size_t size, off_t offs
 	errno = EXIT_SUCCESS;
 
 	(void)info;
+	if (offset < 0)
+		return errno = EINVAL, -errno;
 
 	stegfs_cache_s *c = NULL;
 	if ((c = stegfs_cache_exists(path, NULL)) && c->file)
 	{
-		if ((unsigned)(offset + size) > c->file->size)
-			size = c->file->size - offset;
+		if ((uint64_t)offset >= c->file->size || !size)
+			return 0;
+		uint64_t available = c->file->size - (uint64_t)offset;
+		if (size > available)
+			size = (size_t)available;
+		if (!c->file->data)
+			return errno = EIO, -errno;
+		if (size > INT_MAX)
+			size = INT_MAX;
 		memcpy(buf, c->file->data + offset, size);
 		return size;
 	}
@@ -388,6 +447,13 @@ static int fuse_stegfs_write(const char *path, const char *buf, size_t size, off
 	errno = EXIT_SUCCESS;
 
 	(void)info;
+	if (offset < 0)
+		return errno = EINVAL, -errno;
+	if (size > INT_MAX)
+		return errno = EOVERFLOW, -errno;
+	if (size > UINT64_MAX - (uint64_t)offset)
+		return errno = EFBIG, -errno;
+	uint64_t end = (uint64_t)offset + size;
 
 	/*
 	 * if the file is cached (has been read/written to already) then
@@ -398,14 +464,23 @@ static int fuse_stegfs_write(const char *path, const char *buf, size_t size, off
 		stegfs_cache_s *c = NULL;
 		if ((c = stegfs_cache_exists(path, NULL)) && c->file)
 		{
-			if (!stegfs_file_will_fit(c->file))
-				return -errno;
 			if (!c->file->write)
 				return errno = EBADF, -errno;
-			c->file->size = c->file->size > size + offset ? c->file->size : size + offset;
-			c->file->data = m_realloc(c->file->data, c->file->size);
+			uint64_t old_size = c->file->size;
+			uint64_t new_size = old_size > end ? old_size : end;
+			stegfs_file_s candidate = *c->file;
+			candidate.size = new_size;
+			if (!stegfs_file_will_fit(&candidate))
+				return -errno;
+			if (new_size > old_size)
+			{
+				c->file->data = m_realloc(c->file->data, new_size);
+				memset(c->file->data + old_size, 0, new_size - old_size);
+			}
+			c->file->size = new_size;
 			c->file->time = time(NULL);
-			memcpy(c->file->data + offset, buf, size);
+			if (size)
+				memcpy(c->file->data + offset, buf, size);
 			return size;
 		}
 		else if (c && !c->file)
@@ -425,16 +500,20 @@ static int fuse_stegfs_open(const char *path, struct fuse_file_info *info)
 {
 	errno = EXIT_SUCCESS;
 
-	(void)info;
-
 	stegfs_cache_s *c = NULL;
 	if ((c = stegfs_cache_exists(path, NULL)) && c->file)
 	{
+		free(c->file->pass);
 		c->file->pass = dir_get_pass(path);
+		c->file->write = info && (info->flags & O_ACCMODE) != O_RDONLY;
+		if (c->file->write && !c->file->inodes[0])
+			return 0;
 		if (!stegfs_file_read(c->file))
 			errno = EACCES;
 		/* TODO use the fields in info for something meaningful */
 	}
+	else
+		errno = c ? EISDIR : ENOENT;
 
 	return -errno;
 }
@@ -447,8 +526,9 @@ static int fuse_stegfs_flush(const char *path, struct fuse_file_info *info)
 
 	stegfs_cache_s *c = NULL;
 	if ((c = stegfs_cache_exists(path, NULL)) && c->file)
-		if (stegfs_file_will_fit(c->file))
-			errno = EXIT_SUCCESS;
+		stegfs_file_will_fit(c->file);
+	else
+		errno = c ? EISDIR : ENOENT;
 
 	return -errno;
 }
@@ -463,27 +543,39 @@ static int fuse_stegfs_truncate(const char *path, off_t offset)
 static int fuse_stegfs_ftruncate(const char *path, off_t offset, struct fuse_file_info *info)
 {
 	errno = EXIT_SUCCESS;
+	(void)info;
+	if (offset < 0)
+		return errno = EINVAL, -errno;
 
 	stegfs_cache_s *c = NULL;
-	while (true)
+	if ((c = stegfs_cache_exists(path, NULL)) && c->file)
 	{
-		if ((c = stegfs_cache_exists(path, NULL)) && c->file)
-		{
-			char *buf = m_calloc(offset, sizeof(uint8_t));
-			fuse_stegfs_read(path, buf, offset, 0, info);
-			fuse_stegfs_unlink(path);
-			fuse_stegfs_write(path, buf, offset, 0, info);
-			free(buf);
+		if (!c->file->data && c->file->size && !stegfs_file_read(c->file))
 			return -errno;
+		stegfs_file_s candidate = *c->file;
+		candidate.size = (uint64_t)offset;
+		if (!stegfs_file_will_fit(&candidate))
+			return -errno;
+		uint64_t old_size = c->file->size;
+		uint64_t new_size = (uint64_t)offset;
+		if (new_size != old_size)
+		{
+			if (new_size)
+				c->file->data = m_realloc(c->file->data, new_size);
+			else
+			{
+				free(c->file->data);
+				c->file->data = NULL;
+			}
+			if (new_size > old_size)
+				memset(c->file->data + old_size, 0, new_size - old_size);
+			c->file->size = new_size;
+			c->file->time = time(NULL);
 		}
-		else if (c && !c->file)
-			return errno = EISDIR, -errno;
-		else
-			stegfs_file_create(path, true);
+		c->file->write = true;
+		return 0;
 	}
-
-	return errno = EIO, -errno;
-
+	return errno = c ? EISDIR : ENOENT, -errno;
 }
 
 #ifdef STEGFS_FALLOCATE
@@ -550,6 +642,9 @@ static int fuse_stegfs_create(const char *path, mode_t mode, struct fuse_file_in
 	(void)mode;
 	(void)info;
 
+	if (stegfs_cache_exists(path, NULL))
+		return errno = EEXIST, -errno;
+
 	stegfs_file_create(path, true);
 
 	return -errno;
@@ -562,6 +657,8 @@ static int fuse_stegfs_mknod(const char *path, mode_t mode, dev_t rdev)
 	(void)mode;
 	(void)rdev;
 
+	if (stegfs_cache_exists(path, NULL))
+		return errno = EEXIST, -errno;
 	stegfs_file_create(path, false);
 
 	return -errno;
@@ -580,7 +677,9 @@ static int fuse_stegfs_release(const char *path, struct fuse_file_info *info)
 		{
 			if (stegfs_file_write(c->file))
 				errno = EXIT_SUCCESS;
-			c->file->write = false;
+				else if (!errno)
+					errno = EIO;
+				c->file->write = false;
 		}
 		free(c->file->data);
 		c->file->data = NULL;
@@ -605,12 +704,14 @@ static int fuse_stegfs_readlink(const char *path, char *buf, size_t size)
 	stegfs_s file_system = stegfs_info();
 	if (file_system.show_bloc && path_starts_with(PATH_BLOC, path))
 	{
-		char *b = dir_get_name(path, PASSWORD_SEPARATOR);
-		uint64_t ino = strtol(b, NULL, 0);
-		char *f = file_system.blocks.file[ino];
-		if (f)
-			snprintf(buf, size, "%s", f);
-		free(b);
+		uint64_t ino;
+		uint64_t block_count = file_system.blocksize ? file_system.size / file_system.blocksize : 0;
+		if (!block_index_from_path(path, &ino) || ino >= block_count)
+			errno = ENOENT;
+		else if (file_system.blocks.file[ino])
+			snprintf(buf, size, "%s", file_system.blocks.file[ino]);
+		else
+			errno = ENOENT;
 	}
 	else
 	{
@@ -734,7 +835,7 @@ int main(int argc, char **argv)
 
 	bool debug         =          ((config_named_s *)list_get(args,  8))->response.value.boolean;
 	bool foreground    = debug || ((config_named_s *)list_get(args,  9))->response.value.boolean;
-	bool single_thread = debug || ((config_named_s *)list_get(args, 10))->response.value.boolean;
+	bool single_thread = true;
 
 	int fuse_argc = 3;
 	char **fuse_argv = m_calloc(fuse_argc, sizeof (char *));

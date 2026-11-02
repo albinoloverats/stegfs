@@ -1,10 +1,12 @@
-.PHONY: stegfs test test-common coverage coverage-report clean distclean
+.PHONY: stegfs test test-common test-stegfs coverage coverage-report clean distclean
 
 STEGFS   = stegfs
 MKFS     = mkstegfs
 CP       = cp_tree
+TEST_STEGFS = test-stegfs
 
 SOURCE   = src/main.c src/stegfs.c
+TEST_SOURCE = test/test_stegfs.c src/stegfs.c
 MKSRC    = src/mkfs.c
 CPSRC    = src/cp.c
 COMMON   = common/src/error.c common/src/mem.c common/src/ccrypt.c common/src/tlv.c common/src/list.c common/src/dir.c common/src/cli.c common/src/version.c common/src/config.c
@@ -19,21 +21,31 @@ PROFILE        = ${DEBUG} -pg -lc
 
 # -lpthread
 LIBS     = -lpthread -lcurl $(shell pkg-config --libs fuse libgcrypt)
+TEST_LIBS = $(shell pkg-config --libs cmocka) $(LIBS)
 
 all: stegfs mkfs man
 
-test: test-common
+test:
+	@${MAKE} test-common
+	@${MAKE} test-stegfs
 
 test-common:
 	@${MAKE} -C common test
 
+test-stegfs:
+	@${CC} ${CFLAGS} ${CPPFLAGS} $(shell pkg-config --cflags cmocka) ${TEST_SOURCE} ${COMMON} ${TEST_LIBS} -o ${TEST_STEGFS}
+	@./${TEST_STEGFS}
+
 coverage: coverage-report
 
 coverage-report:
-	@${MAKE} -C common coverage-report
+	@${MAKE} -C common coverage
+	@rm -f test-stegfs-*.gcda test-stegfs-*.gcno
+	@${CC} ${CFLAGS} ${CPPFLAGS} $(shell pkg-config --cflags cmocka) --coverage ${TEST_SOURCE} ${COMMON} ${TEST_LIBS} -o ${TEST_STEGFS}
+	@./${TEST_STEGFS}
 	@rm -fvr coverage
 	@mkdir -p coverage
-	@cp -R common/coverage/. coverage/
+	@gcovr --root . --gcov-executable "$$(gcc -print-prog-name=gcov)" --filter '^(src/|common/src/)' --xml-pretty --output coverage/coverage.xml --html-details coverage/index.html --print-summary
 
 stegfs:
 	 @echo "#define ALL_CFLAGS   \"$(strip $(subst \",\',"${CFLAGS}"))\""    > ${MISC}
@@ -92,9 +104,10 @@ uninstall:
 	@rm -fv ${PREFIX}/usr/bin/${STEGFS}
 
 clean:
-	 @rm -fv ${STEGFS} ${MKFS} ${CP}
+	 @rm -fv ${STEGFS} ${MKFS} ${CP} ${TEST_STEGFS}
 	 @rm -fv ${MISC}
 	 @rm -fvr coverage
+	 @rm -fv test-stegfs-*.gcda test-stegfs-*.gcno
 	 @${MAKE} -C common clean
 
 distclean: clean
