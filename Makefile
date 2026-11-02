@@ -32,13 +32,13 @@ test:
 test-common:
 	@${MAKE} -C common test
 
-test-stegfs:
+test-stegfs: mkfs
 	@${CC} ${CFLAGS} ${CPPFLAGS} $(shell pkg-config --cflags cmocka) ${TEST_SOURCE} ${COMMON} ${TEST_LIBS} -o ${TEST_STEGFS}
 	@./${TEST_STEGFS}
 
 coverage: coverage-report
 
-coverage-report:
+coverage-report: mkfs
 	@${MAKE} -C common coverage
 	@rm -f test-stegfs-*.gcda test-stegfs-*.gcno
 	@${CC} ${CFLAGS} ${CPPFLAGS} $(shell pkg-config --cflags cmocka) --coverage ${TEST_SOURCE} ${COMMON} ${TEST_LIBS} -o ${TEST_STEGFS}

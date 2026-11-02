@@ -68,7 +68,7 @@ static void cache_free(stegfs_cache_s *cache)
 {
 	if (!cache)
 		return;
-	for (uint64_t i = 0; i < cache->ents; i++)
+	for (uint64_t i = 0; cache->child && i < cache->ents; i++)
 	{
 		stegfs_cache_s *child = cache->child[i];
 		if (!child)
@@ -168,7 +168,9 @@ static stegfs_init_e parse_superblock(const stegfs_block_s *block)
 
 	if (!tlv_has_tag(tlv, TAG_VERSION))
 		goto missing;
-	char *version_string = m_strndup((char *)tlv_value_of(tlv, TAG_VERSION), tlv_length_of(tlv, TAG_VERSION));
+	uint16_t version_length = tlv_length_of(tlv, TAG_VERSION);
+	char *version_string = m_calloc((size_t)version_length + 1, sizeof *version_string);
+	memcpy(version_string, tlv_value_of(tlv, TAG_VERSION), version_length);
 	file_system.version = parse_version(version_string);
 	free(version_string);
 	if (file_system.version != VERSION_2015_08 && file_system.version != VERSION_202X_XX)
@@ -182,7 +184,8 @@ static stegfs_init_e parse_superblock(const stegfs_block_s *block)
 		if (tlv_has_tag(tlv, tag)) { \
 			uint16_t length = tlv_length_of(tlv, tag); \
 			if (!length) goto invalid; \
-			char *name = m_strndup((char *)tlv_value_of(tlv, tag), length); \
+			char *name = m_calloc((size_t)length + 1, sizeof *name); \
+			memcpy(name, tlv_value_of(tlv, tag), length); \
 			destination = convert(name); \
 			free(name); \
 		} else destination = default_value; \
@@ -716,25 +719,11 @@ extern bool stegfs_file_write(stegfs_file_s *file)
 					/* failed to allocate space; free what we had claimed */
 					for (unsigned k = 0; k <= i; k++)
 					{
-						file_system.blocks.in_use[normalize(file->inodes[i])] = false;
-						if (file_system.show_bloc)
-						{
-							free(file_system.blocks.file[normalize(file->inodes[i])]);
-							file_system.blocks.file[normalize(file->inodes[i])] = NULL;
-						}
-						file_system.blocks.used--;
+						block_delete(file->inodes[k]);
 						if (file->blocks[k])
 						{
-							for (uint64_t l = 1; l <= j; l++)
-							{
-								file_system.blocks.in_use[normalize(file->blocks[k][l])] = false;
-								if (file_system.show_bloc)
-								{
-									free(file_system.blocks.file[normalize(file->blocks[k][l])]);
-									file_system.blocks.file[normalize(file->blocks[k][l])] = NULL;
-								}
-								file_system.blocks.used--;
-							}
+							for (uint64_t l = 1; l <= file->blocks[k][0]; l++)
+								block_delete(file->blocks[k][l]);
 							free(file->blocks[k]);
 							file->blocks[k] = NULL;
 						}
@@ -750,21 +739,20 @@ extern bool stegfs_file_write(stegfs_file_s *file)
 	{
 		for (unsigned i = 0; i < file_system.copies; i++)
 		{
+			uint64_t old_blocks = file->blocks[i][0];
 			file->blocks[i] = m_realloc(file->blocks[i], (blocks + 2) * sizeof blocks);
-			for (uint64_t j = file->blocks[i][0]; j <= blocks; j++)
+			memset(file->blocks[i] + old_blocks + 1, 0,
+					(blocks - old_blocks + 1) * sizeof *file->blocks[i]);
+			for (uint64_t j = old_blocks + 1; j <= blocks; j++)
 				if (!(file->blocks[i][j] = block_assign(file->path)))
 				{
-					/* failed to allocate space; free what we had claimed */
+					/* failed to allocate space; release only newly claimed blocks */
 					for (unsigned k = 0; k <= i; k++)
-						for (uint64_t l = file->blocks[k][0]; l <= j; l++)
+						for (uint64_t l = file->blocks[k][0] + 1; l <= blocks; l++)
 						{
-							file_system.blocks.in_use[normalize(file->blocks[k][l])] = false;
-							if (file_system.show_bloc)
-							{
-								free(file_system.blocks.file[normalize(file->blocks[k][l])]);
-								file_system.blocks.file[normalize(file->blocks[k][l])] = NULL;
-							}
-							file_system.blocks.used--;
+							if (file->blocks[k][l])
+								block_delete(file->blocks[k][l]);
+							file->blocks[k][l] = 0;
 						}
 					return errno = ENOSPC, false;
 				}
@@ -1204,15 +1192,19 @@ extern void stegfs_cache_add(const char * const restrict path, stegfs_file_s *fi
 			 * use existing, NULL entry in array if available
 			 */
 			uint64_t k = ptr->ents;
+			bool reused = false;
 			for (uint64_t j = 0; j < ptr->ents; j++)
 				if (!ptr->child[j]->name)
 				{
 					k = j;
+					reused = true;
 					goto c2a1;
 				}
 			ptr->child = m_realloc(ptr->child, (k + 1) * sizeof(stegfs_cache_s *));
 			ptr->ents++;
 c2a1:
+			if (reused)
+				free(ptr->child[k]);
 			ptr->child[k] = m_calloc(sizeof( stegfs_cache_s ), sizeof( uint8_t ));
 			ptr->child[k]->name = m_strdup(e);
 			ptr = ptr->child[k];
@@ -1221,15 +1213,19 @@ c2a1:
 	}
 	/* ditto */
 	uint64_t j = ptr->ents;
+	bool reused = false;
 	for (uint64_t i = 0; i < ptr->ents; i++)
 		if (!ptr->child[i]->name)
 		{
 			j = i;
+			reused = true;
 			goto c2a2;
 		}
 	ptr->child = m_realloc(ptr->child, (j + 1) * sizeof(stegfs_cache_s *));
 	ptr->ents++;
 c2a2:
+	if (reused)
+		free(ptr->child[j]);
 	ptr->child[j] = m_calloc(sizeof( stegfs_cache_s ), sizeof( uint8_t ));
 	ptr = ptr->child[j];
 	ptr->name = name;
@@ -1361,34 +1357,7 @@ extern void stegfs_cache_remove(const char * const restrict path)
 		}
 	if (!found)
 		goto done;
-	if (ptr->file)
-	{
-		free(ptr->file->path);
-		free(ptr->file->name);
-		free(ptr->file->pass);
-		if (ptr->file->data)
-			free(ptr->file->data);
-		for (unsigned i = 0; i < file_system.copies; i++)
-			if (ptr->file->blocks[i])
-			{
-				free(ptr->file->blocks[i]);
-				ptr->file->blocks[i] = NULL;
-			}
-		free(ptr->file);
-	}
-	if (ptr->child)
-	{
-		for (uint64_t i = 0; i < ptr->ents; i++)
-			if (ptr->child[i])
-			{
-				char *c = m_strdupf("%s/%s", path, ptr->child[i]->name);
-				stegfs_cache_remove(c);
-				free(c);
-			}
-		free(ptr->child);
-	}
-	free(ptr->name);
-	ptr->name = NULL;
+	cache_free(ptr);
 done:
 	if (name)
 		free(name);
