@@ -36,11 +36,17 @@ Enable paranoia mode
 .TP
 .BR \-x ", " \-\-duplicates\fR " " \fICOPIES\fR
 Number of times each file should be duplicated
+.TP
+.BR \-t
+Disable multi-threaded FUSE operation
 .SH NOTES
 It doesn't matter which order the file system and mount point are specified as
 stegfs will figure that out. All other options are passed to FUSE.
 .P
-The FUSE option -s (to use a single thread) is (currently) forced by stegfs.
+Filesystem mutations are serialized. Read-only operations can proceed
+concurrently when no mutation is in progress. By default, FUSE may dispatch
+requests using multiple threads; use \fB-t\fR to disable multi-threaded
+operation.
 .P
 If you’re feeling extra paranoid you can now disable to stegfs file system
 header. This will also disable the checks when mounting and thus anything could
@@ -48,8 +54,8 @@ happen ;-)
 .SH AUTHOR
 Written by Ashley Morgan Anderson
 .SH BUGS
-stegfs is currently single threaded - more work is needed to support multiple
-threads accessing the file system at once. This is enforced by FUSE.
+Filesystem mutations currently share a single lock, so concurrent writes are
+safe but execute one at a time.
 .P
 Although if you do think you've really found a bug, please first check the
 README or the CHANGELOG to see if it has already been documented and scheduled

@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -204,6 +205,76 @@ static void write_test_file(const char *path, const uint8_t *data, size_t size)
 	assert_true(stegfs_file_will_fit(cached->file));
 	if (!stegfs_file_write(cached->file))
 		fail_msg("writing %s failed: %s", path, strerror(errno));
+}
+
+typedef struct
+{
+	unsigned id;
+	int result;
+}
+concurrent_writer_s;
+
+static void *concurrent_writer(void *argument)
+{
+	concurrent_writer_s *writer = argument;
+	char path[64];
+	char content[64];
+	snprintf(path, sizeof path, "/concurrent-%u:secret", writer->id);
+	int length = snprintf(content, sizeof content, "concurrent payload %u", writer->id);
+	struct fuse_file_info info = { .flags = O_WRONLY };
+
+	if (fuse_stegfs_functions.create(path, 0600, &info) != 0
+			|| fuse_stegfs_functions.write(path, content, length, 0, &info) != length
+			|| fuse_stegfs_functions.release(path, &info) != 0)
+		writer->result = -1;
+	return NULL;
+}
+
+static void *concurrent_reader(void *argument)
+{
+	concurrent_writer_s *reader = argument;
+	char path[64];
+	char expected[64];
+	char actual[64] = { 0 };
+	snprintf(path, sizeof path, "/concurrent-%u:secret", reader->id);
+	int length = snprintf(expected, sizeof expected, "concurrent payload %u", reader->id);
+	struct fuse_file_info info = { .flags = O_RDONLY };
+
+	if (fuse_stegfs_functions.open(path, &info) != 0
+			|| fuse_stegfs_functions.read(path, actual, sizeof actual, 0, &info) != length
+			|| memcmp(actual, expected, length)
+			|| fuse_stegfs_functions.release(path, &info) != 0)
+		reader->result = -1;
+	return NULL;
+}
+
+static void test_concurrent_fuse_requests_preserve_filesystem_state(void **state)
+{
+	(void)state;
+	enum { THREADS = 8 };
+	pthread_t threads[THREADS];
+	concurrent_writer_s writers[THREADS] = { 0 };
+	for (unsigned i = 0; i < THREADS; i++)
+	{
+		writers[i].id = i;
+		assert_int_equal(pthread_create(&threads[i], NULL, concurrent_writer, &writers[i]), 0);
+	}
+	for (unsigned i = 0; i < THREADS; i++)
+	{
+		assert_int_equal(pthread_join(threads[i], NULL), 0);
+		assert_int_equal(writers[i].result, 0);
+	}
+
+	for (unsigned i = 0; i < THREADS; i++)
+	{
+		writers[i].result = 0;
+		assert_int_equal(pthread_create(&threads[i], NULL, concurrent_reader, &writers[i]), 0);
+	}
+	for (unsigned i = 0; i < THREADS; i++)
+	{
+		assert_int_equal(pthread_join(threads[i], NULL), 0);
+		assert_int_equal(writers[i].result, 0);
+	}
 }
 
 static void test_storage_round_trip_and_repeated_stat(void **state)
@@ -1070,6 +1141,7 @@ static void test_block_path_parser_bounds(void **state)
 static const struct CMUnitTest tests[] =
 {
 	cmocka_unit_test_setup_teardown(test_storage_round_trip_and_repeated_stat, setup_filesystem, teardown_filesystem),
+	cmocka_unit_test_setup_teardown(test_concurrent_fuse_requests_preserve_filesystem_state, setup_filesystem, teardown_filesystem),
 	cmocka_unit_test_setup_teardown(test_storage_round_trips_at_block_boundaries, setup_filesystem, teardown_filesystem),
 	cmocka_unit_test_setup_teardown(test_storage_persists_across_normal_remount, setup_filesystem, teardown_filesystem),
 	cmocka_unit_test_setup_teardown(test_storage_persists_across_formatter_image, setup_filesystem, teardown_filesystem),

@@ -27,6 +27,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
 
 #include <string.h>
 #include <inttypes.h>
@@ -82,6 +83,67 @@ static int fuse_stegfs_chmod(const char *, mode_t);
 static int fuse_stegfs_chown(const char *, uid_t, gid_t);
 static int fuse_stegfs_flush(const char *, struct fuse_file_info *);
 
+static pthread_rwlock_t filesystem_lock = PTHREAD_RWLOCK_INITIALIZER;
+
+static void filesystem_read_lock(void)
+{
+	int result = pthread_rwlock_rdlock(&filesystem_lock);
+	if (result)
+		die("Unable to read-lock filesystem state: %s", strerror(result));
+}
+
+static void filesystem_write_lock(void)
+{
+	int result = pthread_rwlock_wrlock(&filesystem_lock);
+	if (result)
+		die("Unable to write-lock filesystem state: %s", strerror(result));
+}
+
+static void filesystem_unlock(void)
+{
+	int result = pthread_rwlock_unlock(&filesystem_lock);
+	if (result)
+		die("Unable to unlock filesystem state: %s", strerror(result));
+}
+
+#define FUSE_CALLBACK(name, lock, parameters, arguments) \
+	static int dispatch_##name parameters \
+	{ \
+		lock(); \
+		int result = fuse_stegfs_##name arguments; \
+		filesystem_unlock(); \
+		return result; \
+	}
+
+FUSE_CALLBACK(statfs, filesystem_read_lock, (const char *path, struct statvfs *buf), (path, buf))
+FUSE_CALLBACK(getattr, filesystem_read_lock, (const char *path, struct stat *buf), (path, buf))
+FUSE_CALLBACK(mkdir, filesystem_write_lock, (const char *path, mode_t mode), (path, mode))
+FUSE_CALLBACK(rmdir, filesystem_write_lock, (const char *path), (path))
+FUSE_CALLBACK(readdir, filesystem_read_lock, (const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *info), (path, buf, filler, offset, info))
+FUSE_CALLBACK(unlink, filesystem_write_lock, (const char *path), (path))
+FUSE_CALLBACK(read, filesystem_read_lock, (const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *info), (path, buf, size, offset, info))
+FUSE_CALLBACK(write, filesystem_write_lock, (const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *info), (path, buf, size, offset, info))
+FUSE_CALLBACK(open, filesystem_write_lock, (const char *path, struct fuse_file_info *info), (path, info))
+FUSE_CALLBACK(release, filesystem_write_lock, (const char *path, struct fuse_file_info *info), (path, info))
+FUSE_CALLBACK(truncate, filesystem_write_lock, (const char *path, off_t offset), (path, offset))
+FUSE_CALLBACK(ftruncate, filesystem_write_lock, (const char *path, off_t offset, struct fuse_file_info *info), (path, offset, info))
+#ifdef STEGFS_FALLOCATE
+FUSE_CALLBACK(fallocate, filesystem_write_lock, (const char *path, int mode, off_t offset, off_t length, struct fuse_file_info *info), (path, mode, offset, length, info))
+#endif
+FUSE_CALLBACK(create, filesystem_write_lock, (const char *path, mode_t mode, struct fuse_file_info *info), (path, mode, info))
+FUSE_CALLBACK(mknod, filesystem_write_lock, (const char *path, mode_t mode, dev_t rdev), (path, mode, rdev))
+FUSE_CALLBACK(readlink, filesystem_read_lock, (const char *path, char *buf, size_t size), (path, buf, size))
+FUSE_CALLBACK(flush, filesystem_read_lock, (const char *path, struct fuse_file_info *info), (path, info))
+
+#undef FUSE_CALLBACK
+
+static void dispatch_destroy(void *ptr)
+{
+	filesystem_write_lock();
+	fuse_stegfs_destroy(ptr);
+	filesystem_unlock();
+}
+
 static bool block_index_from_path(const char *path, uint64_t *index)
 {
 	char *name = dir_get_name(path, PASSWORD_SEPARATOR);
@@ -103,32 +165,32 @@ static bool block_index_from_path(const char *path, uint64_t *index)
 
 static struct fuse_operations fuse_stegfs_functions =
 {
-	.statfs    = fuse_stegfs_statfs,
-	.getattr   = fuse_stegfs_getattr,
-	.mkdir     = fuse_stegfs_mkdir,
-	.rmdir     = fuse_stegfs_rmdir,
-	.readdir   = fuse_stegfs_readdir,
-	.unlink    = fuse_stegfs_unlink,
-	.read      = fuse_stegfs_read,
-	.write     = fuse_stegfs_write,
-	.open      = fuse_stegfs_open,
-	.release   = fuse_stegfs_release,
-	.truncate  = fuse_stegfs_truncate,
-	.ftruncate = fuse_stegfs_ftruncate,
+	.statfs    = dispatch_statfs,
+	.getattr   = dispatch_getattr,
+	.mkdir     = dispatch_mkdir,
+	.rmdir     = dispatch_rmdir,
+	.readdir   = dispatch_readdir,
+	.unlink    = dispatch_unlink,
+	.read      = dispatch_read,
+	.write     = dispatch_write,
+	.open      = dispatch_open,
+	.release   = dispatch_release,
+	.truncate  = dispatch_truncate,
+	.ftruncate = dispatch_ftruncate,
 #ifdef STEGFS_FALLOCATE
-	.fallocate = fuse_stegfs_fallocate,
+	.fallocate = dispatch_fallocate,
 #endif
-	.create    = fuse_stegfs_create,
-	.mknod     = fuse_stegfs_mknod,
-	.destroy   = fuse_stegfs_destroy,
-	.readlink  = fuse_stegfs_readlink,
+	.create    = dispatch_create,
+	.mknod     = dispatch_mknod,
+	.destroy   = dispatch_destroy,
+	.readlink  = dispatch_readlink,
 	/*
 	 * empty functions; required by fuse, but not used by stegfs
 	 */
 	.utime     = fuse_stegfs_utime,
 	.chmod     = fuse_stegfs_chmod,
 	.chown     = fuse_stegfs_chown,
-	.flush     = fuse_stegfs_flush
+	.flush     = dispatch_flush
 };
 
 extern bool is_stegfs(void)
@@ -835,7 +897,7 @@ int main(int argc, char **argv)
 
 	bool debug         =          ((config_named_s *)list_get(args,  8))->response.value.boolean;
 	bool foreground    = debug || ((config_named_s *)list_get(args,  9))->response.value.boolean;
-	bool single_thread = true;
+	bool single_thread = ((config_named_s *)list_get(args, 10))->response.value.boolean;
 
 	int fuse_argc = 3;
 	char **fuse_argv = m_calloc(fuse_argc, sizeof (char *));
