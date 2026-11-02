@@ -1,5 +1,7 @@
 stegfs
 mkstegfs
+coverage/
+test-reports/
 src/common/win32_ext.c
 src/common/win32_ext.h
 src/common/ecc.c

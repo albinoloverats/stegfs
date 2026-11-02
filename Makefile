@@ -31,6 +31,9 @@ coverage: coverage-report
 
 coverage-report:
 	@${MAKE} -C common coverage-report
+	@rm -fvr coverage
+	@mkdir -p coverage
+	@cp -R common/coverage/. coverage/
 
 stegfs:
 	 @echo "#define ALL_CFLAGS   \"$(strip $(subst \",\',"${CFLAGS}"))\""    > ${MISC}
@@ -90,6 +93,8 @@ uninstall:
 
 clean:
 	 @rm -fv ${STEGFS} ${MKFS} ${CP}
+	 @rm -fv ${MISC}
+	 @rm -fvr coverage
 	 @${MAKE} -C common clean
 
 distclean: clean

@@ -1,0 +1,40 @@
+image: gcc:16@sha256:07280eb2e744f1b7a2d8d4a3894c089ea07266c109758afc388a634bd098e4eb
+
+variables:
+  CC: gcc
+
+stages:
+  - build
+  - deploy
+
+build:
+  stage: build
+  before_script:
+    - apt-get update && apt-get install -y build-essential git gcovr=7.2+really-1.1 libfuse-dev libgcrypt20 libgcrypt20-dev libcurl4-gnutls-dev libcmocka-dev pkg-config
+    - git submodule update --init
+  script:
+    - make
+    - make coverage
+  coverage: '/lines: ([0-9]+\.[0-9]+)%/'
+  artifacts:
+    paths:
+      - stegfs
+      - mkstegfs
+      - coverage/
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage/coverage.xml
+
+pages:
+  stage: deploy
+  needs:
+    - job: build
+      artifacts: true
+  script:
+    - mkdir -p public
+    - cp -R coverage/. public/
+  pages:
+    publish: public
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
