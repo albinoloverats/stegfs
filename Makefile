@@ -1,4 +1,4 @@
-.PHONY: stegfs clean distclean
+.PHONY: stegfs test test-common coverage coverage-report clean distclean
 
 STEGFS   = stegfs
 MKFS     = mkstegfs
@@ -21,6 +21,16 @@ PROFILE        = ${DEBUG} -pg -lc
 LIBS     = -lpthread -lcurl $(shell pkg-config --libs fuse libgcrypt)
 
 all: stegfs mkfs man
+
+test: test-common
+
+test-common:
+	@${MAKE} -C common test
+
+coverage: coverage-report
+
+coverage-report:
+	@${MAKE} -C common coverage-report
 
 stegfs:
 	 @echo "#define ALL_CFLAGS   \"$(strip $(subst \",\',"${CFLAGS}"))\""    > ${MISC}
@@ -80,6 +90,7 @@ uninstall:
 
 clean:
 	 @rm -fv ${STEGFS} ${MKFS} ${CP}
+	 @${MAKE} -C common clean
 
 distclean: clean
 	@rm -fv ${STEGFS}.1.gz
