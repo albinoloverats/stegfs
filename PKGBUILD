@@ -9,7 +9,7 @@ arch=('i686' 'x86_64' 'arm')
 license=('GPL3')
 depends=('curl' 'fuse' 'libgcrypt')
 makedepends=('pkgconfig')
-checkdepends=('cmocka')
+checkdepends=('cmocka' 'gcovr')
 
 # you shouldn't need to uncomment this as this PKGBUILD file lives in
 # the same Git repoository as the source

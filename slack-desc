@@ -6,6 +6,6 @@ stegfs: aims to ensure that the existence of such files isn't guaranteed. Implem
 stegfs: as a FUSE based file system and using the GNU crypto library, libgcrypt, to
 stegfs: provide the cryptographic hash and symmetric block cipher functions, stegfs is
 stegfs: at the cutting edge of secure file system technology.
-stegfs: Dependencies: fuse gcrypt
+stegfs: Dependencies: curl fuse gcrypt
 stegfs: It's likely your system already has all of these as they are they're
 stegfs: included in the default Slackware installation.

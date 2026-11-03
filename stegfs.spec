@@ -7,12 +7,8 @@ URL: https://albinoloverats.net/projects/%{name}
 License: GPL
 BuildRoot: /var/tmp/%{name}
 Group: Applications/File
-
-BuildRequires: cmocka-devel
-BuildRequires: fuse-devel
-BuildRequires: libcurl-devel
-BuildRequires: libgcrypt-devel
-BuildRequires: pkgconf-pkg-config
+Requires: fuse
+BuildRequires: gcovr, fuse-devel, libcmocka-devel, libcurl-devel, libgcrypt-devel, pkgconf-pkg-config
 
 %description
 stegfs is a FUSE based file system which provides absolute security.

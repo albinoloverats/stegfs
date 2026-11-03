@@ -14,7 +14,7 @@ build:
     - git submodule update --init
   script:
     - make
-    - make coverage
+    - make test
   coverage: '/lines: ([0-9]+\.[0-9]+)%/'
   artifacts:
     paths:

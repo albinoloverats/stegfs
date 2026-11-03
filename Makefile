@@ -1,4 +1,4 @@
-.PHONY: stegfs test test-common test-stegfs coverage coverage-report clean distclean
+.PHONY: stegfs test clean distclean
 
 STEGFS   = stegfs
 MKFS     = mkstegfs
@@ -22,30 +22,31 @@ PROFILE        = ${DEBUG} -pg -lc
 # -lpthread
 LIBS     = -lpthread -lcurl $(shell pkg-config --libs fuse libgcrypt)
 TEST_LIBS = $(shell pkg-config --libs cmocka) $(LIBS)
+GCOV = $(shell ${CC} -print-prog-name=gcov)
 
 all: stegfs mkfs man
 
 test:
-	@${MAKE} test-common
-	@${MAKE} test-stegfs
-
-test-common:
-	@${MAKE} -C common test
-
-test-stegfs: mkfs
-	@${CC} ${CFLAGS} ${CPPFLAGS} $(shell pkg-config --cflags cmocka) ${TEST_SOURCE} ${COMMON} ${TEST_LIBS} -o ${TEST_STEGFS}
-	@./${TEST_STEGFS}
-
-coverage: coverage-report
-
-coverage-report: mkfs
-	@${MAKE} -C common coverage
-	@rm -f test-stegfs-*.gcda test-stegfs-*.gcno
-	@${CC} ${CFLAGS} ${CPPFLAGS} $(shell pkg-config --cflags cmocka) --coverage ${TEST_SOURCE} ${COMMON} ${TEST_LIBS} -o ${TEST_STEGFS}
-	@./${TEST_STEGFS}
-	@rm -fvr coverage
-	@mkdir -p coverage
-	@gcovr --root . --gcov-executable "$$(gcc -print-prog-name=gcov)" --filter '^(src/|common/src/)' --xml-pretty --output coverage/coverage.xml --html-details coverage/index.html --print-summary
+	 @${MAKE} -C common clean
+	 @rm -f ${TEST_STEGFS} test-stegfs-*.gcda test-stegfs-*.gcno
+	 @rm -fvr coverage
+	 @${MAKE} mkfs
+ifneq ($(strip ${CMOCKA_XML_DIR}),)
+	 @mkdir -p "${CMOCKA_XML_DIR}"
+	 @CMOCKA_MESSAGE_OUTPUT=XML CMOCKA_XML_FILE="$(abspath ${CMOCKA_XML_DIR})/common.xml" ${MAKE} -C common test CFLAGS=--coverage CMOCKA_XML_DIR="$(abspath ${CMOCKA_XML_DIR})"
+else
+	 @${MAKE} -C common test CFLAGS=--coverage
+endif
+	 @${CC} ${CFLAGS} ${CPPFLAGS} $(shell pkg-config --cflags cmocka) --coverage ${TEST_SOURCE} ${COMMON} ${TEST_LIBS} -o ${TEST_STEGFS}
+ifneq ($(strip ${CMOCKA_XML_DIR}),)
+	 @mkdir -p "${CMOCKA_XML_DIR}"
+	 @CMOCKA_MESSAGE_OUTPUT=XML CMOCKA_XML_FILE="$(abspath ${CMOCKA_XML_DIR})/stegfs.xml" ./${TEST_STEGFS}
+else
+	 @./${TEST_STEGFS}
+endif
+	 @rm -fvr coverage
+	 @mkdir -p coverage
+	 @gcovr --root . --gcov-executable "${GCOV}" --filter '^(src/|common/src/)' --xml-pretty --output coverage/coverage.xml --html-details coverage/index.html --print-summary
 
 stegfs:
 	 @echo "#define ALL_CFLAGS   \"$(strip $(subst \",\',"${CFLAGS}"))\""    > ${MISC}
@@ -111,9 +112,9 @@ clean:
 	 @${MAKE} -C common clean
 
 distclean: clean
-	@rm -fv ${STEGFS}.1.gz
-	@rm -fv ${MKFS}.1.gz
-	@rm -fvr pkg build
-	@rm -fv ${STEGFS}*.pkg.tar.xz
-	@rm -fv ${STEGFS}*.tgz
-	@rm -fv ${MISC}
+	 @rm -fv ${STEGFS}.1.gz
+	 @rm -fv ${MKFS}.1.gz
+	 @rm -fvr pkg build
+	 @rm -fv ${STEGFS}*.pkg.tar.xz
+	 @rm -fv ${STEGFS}*.tgz
+	 @rm -fv ${MISC}

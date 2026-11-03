@@ -2,8 +2,7 @@ Source: stegfs
 Section: Accessories
 Priority: extra
 Maintainer: Ashley Anderson <amanderson@albinoloverats.net>
-Build-Depends: debhelper (>= 5), libcmocka-dev, libcurl4-gnutls-dev,
- libfuse-dev, libgcrypt20-dev, pkg-config
+Build-Depends: debhelper (>= 5), gcovr, libcmocka-dev, libcurl4-gnutls-dev, libfuse-dev, libgcrypt20-dev, pkg-config
 Standards-Version: 3.7.2
 
 Package: stegfs
