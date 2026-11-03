@@ -121,7 +121,8 @@ Changelog
 TODO
 ----
 
-* Bring back multi-threaded support
 * Cache time limit (force forget if a file isn’t accessed)
 * Don’t break backwards compatibility (again)!
 * Start using ECC
+* Validate formatter image sizes and duplicate counts, and check I/O failures
+* Update installation instructions and declare production package dependencies

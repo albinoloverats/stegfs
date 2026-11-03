@@ -7,8 +7,9 @@ pkgdesc="stegfs is a FUSE based file system which provides absolute security. Us
 url="https://albinoloverats.net/projects/stegfs"
 arch=('i686' 'x86_64' 'arm')
 license=('GPL3')
-depends=('fuse' 'libgcrypt')
+depends=('curl' 'fuse' 'libgcrypt')
 makedepends=('pkgconfig')
+checkdepends=('cmocka')
 
 # you shouldn't need to uncomment this as this PKGBUILD file lives in
 # the same Git repoository as the source
@@ -18,6 +19,11 @@ makedepends=('pkgconfig')
 build() {
   cd ${startdir}
   make -f Makefile
+}
+
+check() {
+  cd ${startdir}
+  make -f Makefile test
 }
 
 package() {

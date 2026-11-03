@@ -8,6 +8,12 @@ License: GPL
 BuildRoot: /var/tmp/%{name}
 Group: Applications/File
 
+BuildRequires: cmocka-devel
+BuildRequires: fuse-devel
+BuildRequires: libcurl-devel
+BuildRequires: libgcrypt-devel
+BuildRequires: pkgconf-pkg-config
+
 %description
 stegfs is a FUSE based file system which provides absolute security.
 Using encryption to secure files, and the art of steganography to hide
@@ -24,6 +30,9 @@ secure file system technology.
 
 %build
 make
+
+%check
+make test
 
 %install
 rm -rf %{buildroot}

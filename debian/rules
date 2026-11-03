@@ -31,6 +31,7 @@ build-stamp: configure-stamp
 
 	# Add here commands to compile the package.
 	$(MAKE) all
+	$(MAKE) test
 	#docbook-to-man debian/stegfs.sgml > stegfs.1
 
 	touch $@
