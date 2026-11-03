@@ -415,16 +415,13 @@ extern bool stegfs_file_will_fit(stegfs_file_s *file)
 extern void stegfs_file_create(const char * const restrict path, bool write)
 {
 	stegfs_file_s file;
-	//memset(&file, 0x00, sizeof file);
+	memset(&file, 0, sizeof file);
 	file.path = dir_get_path(path);
 	file.name = dir_get_name(path, PASSWORD_SEPARATOR);
 	file.pass = dir_get_pass(path);
-	memset(file.inodes, 0, sizeof file.inodes);
-	memset(file.blocks, 0, sizeof file.blocks);
-	file.data = NULL;
-	file.write = write;
-	file.size = 0;
 	file.time = time(NULL);
+	file.loaded = true;
+	file.dirty = write;
 	stegfs_cache_add(NULL, &file);
 	free(file.path);
 	free(file.name);
@@ -564,7 +561,8 @@ extern bool stegfs_file_stat_aux(stegfs_file_s *file, bool quick)
 	 */
 	if (available_inodes && corrupt_copies < file_system.copies)
 	{
-		stegfs_cache_add(NULL, file);
+		if (!file->unlinked)
+			stegfs_cache_add(NULL, file);
 		return true;
 	}
 	for (unsigned i = 0; i < file_system.copies; i++)
@@ -670,7 +668,10 @@ extern bool stegfs_file_read(stegfs_file_s *file)
 		gcry_mac_close(mac_handle);
 		if (failed)
 			continue;
-		stegfs_cache_add(NULL, file);
+		file->loaded = true;
+		file->dirty = false;
+		if (!file->unlinked)
+			stegfs_cache_add(NULL, file);
 		read_successfully = corrupt_copies < file_system.copies;
 		break;
 	}
@@ -844,26 +845,54 @@ extern bool stegfs_file_write(stegfs_file_s *file)
 		gcry_cipher_close(cipher_handle);
 	}
 
+	file->loaded = true;
+	file->dirty = false;
 	stegfs_cache_add(NULL, file);
 	return true;
 }
 
+extern void stegfs_file_unlink(stegfs_file_s *file)
+{
+	stegfs_block_s block;
+	lldiv_t d = lldiv(file->size - (file->size < (sizeof block.data - file_system.head_offset)
+			? file->size : (sizeof block.data - file_system.head_offset)), SIZE_BYTE_DATA);
+	uint64_t blocks = d.quot + (d.rem > 0);
+	for (unsigned i = 0; i < file_system.copies; i++)
+	{
+		if (file->inodes[i])
+		{
+			block_delete(file->inodes[i]);
+			for (uint64_t j = 1; file->blocks[i] && j <= blocks && file->blocks[i][j]; j++)
+				block_delete(file->blocks[i][j]);
+		}
+		file->inodes[i] = 0;
+		free(file->blocks[i]);
+		file->blocks[i] = NULL;
+	}
+	file->dirty = false;
+}
+
 extern void stegfs_file_delete(stegfs_file_s *file)
 {
-	if (!stegfs_file_stat(file))
+	if (!file->unlinked && !stegfs_file_stat(file))
 		goto rfc;
 	stegfs_block_s block;
 	lldiv_t d = lldiv(file->size - (file->size < (sizeof block.data - file_system.head_offset) ? file->size : (sizeof block.data - file_system.head_offset)), SIZE_BYTE_DATA);
 	uint64_t blocks = d.quot + (d.rem > 0);
 	for (unsigned i = 0; i < file_system.copies; i++)
 	{
+		if (!file->inodes[i])
+			continue;
 		block_delete(file->inodes[i]);
-		for (uint64_t j = 1; j <= blocks && file->blocks[i][j]; j++)
+		for (uint64_t j = 1; file->blocks[i] && j <= blocks && file->blocks[i][j]; j++)
 			block_delete(file->blocks[i][j]);
 	}
 rfc:
 	char *p = m_strdupf("%s/%s", path_equals(file->path, DIR_SEPARATOR) ? "" : file->path, file->name);
-	stegfs_cache_remove(p);
+	if (file->unlinked)
+		stegfs_cache_remove_file(file);
+	else
+		stegfs_cache_remove(p);
 	free(p);
 	return;
 }
@@ -1248,9 +1277,10 @@ c2a3:
 		for (unsigned i = 0; i < file_system.copies; i++)
 			ptr->file->inodes[i] = file->inodes[i];
 		/* set time and size */
-		ptr->file->write = file->write;
 		ptr->file->time = file->time;
 		ptr->file->size = file->size;
+		ptr->file->loaded = file->loaded;
+		ptr->file->dirty = file->dirty;
 		if (ptr->file->size)
 		{
 			/* copy data */
@@ -1314,7 +1344,8 @@ extern stegfs_cache_s *stegfs_cache_exists(const char * const restrict path, ste
 			goto done;
 	}
 	for (uint64_t i = 0; i < ptr->ents; i++)
-		if (ptr->child[i]->name && !strcmp(ptr->child[i]->name, name))
+		if (ptr->child[i]->name && !strcmp(ptr->child[i]->name, name)
+				&& (!ptr->child[i]->file || !ptr->child[i]->file->unlinked))
 		{
 			free(name);
 			if (entry)
@@ -1327,7 +1358,7 @@ done:
 	return NULL;
 }
 
-extern void stegfs_cache_remove(const char * const restrict path)
+static void cache_remove(const char * const restrict path, stegfs_file_s * const file)
 {
 	stegfs_cache_s *ptr = &(file_system.cache);
 	char *name = dir_get_name(path, PASSWORD_SEPARATOR);
@@ -1349,7 +1380,8 @@ extern void stegfs_cache_remove(const char * const restrict path)
 	}
 	bool found = false;
 	for (uint64_t i = 0; i < ptr->ents; i++)
-		if (ptr->child[i]->name && !strcmp(ptr->child[i]->name, name))
+		if (ptr->child[i]->name && !strcmp(ptr->child[i]->name, name)
+				&& (!file || ptr->child[i]->file == file))
 		{
 			ptr = ptr->child[i];
 			found = true;
@@ -1362,4 +1394,16 @@ done:
 	if (name)
 		free(name);
 	return;
+}
+
+extern void stegfs_cache_remove(const char * const restrict path)
+{
+	cache_remove(path, NULL);
+}
+
+extern void stegfs_cache_remove_file(stegfs_file_s * const restrict file)
+{
+	char *path = m_strdupf("%s/%s", path_equals(file->path, DIR_SEPARATOR) ? "" : file->path, file->name);
+	cache_remove(path, file);
+	free(path);
 }

@@ -248,6 +248,9 @@ static void *concurrent_reader(void *argument)
 	return NULL;
 }
 
+/*!
+ * \brief Verifies concurrent FUSE writes and reads preserve each file's contents.
+ */
 static void test_concurrent_fuse_requests_preserve_filesystem_state(void **state)
 {
 	(void)state;
@@ -265,6 +268,7 @@ static void test_concurrent_fuse_requests_preserve_filesystem_state(void **state
 		assert_int_equal(writers[i].result, 0);
 	}
 
+	/* Verify every payload only after all concurrent writers have finished. */
 	for (unsigned i = 0; i < THREADS; i++)
 	{
 		writers[i].result = 0;
@@ -277,6 +281,127 @@ static void test_concurrent_fuse_requests_preserve_filesystem_state(void **state
 	}
 }
 
+/*!
+ * \brief Verifies overlapping handles enforce access modes and share live file state.
+ */
+static void test_overlapping_handles_keep_independent_access_and_lifetime(void **state)
+{
+	(void)state;
+	const uint8_t original[] = "shared initial contents";
+	const uint8_t replacement[] = "updated";
+	write_test_file("/shared:secret", original, sizeof original);
+
+	struct fuse_file_info reader = { .flags = O_RDONLY };
+	struct fuse_file_info writer = { .flags = O_WRONLY };
+	char output[sizeof original] = { 0 };
+	assert_int_equal(fuse_stegfs_functions.open("/shared:secret", &reader), 0);
+	assert_int_equal(fuse_stegfs_functions.open("/shared:secret", &writer), 0);
+	assert_int_equal(fuse_stegfs_functions.write("/shared:secret", (const char *)replacement,
+			sizeof replacement, 0, &reader), -EBADF);
+	assert_int_equal(fuse_stegfs_functions.read("/shared:secret", output, sizeof output,
+			0, &writer), -EBADF);
+	assert_int_equal(fuse_stegfs_functions.write("/shared:secret", (const char *)replacement,
+			sizeof replacement, 0, &writer), sizeof replacement);
+	assert_int_equal(fuse_stegfs_functions.read("/shared:secret", output, sizeof output,
+			0, &reader), sizeof output);
+	assert_memory_equal(output, replacement, sizeof replacement);
+	assert_memory_equal(output + sizeof replacement, original + sizeof replacement,
+			sizeof original - sizeof replacement);
+	assert_int_equal(fuse_stegfs_functions.ftruncate("/shared:secret", sizeof replacement, &writer), 0);
+	memset(output, 0, sizeof output);
+	assert_int_equal(fuse_stegfs_functions.read("/shared:secret", output, sizeof output,
+			0, &reader), sizeof replacement);
+	assert_memory_equal(output, replacement, sizeof replacement);
+
+	/* Releasing one handle must not invalidate another handle's shared file state. */
+	struct fuse_file_info wrong_password = { .flags = O_RDONLY };
+	assert_int_equal(fuse_stegfs_functions.open("/shared:wrong", &wrong_password), -EACCES);
+	assert_int_equal(fuse_stegfs_functions.release("/shared:secret", &writer), 0);
+	assert_int_equal(fuse_stegfs_functions.read("/shared:secret", output, sizeof output,
+			0, &reader), sizeof replacement);
+	assert_memory_equal(output, replacement, sizeof replacement);
+	assert_int_equal(fuse_stegfs_functions.release("/shared:secret", &reader), 0);
+
+	stegfs_file_s persisted = { 0 };
+	persisted.path = strdup("/");
+	persisted.name = strdup("shared");
+	persisted.pass = strdup("secret");
+	assert_true(stegfs_file_read(&persisted));
+	assert_int_equal(persisted.size, sizeof replacement);
+	assert_memory_equal(persisted.data, replacement, sizeof replacement);
+	free(persisted.path);
+	free(persisted.name);
+	free(persisted.pass);
+	free(persisted.data);
+	for (unsigned i = 0; i < COPIES_MAX; i++)
+		free(persisted.blocks[i]);
+}
+
+/*!
+ * \brief Verifies an unlinked open file remains distinct from a recreated path.
+ */
+static void test_unlink_open_file_then_recreate_same_path(void **state)
+{
+	(void)state;
+	const uint8_t original[] = "old generation";
+	const uint8_t replacement[] = "new generation";
+	write_test_file("/recreated:secret", original, sizeof original);
+	uint64_t blocks_before = stegfs_info().blocks.used;
+
+	struct fuse_file_info old_reader = { .flags = O_RDONLY };
+	assert_int_equal(fuse_stegfs_functions.open("/recreated:secret", &old_reader), 0);
+	assert_int_equal(fuse_stegfs_functions.unlink("/recreated:secret"), 0);
+	struct stat stbuf = { 0 };
+	assert_int_equal(fuse_stegfs_functions.getattr("/recreated:secret", &stbuf), -ENOENT);
+
+	char output[sizeof original] = { 0 };
+	assert_int_equal(fuse_stegfs_functions.read("/recreated:secret", output, sizeof output,
+			0, &old_reader), sizeof original);
+	assert_memory_equal(output, original, sizeof original);
+
+	/* Reusing the pathname creates a separate generation from the unlinked open file. */
+	struct fuse_file_info new_writer = { .flags = O_RDWR };
+	assert_int_equal(fuse_stegfs_functions.create("/recreated:secret", 0600, &new_writer), 0);
+	open_file_s *old_opened = open_file_lookup(&old_reader);
+	open_file_s *new_opened = open_file_lookup(&new_writer);
+	assert_non_null(old_opened);
+	assert_non_null(new_opened);
+	assert_ptr_not_equal(old_opened->file, new_opened->file);
+	assert_false(new_opened->file->unlinked);
+	assert_int_equal(fuse_stegfs_functions.write("/recreated:secret", (const char *)replacement,
+			sizeof replacement, 0, &new_writer), sizeof replacement);
+	assert_int_equal(fuse_stegfs_functions.release("/recreated:secret", &new_writer), 0);
+	assert_int_equal(fuse_stegfs_functions.release("/recreated:secret", &old_reader), 0);
+	assert_int_equal(stegfs_info().blocks.used, blocks_before);
+	struct fuse_file_info new_reader = { .flags = O_RDONLY };
+	assert_int_equal(fuse_stegfs_functions.open("/recreated:secret", &new_reader), 0);
+	memset(output, 0, sizeof output);
+	assert_int_equal(fuse_stegfs_functions.read("/recreated:secret", output, sizeof output,
+			0, &new_reader), sizeof replacement);
+	assert_memory_equal(output, replacement, sizeof replacement);
+	assert_int_equal(fuse_stegfs_functions.release("/recreated:secret", &new_reader), 0);
+}
+
+/*!
+ * \brief Verifies releasing a newly created empty file persists it for reopening.
+ */
+static void test_empty_fuse_create_is_persisted_on_release(void **state)
+{
+	(void)state;
+	struct fuse_file_info created = { .flags = O_RDONLY };
+	assert_int_equal(fuse_stegfs_functions.create("/empty-created:secret", 0600, &created), 0);
+	assert_int_equal(fuse_stegfs_functions.release("/empty-created:secret", &created), 0);
+
+	struct fuse_file_info reopened = { .flags = O_RDONLY };
+	assert_int_equal(fuse_stegfs_functions.open("/empty-created:secret", &reopened), 0);
+	char buffer = 0;
+	assert_int_equal(fuse_stegfs_functions.read("/empty-created:secret", &buffer, 1, 0, &reopened), 0);
+	assert_int_equal(fuse_stegfs_functions.release("/empty-created:secret", &reopened), 0);
+}
+
+/*!
+ * \brief Verifies file contents survive storage round-trip and repeated stat calls.
+ */
 static void test_storage_round_trip_and_repeated_stat(void **state)
 {
 	(void)state;
@@ -311,6 +436,9 @@ static void test_storage_round_trip_and_repeated_stat(void **state)
 	free(original);
 }
 
+/*!
+ * \brief Verifies storage round-trips for payloads around block boundaries.
+ */
 static void test_storage_round_trips_at_block_boundaries(void **state)
 {
 	(void)state;
@@ -347,6 +475,9 @@ static void test_storage_round_trips_at_block_boundaries(void **state)
 	}
 }
 
+/*!
+ * \brief Verifies file data persists after normal filesystem reinitialization.
+ */
 static void test_storage_persists_across_normal_remount(void **state)
 {
 	test_state_s *test = *state;
@@ -383,6 +514,9 @@ static void test_storage_persists_across_normal_remount(void **state)
 	free(original);
 }
 
+/*!
+ * \brief Verifies formatted-image data can be read after a normal remount.
+ */
 static void test_storage_persists_across_formatter_image(void **state)
 {
 	test_state_s *test = *state;
@@ -436,6 +570,9 @@ static void test_storage_persists_across_formatter_image(void **state)
 	free(original);
 }
 
+/*!
+ * \brief Verifies overwriting a file persists the replacement contents.
+ */
 static void test_overwrite_existing_file_and_remount(void **state)
 {
 	test_state_s *test = *state;
@@ -467,6 +604,9 @@ static void test_overwrite_existing_file_and_remount(void **state)
 		free(file.blocks[i]);
 }
 
+/*!
+ * \brief Verifies an empty file can be written, read, and reopened.
+ */
 static void test_empty_file_round_trip(void **state)
 {
 	(void)state;
@@ -487,6 +627,9 @@ static void test_empty_file_round_trip(void **state)
 		free(file.blocks[i]);
 }
 
+/*!
+ * \brief Verifies sparse writes produce zero-filled gaps and valid read bounds.
+ */
 static void test_sparse_write_truncate_and_read(void **state)
 {
 	(void)state;
@@ -512,6 +655,9 @@ static void test_sparse_write_truncate_and_read(void **state)
 	assert_int_equal(fuse_stegfs_release("/sparse:secret", &info), 0);
 }
 
+/*!
+ * \brief Verifies initialization rejects backing images with invalid sizes.
+ */
 static void test_reject_invalid_image_size(void **state)
 {
 	test_state_s *test = *state;
@@ -524,6 +670,9 @@ static void test_reject_invalid_image_size(void **state)
 			DEFAULT_HASH, DEFAULT_MAC, 10, 2, false), STEGFS_INIT_CORRUPT_TAG);
 }
 
+/*!
+ * \brief Verifies initialization rejects an impossible superblock tag count.
+ */
 static void test_reject_malformed_superblock_tag_count(void **state)
 {
 	test_state_s *test = *state;
@@ -531,6 +680,7 @@ static void test_reject_malformed_superblock_tag_count(void **state)
 	int fd = open(test->image, O_RDWR);
 	assert_true(fd >= 0);
 
+	/* Keep the magic valid so initialization rejects the impossible tag count itself. */
 	stegfs_block_s block = { 0 };
 	block.hash[0] = htonll(HASH_MAGIC_0);
 	block.hash[1] = htonll(HASH_MAGIC_1);
@@ -543,6 +693,9 @@ static void test_reject_malformed_superblock_tag_count(void **state)
 			DEFAULT_HASH, DEFAULT_MAC, 10, 2, false), STEGFS_INIT_CORRUPT_TAG);
 }
 
+/*!
+ * \brief Verifies initialization rejects a TLV value truncated by the superblock.
+ */
 static void test_reject_truncated_superblock_tlv(void **state)
 {
 	test_state_s *test = *state;
@@ -550,6 +703,7 @@ static void test_reject_truncated_superblock_tlv(void **state)
 	int fd = open(test->image, O_RDWR);
 	assert_true(fd >= 0);
 
+	/* The declared value length exceeds the bytes available in the superblock. */
 	stegfs_block_s block = { 0 };
 	block.hash[0] = htonll(HASH_MAGIC_0);
 	block.hash[1] = htonll(HASH_MAGIC_1);
@@ -565,11 +719,15 @@ static void test_reject_truncated_superblock_tlv(void **state)
 			DEFAULT_HASH, DEFAULT_MAC, 10, 2, false), STEGFS_INIT_CORRUPT_TAG);
 }
 
+/*!
+ * \brief Verifies superblock metadata values, required tags, and version handling.
+ */
 static void test_superblock_metadata_validation_matrix(void **state)
 {
 	test_state_s *test = *state;
 	stegfs_deinit();
 
+	/* Distinguish invalid metadata values from malformed or missing tags. */
 	write_superblock(test, 2, SIZE_BYTE_BLOCK, OFFSET_BYTE_HEAD,
 			"not-a-cipher", -1);
 	assert_int_equal(stegfs_init(test->image, false, DEFAULT_CIPHER, DEFAULT_MODE,
@@ -647,12 +805,18 @@ static void test_superblock_metadata_validation_matrix(void **state)
 			DEFAULT_HASH, DEFAULT_MAC, 10, 2, false), STEGFS_INIT_NOT_STEGFS);
 }
 
+/*!
+ * \brief Verifies filesystem initialization does not close standard input.
+ */
 static void test_initialization_preserves_stdin(void **state)
 {
 	(void)state;
 	assert_true(fcntl(STDIN_FILENO, F_GETFD) >= 0);
 }
 
+/*!
+ * \brief Verifies repeated initialization and deinitialization are safe.
+ */
 static void test_repeated_init_and_deinit(void **state)
 {
 	test_state_s *test = *state;
@@ -665,6 +829,9 @@ static void test_repeated_init_and_deinit(void **state)
 			DEFAULT_HASH, DEFAULT_MAC, 10, 2, false), STEGFS_INIT_OKAY);
 }
 
+/*!
+ * \brief Verifies capacity rejection leaves an existing cached file intact.
+ */
 static void test_reject_capacity_without_deleting_file(void **state)
 {
 	(void)state;
@@ -680,6 +847,9 @@ static void test_reject_capacity_without_deleting_file(void **state)
 	assert_non_null(stegfs_cache_exists("/preserve:secret", NULL));
 }
 
+/*!
+ * \brief Verifies failed allocation releases partial blocks without damaging files.
+ */
 static void test_small_image_allocation_failure_releases_partial_blocks(void **state)
 {
 	(void)state;
@@ -698,6 +868,7 @@ static void test_small_image_allocation_failure_releases_partial_blocks(void **s
 	errno = 0;
 	assert_false(stegfs_file_write(&failed));
 	assert_int_equal(errno, ENOSPC);
+	/* Failed allocation must leave the allocator reusable and the old file intact. */
 	assert_int_equal(stegfs_info().blocks.used, used_before);
 
 	const uint8_t subsequent[] = "small";
@@ -726,6 +897,9 @@ static void test_small_image_allocation_failure_releases_partial_blocks(void **s
 		free(file.blocks[i]);
 }
 
+/*!
+ * \brief Verifies failed growth preserves the prior contents and block allocation.
+ */
 static void test_existing_file_growth_failure_preserves_contents_and_blocks(void **state)
 {
 	(void)state;
@@ -760,6 +934,7 @@ static void test_existing_file_growth_failure_preserves_contents_and_blocks(void
 	errno = 0;
 	assert_false(stegfs_file_write(cached->file));
 	assert_int_equal(errno, ENOSPC);
+	/* No newly reserved blocks or partial contents may survive a failed growth. */
 	assert_int_equal(stegfs_info().blocks.used, used_before);
 
 	stegfs_file_s persisted = { 0 };
@@ -779,6 +954,9 @@ static void test_existing_file_growth_failure_preserves_contents_and_blocks(void
 	free(original);
 }
 
+/*!
+ * \brief Verifies the maximum file capacity and rejection one block beyond it.
+ */
 static void test_file_capacity_exact_fit_and_one_block_over(void **state)
 {
 	(void)state;
@@ -791,6 +969,9 @@ static void test_file_capacity_exact_fit_and_one_block_over(void **state)
 	assert_int_equal(errno, EFBIG);
 }
 
+/*!
+ * \brief Verifies multi-block growth, shrinkage, and zero-filled extension.
+ */
 static void test_file_growth_and_shrink_across_multiple_blocks(void **state)
 {
 	(void)state;
@@ -833,6 +1014,9 @@ static void test_file_growth_and_shrink_across_multiple_blocks(void **state)
 	free(original);
 }
 
+/*!
+ * \brief Verifies file reads fail when the supplied password is incorrect.
+ */
 static void test_wrong_password_is_rejected(void **state)
 {
 	(void)state;
@@ -851,6 +1035,9 @@ static void test_wrong_password_is_rejected(void **state)
 		free(file.blocks[i]);
 }
 
+/*!
+ * \brief Verifies file reads recover from a damaged data replica.
+ */
 static void test_read_falls_back_to_unmodified_copy(void **state)
 {
 	(void)state;
@@ -870,6 +1057,7 @@ static void test_read_falls_back_to_unmodified_copy(void **state)
 		+ sizeof(uint64_t) * SIZE_LONG_PATH;
 	corrupt[0] ^= 0x01;
 
+	/* One damaged replica should be bypassed in favor of an intact copy. */
 	stegfs_file_s file = { 0 };
 	file.path = strdup("/");
 	file.name = strdup("duplicated");
@@ -885,6 +1073,9 @@ static void test_read_falls_back_to_unmodified_copy(void **state)
 	free(original);
 }
 
+/*!
+ * \brief Verifies file reads locate a valid backup when the first inode is corrupt.
+ */
 static void test_read_uses_backup_when_first_inode_is_corrupt(void **state)
 {
 	(void)state;
@@ -904,6 +1095,7 @@ static void test_read_uses_backup_when_first_inode_is_corrupt(void **state)
 		+ block_index * filesystem.blocksize + sizeof(uint64_t) * SIZE_LONG_PATH;
 	corrupt[0] ^= 0x01;
 
+	/* Data blocks remain intact; inode discovery must continue to its backup. */
 	assert_true(stegfs_file_read(&file));
 	assert_memory_equal(file.data, original, size);
 	free(file.path);
@@ -915,6 +1107,9 @@ static void test_read_uses_backup_when_first_inode_is_corrupt(void **state)
 	free(original);
 }
 
+/*!
+ * \brief Verifies file reads fail when every stored data replica is corrupt.
+ */
 static void test_read_fails_when_all_data_copies_are_corrupt(void **state)
 {
 	(void)state;
@@ -938,6 +1133,7 @@ static void test_read_fails_when_all_data_copies_are_corrupt(void **state)
 			corrupt[0] ^= 0x01;
 		}
 	errno = 0;
+	/* With every replica damaged, recovery must fail rather than return partial data. */
 	assert_false(stegfs_file_read(&file));
 	assert_true(errno == ENOENT || errno == EIO);
 	free(file.path);
@@ -949,6 +1145,9 @@ static void test_read_fails_when_all_data_copies_are_corrupt(void **state)
 	free(original);
 }
 
+/*!
+ * \brief Verifies deletion releases storage and cache entries for reuse.
+ */
 static void test_file_delete_releases_file_and_cache(void **state)
 {
 	(void)state;
@@ -973,6 +1172,9 @@ static void test_file_delete_releases_file_and_cache(void **state)
 		free(file.blocks[i]);
 }
 
+/*!
+ * \brief Verifies FUSE create, delete, and directory operations report expected errors.
+ */
 static void test_fuse_create_delete_and_directory_errors(void **state)
 {
 	(void)state;
@@ -991,6 +1193,9 @@ static void test_fuse_create_delete_and_directory_errors(void **state)
 	assert_int_equal(fuse_stegfs_rmdir("/missing"), -ENOENT);
 }
 
+/*!
+ * \brief Verifies nested cache paths can be removed and recreated cleanly.
+ */
 static void test_nested_cache_removal_and_recreation(void **state)
 {
 	(void)state;
@@ -1031,6 +1236,9 @@ static int record_directory_entry(void *buffer, const char *name, const struct s
 	return 0;
 }
 
+/*!
+ * \brief Verifies directory reads resume from offsets and stop at buffer capacity.
+ */
 static void test_readdir_continuation_and_buffer_full(void **state)
 {
 	(void)state;
@@ -1044,6 +1252,7 @@ static void test_readdir_continuation_and_buffer_full(void **state)
 	assert_string_equal(first.names[2], "alpha");
 	assert_int_equal(first.offsets[2], 3);
 
+	/* Resume after the last emitted entry so the second page contains only the remainder. */
 	directory_entries_s second = { .limit = 16 };
 	assert_int_equal(fuse_stegfs_readdir("/", &second, record_directory_entry, first.offsets[2], NULL), 0);
 	assert_int_equal(second.count, 1);
@@ -1052,6 +1261,9 @@ static void test_readdir_continuation_and_buffer_full(void **state)
 	assert_int_equal(fuse_stegfs_readdir("/", &second, record_directory_entry, -1, NULL), -EINVAL);
 }
 
+/*!
+ * \brief Verifies truncation, zero-filled extension, and invalid I/O offsets.
+ */
 static void test_truncate_shrink_extend_and_invalid_offsets(void **state)
 {
 	(void)state;
@@ -1077,6 +1289,9 @@ static void test_truncate_shrink_extend_and_invalid_offsets(void **state)
 	assert_int_equal(fuse_stegfs_release("/resize:secret", &info), 0);
 }
 
+/*!
+ * \brief Verifies filesystem statistics reflect blocks allocated by stored files.
+ */
 static void test_statfs_tracks_used_blocks(void **state)
 {
 	(void)state;
@@ -1091,6 +1306,9 @@ static void test_statfs_tracks_used_blocks(void **state)
 	assert_int_equal(stats.f_bfree, stats.f_blocks - 2);
 }
 
+/*!
+ * \brief Verifies block-device callbacks reject malformed and out-of-range indices.
+ */
 static void test_bloc_callbacks_reject_bad_indices(void **state)
 {
 	(void)state;
@@ -1103,6 +1321,9 @@ static void test_bloc_callbacks_reject_bad_indices(void **state)
 	assert_int_equal(fuse_stegfs_rmdir("/bloc"), -EBUSY);
 }
 
+/*!
+ * \brief Verifies allocated block entries expose their attributes and link targets.
+ */
 static void test_bloc_getattr_and_readlink_for_allocated_block(void **state)
 {
 	(void)state;
@@ -1128,6 +1349,9 @@ static void test_bloc_getattr_and_readlink_for_allocated_block(void **state)
 	assert_true(found);
 }
 
+/*!
+ * \brief Verifies block path parsing handles valid, malformed, and overflowing indices.
+ */
 static void test_block_path_parser_bounds(void **state)
 {
 	(void)state;
@@ -1142,6 +1366,9 @@ static const struct CMUnitTest tests[] =
 {
 	cmocka_unit_test_setup_teardown(test_storage_round_trip_and_repeated_stat, setup_filesystem, teardown_filesystem),
 	cmocka_unit_test_setup_teardown(test_concurrent_fuse_requests_preserve_filesystem_state, setup_filesystem, teardown_filesystem),
+	cmocka_unit_test_setup_teardown(test_overlapping_handles_keep_independent_access_and_lifetime, setup_filesystem, teardown_filesystem),
+	cmocka_unit_test_setup_teardown(test_unlink_open_file_then_recreate_same_path, setup_filesystem, teardown_filesystem),
+	cmocka_unit_test_setup_teardown(test_empty_fuse_create_is_persisted_on_release, setup_filesystem, teardown_filesystem),
 	cmocka_unit_test_setup_teardown(test_storage_round_trips_at_block_boundaries, setup_filesystem, teardown_filesystem),
 	cmocka_unit_test_setup_teardown(test_storage_persists_across_normal_remount, setup_filesystem, teardown_filesystem),
 	cmocka_unit_test_setup_teardown(test_storage_persists_across_formatter_image, setup_filesystem, teardown_filesystem),

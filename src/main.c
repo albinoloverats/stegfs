@@ -85,6 +85,19 @@ static int fuse_stegfs_flush(const char *, struct fuse_file_info *);
 
 static pthread_rwlock_t filesystem_lock = PTHREAD_RWLOCK_INITIALIZER;
 
+typedef struct open_file_s
+{
+	struct open_file_s *next;
+	stegfs_file_s *file;
+	char *path;
+	char *pass;
+	bool readable;
+	bool writable;
+}
+open_file_s;
+
+static open_file_s *open_files;
+
 static void filesystem_read_lock(void)
 {
 	int result = pthread_rwlock_rdlock(&filesystem_lock);
@@ -136,6 +149,58 @@ FUSE_CALLBACK(readlink, filesystem_read_lock, (const char *path, char *buf, size
 FUSE_CALLBACK(flush, filesystem_read_lock, (const char *path, struct fuse_file_info *info), (path, info))
 
 #undef FUSE_CALLBACK
+
+static open_file_s *open_file_lookup(const struct fuse_file_info *info)
+{
+	if (!info || !info->fh)
+		return NULL;
+	for (open_file_s *file = open_files; file; file = file->next)
+		if ((uint64_t)(uintptr_t)file == info->fh)
+			return file;
+	return NULL;
+}
+
+static void open_file_attach(const char *path, struct fuse_file_info *info)
+{
+	if (!info)
+		return;
+	open_file_s *file = m_calloc(1, sizeof *file);
+	file->path = m_strdup(path);
+	file->pass = dir_get_pass(path);
+	file->readable = (info->flags & O_ACCMODE) != O_WRONLY;
+	file->writable = (info->flags & O_ACCMODE) != O_RDONLY;
+	file->next = open_files;
+	open_files = file;
+	info->fh = (uint64_t)(uintptr_t)file;
+	stegfs_cache_s *cached = stegfs_cache_exists(path, NULL);
+	if (cached && cached->file)
+	{
+		file->file = cached->file;
+		cached->file->open_count++;
+	}
+}
+
+static bool path_is_open_unlinked(const char *path)
+{
+	for (open_file_s *file = open_files; file; file = file->next)
+		if (file->file && file->file->unlinked && !strcmp(file->path, path))
+			return true;
+	return false;
+}
+
+static void open_file_detach(open_file_s *file, struct fuse_file_info *info)
+{
+	open_file_s **link = &open_files;
+	while (*link && *link != file)
+		link = &(*link)->next;
+	if (*link)
+		*link = file->next;
+	if (info)
+		info->fh = 0;
+	free(file->path);
+	free(file->pass);
+	free(file);
+}
 
 static void dispatch_destroy(void *ptr)
 {
@@ -301,6 +366,8 @@ static int fuse_stegfs_getattr(const char *path, struct stat *stbuf)
 		}
 		else
 		{
+			if (path_is_open_unlinked(path))
+				return errno = ENOENT, -errno;
 			stegfs_file_s file;
 			memset(&file, 0x00, sizeof file);
 			file.path = dir_get_path(path);
@@ -410,7 +477,8 @@ static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t fill
 	if (path_equals(DIR_SEPARATOR, path))
 	{
 		for (uint64_t i = 0; i < file_system.cache.ents; i++)
-			if (file_system.cache.child[i]->name)
+			if (file_system.cache.child[i]->name
+					&& (!file_system.cache.child[i]->file || !file_system.cache.child[i]->file->unlinked))
 			{
 				cookie = (off_t)i + 3;
 				if (offset < cookie && filler(buf, file_system.cache.child[i]->name, NULL, cookie))
@@ -435,7 +503,8 @@ static int fuse_stegfs_readdir(const char *path, void *buf, fuse_fill_dir_t fill
 		memset(&c, 0x00, sizeof c);
 		if (stegfs_cache_exists(path, &c))
 			for (uint64_t i = 0; i < c.ents; i++)
-				if (c.child[i]->name)
+				if (c.child[i]->name
+						&& (!c.child[i]->file || !c.child[i]->file->unlinked))
 				{
 					cookie = (off_t)i + 3;
 					if (offset < cookie && filler(buf, c.child[i]->name, NULL, cookie))
@@ -450,8 +519,16 @@ static int fuse_stegfs_unlink(const char *path)
 {
 	errno = EXIT_SUCCESS;
 	stegfs_cache_s *cached = stegfs_cache_exists(path, NULL);
+	if (!cached && path_is_open_unlinked(path))
+		return errno = ENOENT, -errno;
 	if (cached && !cached->file)
 		return errno = EISDIR, -errno;
+	if (cached && cached->file && cached->file->open_count)
+	{
+		cached->file->unlinked = true;
+		stegfs_file_unlink(cached->file);
+		return 0;
+	}
 	if (cached && cached->file && !cached->file->inodes[0])
 	{
 		stegfs_cache_remove(path);
@@ -481,23 +558,27 @@ static int fuse_stegfs_read(const char *path, char *buf, size_t size, off_t offs
 {
 	errno = EXIT_SUCCESS;
 
-	(void)info;
 	if (offset < 0)
 		return errno = EINVAL, -errno;
+	open_file_s *opened = open_file_lookup(info);
+	if (!opened || strcmp(opened->path, path))
+		return errno = EBADF, -errno;
+	if (!opened->readable)
+		return errno = EBADF, -errno;
 
-	stegfs_cache_s *c = NULL;
-	if ((c = stegfs_cache_exists(path, NULL)) && c->file)
+	stegfs_file_s *file = opened->file;
+	if (file)
 	{
-		if ((uint64_t)offset >= c->file->size || !size)
+		if ((uint64_t)offset >= file->size || !size)
 			return 0;
-		uint64_t available = c->file->size - (uint64_t)offset;
+		uint64_t available = file->size - (uint64_t)offset;
 		if (size > available)
 			size = (size_t)available;
-		if (!c->file->data)
+		if (!file->data)
 			return errno = EIO, -errno;
 		if (size > INT_MAX)
 			size = INT_MAX;
-		memcpy(buf, c->file->data + offset, size);
+		memcpy(buf, file->data + offset, size);
 		return size;
 	}
 
@@ -508,54 +589,39 @@ static int fuse_stegfs_write(const char *path, const char *buf, size_t size, off
 {
 	errno = EXIT_SUCCESS;
 
-	(void)info;
 	if (offset < 0)
 		return errno = EINVAL, -errno;
 	if (size > INT_MAX)
 		return errno = EOVERFLOW, -errno;
 	if (size > UINT64_MAX - (uint64_t)offset)
 		return errno = EFBIG, -errno;
+	open_file_s *opened = open_file_lookup(info);
+	if (!opened || strcmp(opened->path, path))
+		return errno = EBADF, -errno;
+	if (!opened->writable)
+		return errno = EBADF, -errno;
 	uint64_t end = (uint64_t)offset + size;
 
-	/*
-	 * if the file is cached (has been read/written to already) then
-	 * just buffer this data until it’s released/flushed
-	 */
-	while (true)
+	stegfs_file_s *file = opened->file;
+	if (!file)
+		return errno = EBADF, -errno;
+	uint64_t old_size = file->size;
+	uint64_t new_size = old_size > end ? old_size : end;
+	stegfs_file_s candidate = *file;
+	candidate.size = new_size;
+	if (!stegfs_file_will_fit(&candidate))
+		return -errno;
+	if (new_size > old_size)
 	{
-		stegfs_cache_s *c = NULL;
-		if ((c = stegfs_cache_exists(path, NULL)) && c->file)
-		{
-			if (!c->file->write)
-				return errno = EBADF, -errno;
-			uint64_t old_size = c->file->size;
-			uint64_t new_size = old_size > end ? old_size : end;
-			stegfs_file_s candidate = *c->file;
-			candidate.size = new_size;
-			if (!stegfs_file_will_fit(&candidate))
-				return -errno;
-			if (new_size > old_size)
-			{
-				c->file->data = m_realloc(c->file->data, new_size);
-				memset(c->file->data + old_size, 0, new_size - old_size);
-			}
-			c->file->size = new_size;
-			c->file->time = time(NULL);
-			if (size)
-				memcpy(c->file->data + offset, buf, size);
-			return size;
-		}
-		else if (c && !c->file)
-			return errno = EISDIR, -errno;
-		/*
-		 * the file wasn’t found, so create it and try again, it should
-		 * then fail if the file cannot fit, as at this point all that’s
-		 * happening is increasing the cached buffer
-		 */
-		stegfs_file_create(path, true);
+		file->data = m_realloc(file->data, new_size);
+		memset(file->data + old_size, 0, new_size - old_size);
 	}
-
-	return errno = EIO, -errno;
+	file->size = new_size;
+	file->time = time(NULL);
+	file->dirty = true;
+	if (size)
+		memcpy(file->data + offset, buf, size);
+	return size;
 }
 
 static int fuse_stegfs_open(const char *path, struct fuse_file_info *info)
@@ -565,14 +631,35 @@ static int fuse_stegfs_open(const char *path, struct fuse_file_info *info)
 	stegfs_cache_s *c = NULL;
 	if ((c = stegfs_cache_exists(path, NULL)) && c->file)
 	{
-		free(c->file->pass);
-		c->file->pass = dir_get_pass(path);
-		c->file->write = info && (info->flags & O_ACCMODE) != O_RDONLY;
-		if (c->file->write && !c->file->inodes[0])
-			return 0;
-		if (!stegfs_file_read(c->file))
-			errno = EACCES;
-		/* TODO use the fields in info for something meaningful */
+		if (!info)
+			return errno = EINVAL, -errno;
+		open_file_s *opened = open_file_lookup(info);
+		if (opened)
+			return strcmp(opened->path, path) ? (errno = EBADF, -errno) : 0;
+		if (info->fh)
+			return errno = EBADF, -errno;
+
+		char *pass = dir_get_pass(path);
+		if (!c->file->loaded && c->file->inodes[0])
+		{
+			free(c->file->pass);
+			c->file->pass = m_strdup(pass);
+			if (!stegfs_file_read(c->file))
+			{
+				free(c->file->pass);
+				c->file->pass = NULL;
+				free(pass);
+				return errno = EACCES, -errno;
+			}
+		}
+		else if (c->file->loaded && c->file->pass
+				&& strcmp(c->file->pass, pass ? pass : ""))
+		{
+			free(pass);
+			return errno = EACCES, -errno;
+		}
+		free(pass);
+		open_file_attach(path, info);
 	}
 	else
 		errno = c ? EISDIR : ENOENT;
@@ -584,13 +671,10 @@ static int fuse_stegfs_flush(const char *path, struct fuse_file_info *info)
 {
 	errno = EXIT_SUCCESS;
 
-	(void)info;
-
-	stegfs_cache_s *c = NULL;
-	if ((c = stegfs_cache_exists(path, NULL)) && c->file)
-		stegfs_file_will_fit(c->file);
-	else
-		errno = c ? EISDIR : ENOENT;
+	open_file_s *opened = open_file_lookup(info);
+	if (!opened || strcmp(opened->path, path) || !opened->file)
+		return errno = EBADF, -errno;
+	stegfs_file_will_fit(opened->file);
 
 	return -errno;
 }
@@ -605,39 +689,50 @@ static int fuse_stegfs_truncate(const char *path, off_t offset)
 static int fuse_stegfs_ftruncate(const char *path, off_t offset, struct fuse_file_info *info)
 {
 	errno = EXIT_SUCCESS;
-	(void)info;
 	if (offset < 0)
 		return errno = EINVAL, -errno;
 
-	stegfs_cache_s *c = NULL;
-	if ((c = stegfs_cache_exists(path, NULL)) && c->file)
+	stegfs_file_s *file = NULL;
+	if (info)
 	{
-		if (!c->file->data && c->file->size && !stegfs_file_read(c->file))
+		open_file_s *opened = open_file_lookup(info);
+		if (!opened || strcmp(opened->path, path) || !opened->writable)
+			return errno = EBADF, -errno;
+		file = opened->file;
+	}
+	else
+	{
+		stegfs_cache_s *cached = stegfs_cache_exists(path, NULL);
+		file = cached ? cached->file : NULL;
+	}
+	if (file)
+	{
+		if (!file->data && file->size && !stegfs_file_read(file))
 			return -errno;
-		stegfs_file_s candidate = *c->file;
+		stegfs_file_s candidate = *file;
 		candidate.size = (uint64_t)offset;
 		if (!stegfs_file_will_fit(&candidate))
 			return -errno;
-		uint64_t old_size = c->file->size;
+		uint64_t old_size = file->size;
 		uint64_t new_size = (uint64_t)offset;
 		if (new_size != old_size)
 		{
 			if (new_size)
-				c->file->data = m_realloc(c->file->data, new_size);
+				file->data = m_realloc(file->data, new_size);
 			else
 			{
-				free(c->file->data);
-				c->file->data = NULL;
+				free(file->data);
+				file->data = NULL;
 			}
 			if (new_size > old_size)
-				memset(c->file->data + old_size, 0, new_size - old_size);
-			c->file->size = new_size;
-			c->file->time = time(NULL);
+				memset(file->data + old_size, 0, new_size - old_size);
+			file->size = new_size;
+			file->time = time(NULL);
 		}
-		c->file->write = true;
+		file->dirty = true;
 		return 0;
 	}
-	return errno = c ? EISDIR : ENOENT, -errno;
+	return errno = stegfs_cache_exists(path, NULL) ? EISDIR : ENOENT, -errno;
 }
 
 #ifdef STEGFS_FALLOCATE
@@ -702,12 +797,11 @@ static int fuse_stegfs_create(const char *path, mode_t mode, struct fuse_file_in
 	errno = EXIT_SUCCESS;
 
 	(void)mode;
-	(void)info;
-
 	if (stegfs_cache_exists(path, NULL))
 		return errno = EEXIST, -errno;
 
 	stegfs_file_create(path, true);
+	open_file_attach(path, info);
 
 	return -errno;
 }
@@ -730,24 +824,42 @@ static int fuse_stegfs_release(const char *path, struct fuse_file_info *info)
 {
 	errno = EXIT_SUCCESS;
 
-	(void)info;
+	open_file_s *opened = open_file_lookup(info);
+	if (!opened || strcmp(opened->path, path))
+		return errno = EBADF, -errno;
 
-	stegfs_cache_s *c = NULL;
-	if ((c = stegfs_cache_exists(path, NULL)) && c->file)
+	stegfs_file_s *file = opened->file;
+	if (file)
 	{
-		if (c->file->write && stegfs_file_will_fit(c->file))
+		if (file->open_count)
+			file->open_count--;
+		if (file->unlinked)
 		{
-			if (stegfs_file_write(c->file))
-				errno = EXIT_SUCCESS;
+			if (!file->open_count)
+				stegfs_file_delete(file);
+		}
+		else
+		{
+			if (file->dirty)
+			{
+				free(file->pass);
+				file->pass = m_strdup(opened->pass ? opened->pass : "");
+				if (stegfs_file_will_fit(file) && stegfs_file_write(file))
+					errno = EXIT_SUCCESS;
 				else if (!errno)
 					errno = EIO;
-				c->file->write = false;
+			}
+			if (!file->open_count && !file->dirty && !path_is_open_unlinked(path))
+			{
+				free(file->data);
+				file->data = NULL;
+				file->loaded = false;
+				free(file->pass);
+				file->pass = NULL;
+			}
 		}
-		free(c->file->data);
-		c->file->data = NULL;
-		free(c->file->pass);
-		c->file->pass = NULL;
 	}
+	open_file_detach(opened, info);
 
 	return -errno;
 }
