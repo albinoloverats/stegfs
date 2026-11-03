@@ -12,8 +12,21 @@ Planned Future Enhancements
 * Don’t break backwards compatibility (again)!
 * Start using ECC
 
+stegfs - 202X.XX                                        XXth XXXXXX 202X
+----------------
+
+* Harden storage operations, superblock parsing, block allocation, and
+  recovery from damaged copies
+* Allow concurrent read-only filesystem operations
+* Track per-open file state and handle writes, unlinks, and file lifetime
+  per open handle
+* Add configurable key-derivation iterations to filesystem setup and
+  store them in the superblock format
+* Add MAC configuration and persist the algorithm in the superblock
+
 
 stegfs - 2015.08.1                                        21st July 2016
+----------------
 
 * Fix FUSE initialisation bug (caused by update to FUSE library that was
   stricter than before)
