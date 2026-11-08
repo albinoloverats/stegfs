@@ -118,6 +118,15 @@ Changelog
 * Update documentation and man pages
 
 
+Status
+------
+
+[![Github Pipeline](https://github.com/albinoloverats/stegfs/actions/workflows/coverage.yml/badge.svg)](https://github.com/albinoloverats/stegfs/actions/workflows/coverage.yml)
+[![Gitlab Pipeline](https://gitlab.com/albinoloverats/stegfs/badges/master/pipeline.svg)](https://gitlab.com/albinoloverats/stegfs/-/commits/master)
+[![Gitlab Coverage](https://gitlab.com/albinoloverats/stegfs/badges/master/coverage.svg)](https://gitlab.com/albinoloverats/stegfs/-/commits/master)
+[![Bitbucket Pipeline](https://img.shields.io/bitbucket/pipelines/albinoloverats/stegfs/master)](https://bitbucket.org/albinoloverats/stegfs/src/master)
+
+
 TODO
 ----
 
